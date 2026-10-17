@@ -1,0 +1,11 @@
+{
+  "version": 5,
+  "include": [
+    "cmake/presets/x64-windows.json",
+    "cmake/presets/x64-linux.json",
+    "cmake/presets/arm64-android.json"
+  ],
+  "configurePresets": [
+
+  ]
+}
