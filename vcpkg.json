@@ -1,7 +1,7 @@
 {
-  "name": "sungearengine",
-  "version-string": "0.14.0.8",
-  "homepage": "https://github.com/Pixelfield-ru/SungearEngine/tree/main",
+  "name": "sungearframework",
+  "version-string": "0.1",
+  "homepage": "https://github.com/Pixelfield-ru/SungearFramework",
   "builtin-baseline": "3895230f38e498525f2560a281223d12066fa74a",
   "dependencies": [
     {
