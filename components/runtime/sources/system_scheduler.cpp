@@ -7,10 +7,20 @@
 #include "sgf/runtime/system/system_graph.h"
 
 // todo: review
+// todo: fix run time
 
 sgf::runtime::SystemScheduler::SystemScheduler(SystemSchedulerCreateInfo create_info) noexcept
 {
     create_info_ = std::move(create_info);
+
+    schedules_.resize(SystemScheduleType::kCount);
+    schedules_state_.resize(SystemScheduleType::kCount);
+
+    for(const auto& schedule : create_info_.schedules)
+    {
+        schedules_[schedule.type] = schedule;
+        schedules_state_[schedule.type].schedule_type = schedule.type;
+    }
 }
 
 sgf::runtime::SystemScheduler::~SystemScheduler() noexcept
@@ -44,6 +54,19 @@ void sgf::runtime::SystemScheduler::stop() noexcept
 std::error_code sgf::runtime::SystemScheduler::runOnce() noexcept
 {
     last_error_ = {};
+
+    const auto current_run_time = std::chrono::steady_clock::now();
+    if(!last_run_time_)
+    {
+        last_run_time_ = current_run_time;
+    }
+    const auto run_time_delta = current_run_time - *last_run_time_;
+    last_run_time_ = current_run_time;
+
+    for(auto& schedule_state : schedules_state_)
+    {
+        schedule_state.accumulator += run_time_delta;
+    }
 
     const auto& graph = *create_info_.graph;
     auto& context = *create_info_.context;
@@ -83,6 +106,15 @@ std::error_code sgf::runtime::SystemScheduler::runOnce() noexcept
         systems_cv_.wait(lock);
     }
 
+    for(auto& schedule_state : schedules_state_)
+    {
+        const auto interval = schedules_[schedule_state.schedule_type].interval;
+        if(schedule_state.accumulator >= interval)
+        {
+            schedule_state.accumulator = schedule_state.accumulator - interval;
+        }
+    }
+
     return last_error_;
 }
 
@@ -92,11 +124,23 @@ void sgf::runtime::SystemScheduler::executeNode(SystemContext& context, SystemGr
     auto* system = node.system;
 
     auto execution = [this, system, &context, &node, &graph_state]() {
-        const auto res = system->execute(context);
+        const auto schedule_type = system->schedule();
+        const auto schedule_interval = schedules_[schedule_type].interval;
+
+        std::error_code execute_res {};
+        if(schedules_state_[schedule_type].accumulator >= schedule_interval)
+        {
+            const auto repeat_times = schedules_state_[schedule_type].accumulator / schedule_interval;
+            for(size_t i = 0; i < repeat_times; ++i)
+            {
+                execute_res = system->execute(context);
+                if(execute_res) break;
+            }
+        }
 
         std::lock_guard guard(systems_access_);
 
-        if(res && !last_error_) last_error_ = res;
+        if(execute_res && !last_error_) last_error_ = execute_res;
 
         for(const auto successor_index : node.successors)
         {

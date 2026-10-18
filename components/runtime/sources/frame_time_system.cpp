@@ -18,9 +18,6 @@ std::span<const std::uint32_t> sgf::runtime::FrameTimeSystem::writes() const noe
 
 std::error_code sgf::runtime::FrameTimeSystem::execute(SystemContext& context) noexcept
 {
-    pf_assert(context.resources.hasType<std::chrono::steady_clock::time_point>(), "Cannot find resource in context.");
-    pf_assert(context.resources.hasType<FrameTime>(), "Type was not registered. Maybe system initialize() was not called.");
-
     const auto& now = context.resources.read<std::chrono::steady_clock::time_point>();
     auto& frame_time = context.resources.write<FrameTime>();
 

@@ -11,6 +11,7 @@
 
 #include "system.h"
 #include "system_graph.h"
+#include "system_schedule.h"
 
 namespace sgf::runtime
 {
@@ -18,9 +19,9 @@ namespace sgf::runtime
     {
         const SystemGraph* graph {};
         SystemContext* context;
+        std::vector<SystemSchedule> schedules;
         ThreadPool* thread_pool {};
         const core::LogCallback* debug_output {};
-        std::unordered_map<SystemScheduleType, SystemScheduleConfig> schedule_config;
     };
 
     struct SystemScheduler final
@@ -36,7 +37,6 @@ namespace sgf::runtime
 
     private:
         SystemSchedulerCreateInfo create_info_ {};
-        std::unordered_map<SystemScheduleType, SystemScheduleState> schedule_states_;
 
         std::mutex systems_access_;
         std::condition_variable systems_cv_;
@@ -44,6 +44,9 @@ namespace sgf::runtime
         std::uint32_t running_systems_ {};
         std::vector<std::uint32_t> executable_systems_;
         std::error_code last_error_{};
+        std::vector<SystemSchedule> schedules_;
+        std::vector<SystemScheduleState> schedules_state_;
+        std::optional<std::chrono::steady_clock::time_point> last_run_time_ {};
 
         void executeNode(SystemContext& context, SystemGraphState& graph_state, const SystemGraph::Node& node) noexcept;
     };
