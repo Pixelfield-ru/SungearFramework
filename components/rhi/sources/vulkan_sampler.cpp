@@ -2,14 +2,14 @@
 // Created by stuka on 11.10.2026.
 //
 
-#include "pixelfield/rhi/vulkan/vulkan_sampler.h"
+#include "sgf/rhi/vulkan/vulkan_sampler.h"
 
-#include "pixelfield/rhi/vulkan/vulkan_context.h"
-#include "pixelfield/rhi/vulkan/vulkan_errors.h"
-#include "pixelfield/rhi/vulkan/vulkan_logical_device.h"
-#include "pixelfield/rhi/vulkan/vulkan_types.h"
+#include "sgf/rhi/vulkan/vulkan_context.h"
+#include "sgf/rhi/vulkan/vulkan_errors.h"
+#include "sgf/rhi/vulkan/vulkan_logical_device.h"
+#include "sgf/rhi/vulkan/vulkan_types.h"
 
-pf::rhi::VulkanSampler::VulkanSampler(VulkanSampler&& other) noexcept :
+sgf::rhi::VulkanSampler::VulkanSampler(VulkanSampler&& other) noexcept :
     context_(std::exchange(other.context_, {})),
     logical_device_(std::exchange(other.logical_device_, {})),
     handle_(std::exchange(other.handle_, VK_NULL_HANDLE))
@@ -17,12 +17,12 @@ pf::rhi::VulkanSampler::VulkanSampler(VulkanSampler&& other) noexcept :
 
 }
 
-pf::rhi::VulkanSampler::~VulkanSampler() noexcept
+sgf::rhi::VulkanSampler::~VulkanSampler() noexcept
 {
     destroy();
 }
 
-pf::rhi::VulkanSampler& pf::rhi::VulkanSampler::operator=(VulkanSampler&& other) noexcept
+sgf::rhi::VulkanSampler& sgf::rhi::VulkanSampler::operator=(VulkanSampler&& other) noexcept
 {
     if(std::addressof(other) == this) return *this;
 
@@ -35,7 +35,7 @@ pf::rhi::VulkanSampler& pf::rhi::VulkanSampler::operator=(VulkanSampler&& other)
     return *this;
 }
 
-void pf::rhi::VulkanSampler::destroy() noexcept
+void sgf::rhi::VulkanSampler::destroy() noexcept
 {
     if(handle_)
     {
@@ -44,7 +44,7 @@ void pf::rhi::VulkanSampler::destroy() noexcept
     }
 }
 
-std::error_code pf::rhi::VulkanSampler::create(const SamplerCreateInfo& create_info)
+std::error_code sgf::rhi::VulkanSampler::create(const SamplerCreateInfo& create_info)
 {
     const auto* vulkan_context = static_cast<const VulkanContext*>(create_info.context);
     const auto* vulkan_logical_device = static_cast<const VulkanLogicalDevice*>(create_info.logical_device);

@@ -2,9 +2,9 @@
 // Created by stuka on 12.10.2026.
 //
 
-#include "../include/pixelfield/core/utility/encoding.h"
+#include "sgf/core/utility/encoding.h"
 
-std::string pf::core::pathToUtf8(const std::filesystem::path& path) noexcept
+std::string sgf::core::pathToUtf8(const std::filesystem::path& path) noexcept
 {
     const auto u8 = path.u8string();
     return { u8.begin(), u8.end() };

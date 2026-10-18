@@ -2,17 +2,17 @@
 // Created by stuka on 18.09.2026.
 //
 
-#include "pixelfield/rhi/vulkan/vulkan_pipeline_state.h"
+#include "sgf/rhi/vulkan/vulkan_pipeline_state.h"
 
-#include "pixelfield/rhi/vulkan/vulkan_context.h"
-#include "pixelfield/rhi/vulkan/vulkan_descriptor_set.h"
-#include "pixelfield/rhi/vulkan/vulkan_errors.h"
-#include "pixelfield/rhi/vulkan/vulkan_logical_device.h"
-#include "pixelfield/rhi/vulkan/vulkan_shader.h"
-#include "pixelfield/rhi/vulkan/vulkan_pass.h"
-#include "pixelfield/rhi/vulkan/vulkan_types.h"
+#include "sgf/rhi/vulkan/vulkan_context.h"
+#include "sgf/rhi/vulkan/vulkan_descriptor_set.h"
+#include "sgf/rhi/vulkan/vulkan_errors.h"
+#include "sgf/rhi/vulkan/vulkan_logical_device.h"
+#include "sgf/rhi/vulkan/vulkan_shader.h"
+#include "sgf/rhi/vulkan/vulkan_pass.h"
+#include "sgf/rhi/vulkan/vulkan_types.h"
 
-pf::rhi::VulkanPipelineState::VulkanPipelineState(VulkanPipelineState&& other) noexcept :
+sgf::rhi::VulkanPipelineState::VulkanPipelineState(VulkanPipelineState&& other) noexcept :
     context_(std::exchange(other.context_, nullptr)),
     logical_device_(std::exchange(other.logical_device_, nullptr)),
     pass_(std::exchange(other.pass_, nullptr)),
@@ -22,12 +22,12 @@ pf::rhi::VulkanPipelineState::VulkanPipelineState(VulkanPipelineState&& other) n
 
 }
 
-pf::rhi::VulkanPipelineState::~VulkanPipelineState() noexcept
+sgf::rhi::VulkanPipelineState::~VulkanPipelineState() noexcept
 {
     destroy();
 }
 
-pf::rhi::VulkanPipelineState& pf::rhi::VulkanPipelineState::operator=(VulkanPipelineState&& other) noexcept
+sgf::rhi::VulkanPipelineState& sgf::rhi::VulkanPipelineState::operator=(VulkanPipelineState&& other) noexcept
 {
     if(this == std::addressof(other)) return *this;
 
@@ -42,7 +42,7 @@ pf::rhi::VulkanPipelineState& pf::rhi::VulkanPipelineState::operator=(VulkanPipe
     return *this;
 }
 
-void pf::rhi::VulkanPipelineState::destroy() noexcept
+void sgf::rhi::VulkanPipelineState::destroy() noexcept
 {
     if(graphics_pipeline_)
     {
@@ -57,7 +57,7 @@ void pf::rhi::VulkanPipelineState::destroy() noexcept
     }
 }
 
-std::error_code pf::rhi::VulkanPipelineState::create(const PipelineStateCreateInfo& create_info) noexcept
+std::error_code sgf::rhi::VulkanPipelineState::create(const PipelineStateCreateInfo& create_info) noexcept
 {
     const auto* vulkan_context = static_cast<const VulkanContext*>(create_info.context);
     const auto* vulkan_logical_device = static_cast<const VulkanLogicalDevice*>(create_info.logical_device);

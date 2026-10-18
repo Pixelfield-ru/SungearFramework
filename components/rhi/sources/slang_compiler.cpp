@@ -2,7 +2,7 @@
 // Created by stuka on 02.09.2026.
 //
 
-#include "pixelfield/rhi/slang/slang_compiler.h"
+#include "sgf/rhi/slang/slang_compiler.h"
 
 #include <array>
 #include <iostream>
@@ -10,13 +10,13 @@
 #include <slang.h>
 #include <slang-com-helper.h>
 
-#include "pixelfield/rhi/context.h"
-#include "pixelfield/rhi/slang/slang_compiled_shader.h"
-#include "pixelfield/core/errors.h"
-#include "pixelfield/core/utility/encoding.h"
-#include "pixelfield/rhi/slang/slang_errors.h"
+#include "sgf/rhi/context.h"
+#include "sgf/rhi/slang/slang_compiled_shader.h"
+#include "sgf/core/errors.h"
+#include "sgf/core/utility/encoding.h"
+#include "sgf/rhi/slang/slang_errors.h"
 
-std::error_code pf::rhi::SlangShaderCompiler::compileShader(const IContext& context, ICompiledShader& compiled_shader,
+std::error_code sgf::rhi::SlangShaderCompiler::compileShader(const IContext& context, ICompiledShader& compiled_shader,
                                                             const std::filesystem::path& shader_path)
 {
     auto* slang_shader = dynamic_cast<SlangCompiledShader*>(&compiled_shader);
@@ -218,7 +218,7 @@ std::error_code pf::rhi::SlangShaderCompiler::compileShader(const IContext& cont
     return {};
 }
 
-Slang::ComPtr<slang::IGlobalSession> pf::rhi::SlangShaderCompiler::globalSession() noexcept
+Slang::ComPtr<slang::IGlobalSession> sgf::rhi::SlangShaderCompiler::globalSession() noexcept
 {
     static Slang::ComPtr<slang::IGlobalSession> globalSession;
     static volatile auto init = []() {

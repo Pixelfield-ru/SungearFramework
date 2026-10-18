@@ -2,21 +2,21 @@
 // Created by stuka on 14.09.2026.
 //
 
-#include "pixelfield/rhi/vulkan/vulkan_image.h"
+#include "sgf/rhi/vulkan/vulkan_image.h"
 
-#include "pixelfield/rhi/vulkan/vulkan_context.h"
-#include "pixelfield/rhi/vulkan/vulkan_errors.h"
-#include "pixelfield/rhi/vulkan/vulkan_logical_device.h"
-#include "pixelfield/rhi/vulkan/vulkan_physical_device.h"
-#include "pixelfield/rhi/vulkan/vulkan_types.h"
+#include "sgf/rhi/vulkan/vulkan_context.h"
+#include "sgf/rhi/vulkan/vulkan_errors.h"
+#include "sgf/rhi/vulkan/vulkan_logical_device.h"
+#include "sgf/rhi/vulkan/vulkan_physical_device.h"
+#include "sgf/rhi/vulkan/vulkan_types.h"
 
-pf::rhi::VulkanImage::VulkanImage(VkImage handle) noexcept
+sgf::rhi::VulkanImage::VulkanImage(VkImage handle) noexcept
 {
     handle_ = handle;
     owns_image_ = false;
 }
 
-pf::rhi::VulkanImage::VulkanImage(VulkanImage&& other) noexcept :
+sgf::rhi::VulkanImage::VulkanImage(VulkanImage&& other) noexcept :
     context_(std::exchange(other.context_, {})),
     logical_device_(std::exchange(other.logical_device_, {})),
     handle_(std::exchange(other.handle_, VK_NULL_HANDLE)),
@@ -27,32 +27,32 @@ pf::rhi::VulkanImage::VulkanImage(VulkanImage&& other) noexcept :
 
 }
 
-pf::rhi::VulkanImage::~VulkanImage() noexcept
+sgf::rhi::VulkanImage::~VulkanImage() noexcept
 {
     destroy();
 }
 
-std::error_code pf::rhi::VulkanImage::update(const ImageUpdateInfo& update_info) noexcept
+std::error_code sgf::rhi::VulkanImage::update(const ImageUpdateInfo& update_info) noexcept
 {
     return logical_device_->updateImage(*this, update_info);
 }
 
-pf::rhi::IImageView const *const pf::rhi::VulkanImage::view() const noexcept
+sgf::rhi::IImageView const *const sgf::rhi::VulkanImage::view() const noexcept
 {
     return &view_;
 }
 
-pf::rhi::IImageView *const pf::rhi::VulkanImage::view() noexcept
+sgf::rhi::IImageView *const sgf::rhi::VulkanImage::view() noexcept
 {
     return &view_;
 }
 
-bool pf::rhi::VulkanImage::valid() const noexcept
+bool sgf::rhi::VulkanImage::valid() const noexcept
 {
     return handle_ != nullptr;
 }
 
-pf::rhi::VulkanImage& pf::rhi::VulkanImage::operator=(VulkanImage&& other) noexcept
+sgf::rhi::VulkanImage& sgf::rhi::VulkanImage::operator=(VulkanImage&& other) noexcept
 {
     if(this == std::addressof(other)) return *this;
 
@@ -68,7 +68,7 @@ pf::rhi::VulkanImage& pf::rhi::VulkanImage::operator=(VulkanImage&& other) noexc
     return *this;
 }
 
-void pf::rhi::VulkanImage::destroy() noexcept
+void sgf::rhi::VulkanImage::destroy() noexcept
 {
     view_.destroy();
 
@@ -87,7 +87,7 @@ void pf::rhi::VulkanImage::destroy() noexcept
     }
 }
 
-std::error_code pf::rhi::VulkanImage::create(const ImageCreateInfo& create_info) noexcept
+std::error_code sgf::rhi::VulkanImage::create(const ImageCreateInfo& create_info) noexcept
 {
     const auto* vulkan_context = static_cast<const VulkanContext*>(create_info.context);
     auto* vulkan_logical_device = static_cast<VulkanLogicalDevice*>(create_info.logical_device);

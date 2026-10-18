@@ -2,18 +2,18 @@
 // Created by stuka on 11.09.2026.
 //
 
-#include "pixelfield/rhi/vulkan/vulkan_swapchain.h"
+#include "sgf/rhi/vulkan/vulkan_swapchain.h"
 
-#include "pixelfield/rhi/vulkan/vulkan_context.h"
-#include "pixelfield/rhi/vulkan/vulkan_image.h"
-#include "pixelfield/rhi/vulkan/vulkan_image_view.h"
-#include "pixelfield/rhi/vulkan/vulkan_logical_device.h"
-#include "pixelfield/rhi/vulkan/vulkan_physical_device.h"
+#include "sgf/rhi/vulkan/vulkan_context.h"
+#include "sgf/rhi/vulkan/vulkan_image.h"
+#include "sgf/rhi/vulkan/vulkan_image_view.h"
+#include "sgf/rhi/vulkan/vulkan_logical_device.h"
+#include "sgf/rhi/vulkan/vulkan_physical_device.h"
 
-#include "pixelfield/rhi/vulkan/vulkan_types.h"
-#include "pixelfield/rhi/errors.h"
+#include "sgf/rhi/vulkan/vulkan_types.h"
+#include "sgf/rhi/errors.h"
 
-pf::rhi::VulkanSwapchain::VulkanSwapchain(VulkanSwapchain&& other) noexcept :
+sgf::rhi::VulkanSwapchain::VulkanSwapchain(VulkanSwapchain&& other) noexcept :
     context_(std::exchange(other.context_, nullptr)),
     logical_device_(std::exchange(other.logical_device_, nullptr)),
     handle_(std::exchange(other.handle_, VK_NULL_HANDLE)),
@@ -28,37 +28,37 @@ pf::rhi::VulkanSwapchain::VulkanSwapchain(VulkanSwapchain&& other) noexcept :
 
 }
 
-pf::rhi::VulkanSwapchain::~VulkanSwapchain() noexcept
+sgf::rhi::VulkanSwapchain::~VulkanSwapchain() noexcept
 {
     destroy();
 }
 
-bool pf::rhi::VulkanSwapchain::valid() const noexcept
+bool sgf::rhi::VulkanSwapchain::valid() const noexcept
 {
     return handle_ != nullptr;
 }
 
-glm::ivec2 pf::rhi::VulkanSwapchain::extent() const noexcept
+glm::ivec2 sgf::rhi::VulkanSwapchain::extent() const noexcept
 {
     return { extent_.width, extent_.height };
 }
 
-pf::rhi::Format pf::rhi::VulkanSwapchain::format() const noexcept
+sgf::rhi::Format sgf::rhi::VulkanSwapchain::format() const noexcept
 {
     return fromVkFormat(surface_format_.format);
 }
 
-std::uint16_t pf::rhi::VulkanSwapchain::imagesCount() const noexcept
+std::uint16_t sgf::rhi::VulkanSwapchain::imagesCount() const noexcept
 {
     return images_view_.size();
 }
 
-pf::rhi::IImageView* pf::rhi::VulkanSwapchain::imageView(std::uint16_t idx) noexcept
+sgf::rhi::IImageView* sgf::rhi::VulkanSwapchain::imageView(std::uint16_t idx) noexcept
 {
     return &images_view_[idx];
 }
 
-std::expected<pf::rhi::AcquiredFrame, std::error_code> pf::rhi::VulkanSwapchain::acquireNextFrame() noexcept
+std::expected<sgf::rhi::AcquiredFrame, std::error_code> sgf::rhi::VulkanSwapchain::acquireNextFrame() noexcept
 {
     // Do not reset the fence here: if acquire succeeds but submit fails later,
     // an early reset leaves the fence unsignaled forever.
@@ -87,7 +87,7 @@ std::expected<pf::rhi::AcquiredFrame, std::error_code> pf::rhi::VulkanSwapchain:
     return frame;
 }
 
-std::error_code pf::rhi::VulkanSwapchain::present(const PresentInfo& present_info) noexcept
+std::error_code sgf::rhi::VulkanSwapchain::present(const PresentInfo& present_info) noexcept
 {
     const VkSwapchainKHR swapchains[] = { handle_ };
 
@@ -119,7 +119,7 @@ std::error_code pf::rhi::VulkanSwapchain::present(const PresentInfo& present_inf
     return {};
 }
 
-pf::rhi::VulkanSwapchain& pf::rhi::VulkanSwapchain::operator=(VulkanSwapchain&& other) noexcept
+sgf::rhi::VulkanSwapchain& sgf::rhi::VulkanSwapchain::operator=(VulkanSwapchain&& other) noexcept
 {
     if(this == std::addressof(other)) return *this;
 
@@ -139,7 +139,7 @@ pf::rhi::VulkanSwapchain& pf::rhi::VulkanSwapchain::operator=(VulkanSwapchain&& 
     return *this;
 }
 
-void pf::rhi::VulkanSwapchain::destroy() noexcept
+void sgf::rhi::VulkanSwapchain::destroy() noexcept
 {
     for(auto& semaphore : render_finished_semaphores_)
     {
@@ -171,7 +171,7 @@ void pf::rhi::VulkanSwapchain::destroy() noexcept
     current_frame_idx_ = 0;
 }
 
-std::error_code pf::rhi::VulkanSwapchain::create(const SwapchainCreateInfo& create_info) noexcept
+std::error_code sgf::rhi::VulkanSwapchain::create(const SwapchainCreateInfo& create_info) noexcept
 {
     auto* vulkan_context = static_cast<const VulkanContext*>(create_info.context);
     auto* vulkan_logical_device = static_cast<const VulkanLogicalDevice*>(create_info.logical_device);
@@ -270,7 +270,7 @@ std::error_code pf::rhi::VulkanSwapchain::create(const SwapchainCreateInfo& crea
     swapchain_create_info.imageExtent = extent_;
     swapchain_create_info.imageArrayLayers = 1;
     swapchain_create_info.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-    if(*vulkan_physical_device->queue_families_indices_[std::to_underlying(QueueFamilyType::kGraphics)] != *vulkan_physical_device->queue_families_indices_[std::to_underlying(pf::rhi::QueueFamilyType::kPresent)])
+    if(*vulkan_physical_device->queue_families_indices_[std::to_underlying(QueueFamilyType::kGraphics)] != *vulkan_physical_device->queue_families_indices_[std::to_underlying(sgf::rhi::QueueFamilyType::kPresent)])
     {
         const std::uint32_t queue_family_indices[] = {
             *vulkan_physical_device->queue_families_indices_[std::to_underlying(QueueFamilyType::kGraphics)],

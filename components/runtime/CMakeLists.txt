@@ -46,9 +46,9 @@ add_library(
 handle_version()
 
 target_link_libraries(
-    ${PROJECT_NAME} PRIVATE
-
-    pixelfield::core
+    ${PROJECT_NAME}
+    PUBLIC
+        sgf::core
 )
 
 target_include_directories(
@@ -63,4 +63,5 @@ target_include_directories(
 
 install_component(
     TARGET_NAME ${PROJECT_NAME}
+    DEPENDS core
 )

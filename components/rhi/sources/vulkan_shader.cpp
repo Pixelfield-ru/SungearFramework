@@ -2,30 +2,30 @@
 // Created by stuka on 16.09.2026.
 //
 
-#include "pixelfield/rhi/vulkan/vulkan_shader.h"
+#include "sgf/rhi/vulkan/vulkan_shader.h"
 
-#include "pixelfield/rhi/vulkan/vulkan_context.h"
-#include "pixelfield/rhi/vulkan/vulkan_logical_device.h"
-#include "pixelfield/rhi/vulkan/vulkan_types.h"
+#include "sgf/rhi/vulkan/vulkan_context.h"
+#include "sgf/rhi/vulkan/vulkan_logical_device.h"
+#include "sgf/rhi/vulkan/vulkan_types.h"
 
-pf::rhi::VulkanShader::VulkanShader(VulkanShader&& other) noexcept :
+sgf::rhi::VulkanShader::VulkanShader(VulkanShader&& other) noexcept :
     context_(std::exchange(other.context_, nullptr)),
     logical_device_(std::exchange(other.logical_device_, nullptr)),
     stages_(std::move(other.stages_))
 {
 }
 
-pf::rhi::VulkanShader::~VulkanShader() noexcept
+sgf::rhi::VulkanShader::~VulkanShader() noexcept
 {
     destroy();
 }
 
-bool pf::rhi::VulkanShader::valid() const noexcept
+bool sgf::rhi::VulkanShader::valid() const noexcept
 {
     return !stages_.empty();
 }
 
-pf::rhi::VulkanShader& pf::rhi::VulkanShader::operator=(VulkanShader&& other) noexcept
+sgf::rhi::VulkanShader& sgf::rhi::VulkanShader::operator=(VulkanShader&& other) noexcept
 {
     if(this == std::addressof(other)) return *this;
 
@@ -38,7 +38,7 @@ pf::rhi::VulkanShader& pf::rhi::VulkanShader::operator=(VulkanShader&& other) no
     return *this;
 }
 
-void pf::rhi::VulkanShader::destroy() noexcept
+void sgf::rhi::VulkanShader::destroy() noexcept
 {
     for(const auto& stage : stages_)
     {
@@ -47,7 +47,7 @@ void pf::rhi::VulkanShader::destroy() noexcept
     stages_.clear();
 }
 
-std::error_code pf::rhi::VulkanShader::create(const ShaderCreateInfo& create_info) noexcept
+std::error_code sgf::rhi::VulkanShader::create(const ShaderCreateInfo& create_info) noexcept
 {
     const auto* vulkan_context = static_cast<const VulkanContext*>(create_info.context);
     const auto* vulkan_logical_device = static_cast<const VulkanLogicalDevice*>(create_info.logical_device);

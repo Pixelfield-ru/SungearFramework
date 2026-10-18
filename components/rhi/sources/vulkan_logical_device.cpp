@@ -2,7 +2,7 @@
 // Created by stuka on 11.09.2026.
 //
 
-#include "pixelfield/rhi/vulkan/vulkan_logical_device.h"
+#include "sgf/rhi/vulkan/vulkan_logical_device.h"
 
 #include <algorithm>
 #include <iostream>
@@ -12,23 +12,23 @@
 
 #include <vulkan/vulkan.h>
 
-#include "pixelfield/rhi/vulkan/vulkan_buffer.h"
-#include "pixelfield/rhi/vulkan/vulkan_command_buffer.h"
-#include "pixelfield/rhi/vulkan/vulkan_context.h"
-#include "pixelfield/rhi/vulkan/vulkan_descriptor_set.h"
-#include "pixelfield/rhi/vulkan/vulkan_framebuffer.h"
-#include "pixelfield/rhi/vulkan/vulkan_image.h"
-#include "pixelfield/rhi/vulkan/vulkan_image_view.h"
-#include "pixelfield/rhi/vulkan/vulkan_pass.h"
-#include "pixelfield/rhi/vulkan/vulkan_physical_device.h"
-#include "pixelfield/rhi/vulkan/vulkan_pass.h"
-#include "pixelfield/rhi/vulkan/vulkan_pipeline_state.h"
-#include "pixelfield/rhi/vulkan/vulkan_sampler.h"
-#include "pixelfield/rhi/vulkan/vulkan_shader.h"
-#include "pixelfield/rhi/vulkan/vulkan_swapchain.h"
-#include "pixelfield/rhi/vulkan/vulkan_types.h"
+#include "sgf/rhi/vulkan/vulkan_buffer.h"
+#include "sgf/rhi/vulkan/vulkan_command_buffer.h"
+#include "sgf/rhi/vulkan/vulkan_context.h"
+#include "sgf/rhi/vulkan/vulkan_descriptor_set.h"
+#include "sgf/rhi/vulkan/vulkan_framebuffer.h"
+#include "sgf/rhi/vulkan/vulkan_image.h"
+#include "sgf/rhi/vulkan/vulkan_image_view.h"
+#include "sgf/rhi/vulkan/vulkan_pass.h"
+#include "sgf/rhi/vulkan/vulkan_physical_device.h"
+#include "sgf/rhi/vulkan/vulkan_pass.h"
+#include "sgf/rhi/vulkan/vulkan_pipeline_state.h"
+#include "sgf/rhi/vulkan/vulkan_sampler.h"
+#include "sgf/rhi/vulkan/vulkan_shader.h"
+#include "sgf/rhi/vulkan/vulkan_swapchain.h"
+#include "sgf/rhi/vulkan/vulkan_types.h"
 
-pf::rhi::VulkanLogicalDevice::VulkanLogicalDevice(VulkanLogicalDevice&& other) noexcept :
+sgf::rhi::VulkanLogicalDevice::VulkanLogicalDevice(VulkanLogicalDevice&& other) noexcept :
     context_(std::exchange(other.context_, nullptr)),
     physical_device_(std::exchange(other.physical_device_, nullptr)),
     handle_(std::exchange(other.handle_, VK_NULL_HANDLE)),
@@ -42,17 +42,17 @@ pf::rhi::VulkanLogicalDevice::VulkanLogicalDevice(VulkanLogicalDevice&& other) n
 
 }
 
-pf::rhi::VulkanLogicalDevice::~VulkanLogicalDevice()
+sgf::rhi::VulkanLogicalDevice::~VulkanLogicalDevice()
 {
     destroy();
 }
 
-bool pf::rhi::VulkanLogicalDevice::valid() const noexcept
+bool sgf::rhi::VulkanLogicalDevice::valid() const noexcept
 {
     return handle_ != nullptr;
 }
 
-std::error_code pf::rhi::VulkanLogicalDevice::submit(const SubmitInfo& submit_info) noexcept
+std::error_code sgf::rhi::VulkanLogicalDevice::submit(const SubmitInfo& submit_info) noexcept
 {
     auto* vulkan_swapchain = static_cast<VulkanSwapchain*>(submit_info.swapchain);
     const auto frame_slot = vulkan_swapchain->current_frame_idx_;
@@ -115,7 +115,7 @@ std::error_code pf::rhi::VulkanLogicalDevice::submit(const SubmitInfo& submit_in
     return {};
 }
 
-std::error_code pf::rhi::VulkanLogicalDevice::waitIdle() noexcept
+std::error_code sgf::rhi::VulkanLogicalDevice::waitIdle() noexcept
 {
     if(vkDeviceWaitIdle(handle_) != VK_SUCCESS)
     {
@@ -125,7 +125,7 @@ std::error_code pf::rhi::VulkanLogicalDevice::waitIdle() noexcept
     return {};
 }
 
-std::expected<std::unique_ptr<pf::rhi::ISwapchain>, std::error_code> pf::rhi::VulkanLogicalDevice::createSwapchain(
+std::expected<std::unique_ptr<sgf::rhi::ISwapchain>, std::error_code> sgf::rhi::VulkanLogicalDevice::createSwapchain(
     const SwapchainCreateInfo& create_info) noexcept
 {
     auto output = std::make_unique<VulkanSwapchain>();
@@ -138,7 +138,7 @@ std::expected<std::unique_ptr<pf::rhi::ISwapchain>, std::error_code> pf::rhi::Vu
     return output;
 }
 
-std::expected<std::unique_ptr<pf::rhi::IImage>, std::error_code> pf::rhi::VulkanLogicalDevice::createImage(
+std::expected<std::unique_ptr<sgf::rhi::IImage>, std::error_code> sgf::rhi::VulkanLogicalDevice::createImage(
     const ImageCreateInfo& create_info) noexcept
 {
     auto output = std::make_unique<VulkanImage>();
@@ -151,7 +151,7 @@ std::expected<std::unique_ptr<pf::rhi::IImage>, std::error_code> pf::rhi::Vulkan
     return output;
 }
 
-std::expected<std::unique_ptr<pf::rhi::IImageView>, std::error_code> pf::rhi::VulkanLogicalDevice::createImageView(
+std::expected<std::unique_ptr<sgf::rhi::IImageView>, std::error_code> sgf::rhi::VulkanLogicalDevice::createImageView(
     const ImageViewCreateInfo& create_info) noexcept
 {
     auto output = std::make_unique<VulkanImageView>();
@@ -164,7 +164,7 @@ std::expected<std::unique_ptr<pf::rhi::IImageView>, std::error_code> pf::rhi::Vu
     return output;
 }
 
-std::expected<std::unique_ptr<pf::rhi::ISampler>, std::error_code> pf::rhi::VulkanLogicalDevice::createSampler(
+std::expected<std::unique_ptr<sgf::rhi::ISampler>, std::error_code> sgf::rhi::VulkanLogicalDevice::createSampler(
     const SamplerCreateInfo& create_info) noexcept
 {
     auto output = std::make_unique<VulkanSampler>();
@@ -177,7 +177,7 @@ std::expected<std::unique_ptr<pf::rhi::ISampler>, std::error_code> pf::rhi::Vulk
     return output;
 }
 
-std::expected<std::unique_ptr<pf::rhi::IShader>, std::error_code> pf::rhi::VulkanLogicalDevice::createShader(
+std::expected<std::unique_ptr<sgf::rhi::IShader>, std::error_code> sgf::rhi::VulkanLogicalDevice::createShader(
     const ShaderCreateInfo& create_info) noexcept
 {
     auto output = std::make_unique<VulkanShader>();
@@ -190,7 +190,7 @@ std::expected<std::unique_ptr<pf::rhi::IShader>, std::error_code> pf::rhi::Vulka
     return output;
 }
 
-std::expected<std::unique_ptr<pf::rhi::IPass>, std::error_code> pf::rhi::VulkanLogicalDevice::createPass(
+std::expected<std::unique_ptr<sgf::rhi::IPass>, std::error_code> sgf::rhi::VulkanLogicalDevice::createPass(
     const PassCreateInfo& create_info) noexcept
 {
     auto output = std::make_unique<VulkanPass>();
@@ -203,7 +203,7 @@ std::expected<std::unique_ptr<pf::rhi::IPass>, std::error_code> pf::rhi::VulkanL
     return output;
 }
 
-std::expected<std::unique_ptr<pf::rhi::IPipelineState>, std::error_code> pf::rhi::VulkanLogicalDevice::createPipelineState(
+std::expected<std::unique_ptr<sgf::rhi::IPipelineState>, std::error_code> sgf::rhi::VulkanLogicalDevice::createPipelineState(
     const PipelineStateCreateInfo& create_info) noexcept
 {
     auto output = std::make_unique<VulkanPipelineState>();
@@ -216,7 +216,7 @@ std::expected<std::unique_ptr<pf::rhi::IPipelineState>, std::error_code> pf::rhi
     return output;
 }
 
-std::expected<std::unique_ptr<pf::rhi::IFramebuffer>, std::error_code> pf::rhi::VulkanLogicalDevice::createFramebuffer(
+std::expected<std::unique_ptr<sgf::rhi::IFramebuffer>, std::error_code> sgf::rhi::VulkanLogicalDevice::createFramebuffer(
     const FramebufferCreateInfo& create_info) noexcept
 {
     auto output = std::make_unique<VulkanFramebuffer>();
@@ -229,7 +229,7 @@ std::expected<std::unique_ptr<pf::rhi::IFramebuffer>, std::error_code> pf::rhi::
     return output;
 }
 
-std::expected<std::unique_ptr<pf::rhi::ICommandBuffer>, std::error_code> pf::rhi::VulkanLogicalDevice::createCommandBuffer(
+std::expected<std::unique_ptr<sgf::rhi::ICommandBuffer>, std::error_code> sgf::rhi::VulkanLogicalDevice::createCommandBuffer(
     const CommandBufferCreateInfo& create_info) noexcept
 {
     auto output = std::make_unique<VulkanCommandBuffer>();
@@ -242,7 +242,7 @@ std::expected<std::unique_ptr<pf::rhi::ICommandBuffer>, std::error_code> pf::rhi
     return output;
 }
 
-std::expected<std::unique_ptr<pf::rhi::IBuffer>, std::error_code> pf::rhi::VulkanLogicalDevice::createBuffer(
+std::expected<std::unique_ptr<sgf::rhi::IBuffer>, std::error_code> sgf::rhi::VulkanLogicalDevice::createBuffer(
     const BufferCreateInfo& create_info) noexcept
 {
     auto output = std::make_unique<VulkanBuffer>();
@@ -255,7 +255,7 @@ std::expected<std::unique_ptr<pf::rhi::IBuffer>, std::error_code> pf::rhi::Vulka
     return output;
 }
 
-std::expected<std::unique_ptr<pf::rhi::IDescriptorSet>, std::error_code> pf::rhi::VulkanLogicalDevice::createDescriptorSet(
+std::expected<std::unique_ptr<sgf::rhi::IDescriptorSet>, std::error_code> sgf::rhi::VulkanLogicalDevice::createDescriptorSet(
     const DescriptorSetCreateInfo& create_info) noexcept
 {
     auto output = std::make_unique<VulkanDescriptorSet>();
@@ -268,7 +268,7 @@ std::expected<std::unique_ptr<pf::rhi::IDescriptorSet>, std::error_code> pf::rhi
     return output;
 }
 
-pf::rhi::VulkanLogicalDevice& pf::rhi::VulkanLogicalDevice::operator=(VulkanLogicalDevice&& other) noexcept
+sgf::rhi::VulkanLogicalDevice& sgf::rhi::VulkanLogicalDevice::operator=(VulkanLogicalDevice&& other) noexcept
 {
     if(this == std::addressof(other)) return *this;
 
@@ -287,7 +287,7 @@ pf::rhi::VulkanLogicalDevice& pf::rhi::VulkanLogicalDevice::operator=(VulkanLogi
     return *this;
 }
 
-std::expected<VkCommandPool, std::error_code> pf::rhi::VulkanLogicalDevice::commandPool(QueueFamilyType queue_type) noexcept
+std::expected<VkCommandPool, std::error_code> sgf::rhi::VulkanLogicalDevice::commandPool(QueueFamilyType queue_type) noexcept
 {
     auto*& existing_pool = command_pools_[std::to_underlying(queue_type)];
     if(existing_pool) return existing_pool;
@@ -310,7 +310,7 @@ std::expected<VkCommandPool, std::error_code> pf::rhi::VulkanLogicalDevice::comm
     return existing_pool;
 }
 
-std::expected<VkDescriptorPool, std::error_code> pf::rhi::VulkanLogicalDevice::descriptorPool() noexcept
+std::expected<VkDescriptorPool, std::error_code> sgf::rhi::VulkanLogicalDevice::descriptorPool() noexcept
 {
     if(descriptor_pool_) return descriptor_pool_;
 
@@ -341,7 +341,7 @@ std::expected<VkDescriptorPool, std::error_code> pf::rhi::VulkanLogicalDevice::d
     return descriptor_pool_;
 }
 
-std::error_code pf::rhi::VulkanLogicalDevice::assureStagingBuffer(size_t size) noexcept
+std::error_code sgf::rhi::VulkanLogicalDevice::assureStagingBuffer(size_t size) noexcept
 {
     if(staging_buffer_.valid() && staging_buffer_.size() >=  size) return {};
 
@@ -361,7 +361,7 @@ std::error_code pf::rhi::VulkanLogicalDevice::assureStagingBuffer(size_t size) n
     return {};
 }
 
-std::error_code pf::rhi::VulkanLogicalDevice::assureStagingCommandBuffer() noexcept
+std::error_code sgf::rhi::VulkanLogicalDevice::assureStagingCommandBuffer() noexcept
 {
     if(staging_command_buffer_.valid()) return {};
 
@@ -379,7 +379,7 @@ std::error_code pf::rhi::VulkanLogicalDevice::assureStagingCommandBuffer() noexc
     return {};
 }
 
-std::error_code pf::rhi::VulkanLogicalDevice::updateBuffer(void* data, VulkanBuffer& dst_buffer, size_t dst_offset,
+std::error_code sgf::rhi::VulkanLogicalDevice::updateBuffer(void* data, VulkanBuffer& dst_buffer, size_t dst_offset,
                                                        size_t size) noexcept
 {
     // creating staging buffer
@@ -437,7 +437,7 @@ std::error_code pf::rhi::VulkanLogicalDevice::updateBuffer(void* data, VulkanBuf
     return {};
 }
 
-std::error_code pf::rhi::VulkanLogicalDevice::updateImage(IImage& dst_image, const ImageUpdateInfo& update_info) noexcept
+std::error_code sgf::rhi::VulkanLogicalDevice::updateImage(IImage& dst_image, const ImageUpdateInfo& update_info) noexcept
 {
     auto& vulkan_image = static_cast<VulkanImage&>(dst_image);
 
@@ -561,7 +561,7 @@ std::error_code pf::rhi::VulkanLogicalDevice::updateImage(IImage& dst_image, con
     return {};
 }
 
-void pf::rhi::VulkanLogicalDevice::destroy() noexcept
+void sgf::rhi::VulkanLogicalDevice::destroy() noexcept
 {
     staging_buffer_.destroy();
     staging_command_buffer_.destroy();
@@ -588,7 +588,7 @@ void pf::rhi::VulkanLogicalDevice::destroy() noexcept
     }
 }
 
-std::error_code pf::rhi::VulkanLogicalDevice::create(const LogicalDeviceCreateInfo& create_info) noexcept
+std::error_code sgf::rhi::VulkanLogicalDevice::create(const LogicalDeviceCreateInfo& create_info) noexcept
 {
     const auto* vulkan_context = static_cast<const VulkanContext*>(create_info.context);
     const auto* vulkan_physical_device = static_cast<const VulkanPhysicalDevice*>(create_info.physical_device);

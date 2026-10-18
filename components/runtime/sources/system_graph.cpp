@@ -2,19 +2,21 @@
 // Created by stuka on 14.10.2026.
 //
 
-#include "pixelfield/runtime/system/system_graph.h"
+#include "sgf/runtime/system/system_graph.h"
 
 #include <algorithm>
 #include <ranges>
 #include <unordered_set>
 
-#include "pixelfield/runtime/system/system.h"
-#include "pixelfield/runtime/errors.h"
+#include "sgf/runtime/system/system.h"
+#include "sgf/runtime/errors.h"
 
-std::expected<pf::runtime::SystemGraph, std::error_code> pf::runtime::SystemGraph::build(
+std::expected<sgf::runtime::SystemGraph, std::error_code> sgf::runtime::SystemGraph::build(
     const SystemGraphBuildInfo& build_info) noexcept
 {
     // todo: maybe needs optimization
+
+    auto* logger = build_info.debug_output;
 
     SystemGraph graph;
 
@@ -28,12 +30,28 @@ std::expected<pf::runtime::SystemGraph, std::error_code> pf::runtime::SystemGrap
         // validation
         const auto system_reads = system->reads();
         if(!std::ranges::all_of(system_reads, [&](std::uint32_t read_id) {
-            return context->resources.hasType(read_id);
+            const bool has_type = context->resources.hasType(read_id);
+            if(logger && !has_type)
+            {
+                (*logger)(core::LogLevel::kError,
+                          std::format(
+                              "System '{}' reads the type with ID {} and context does not have that type.",
+                              typeid(*system).name(), read_id));
+            }
+            return has_type;
         })) return std::unexpected(Error::kIncompleteSystemContext);
 
         const auto system_writes = system->writes();
         if(!std::ranges::all_of(system_writes, [&](std::uint32_t write_id) {
-            return context->resources.hasType(write_id);
+            const bool has_type = context->resources.hasType(write_id);
+            if(logger && !has_type)
+            {
+                (*logger)(core::LogLevel::kError,
+                          std::format(
+                              "System '{}' writes the type with ID {} and context does not have that type.",
+                              typeid(*system).name(), write_id));
+            }
+            return has_type;
         })) return std::unexpected(Error::kIncompleteSystemContext);
 
         Node node;
@@ -112,8 +130,18 @@ std::expected<pf::runtime::SystemGraph, std::error_code> pf::runtime::SystemGrap
         }
     }
 
-    if(std::ranges::any_of(state.remaining, [](std::uint32_t remaining) {
-        return remaining != 0;
+    std::uint32_t system_index {};
+    if(std::ranges::any_of(state.remaining, [&](std::uint32_t remaining) {
+        const bool has_remaining = remaining != 0;
+
+        if(logger && has_remaining)
+        {
+            (*logger)(core::LogLevel::kError, std::format("Graph is cyclic. System {} has {} unfulfilled edges left.",
+                                                          typeid(*build_info.systems[system_index]).name(), remaining));
+        }
+
+        ++system_index;
+        return has_remaining;
     }))
     {
         return std::unexpected(Error::kCyclicSystemGraph);

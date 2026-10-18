@@ -2,50 +2,50 @@
 // Created by stuka on 13.10.2026.
 //
 
-#include "pixelfield/platform/glfw/glfw_window.h"
+#include "sgf/platform/glfw/glfw_window.h"
 
 #include <memory>
 
-#include "pixelfield/core/errors.h"
-#include "pixelfield/platform/glfw/glfw_errors.h"
-#include "pixelfield/platform/platform.h"
+#include "sgf/core/errors.h"
+#include "sgf/platform/glfw/glfw_errors.h"
+#include "sgf/platform/platform.h"
 
-pf::platform::GLFWWindow::GLFWWindow(GLFWWindow&& other) noexcept :
+sgf::platform::GLFWWindow::GLFWWindow(GLFWWindow&& other) noexcept :
     handle_(std::exchange(other.handle_, {}))
 {
 }
 
-pf::platform::GLFWWindow::~GLFWWindow() noexcept
+sgf::platform::GLFWWindow::~GLFWWindow() noexcept
 {
     destroy();
 }
 
-void pf::platform::GLFWWindow::setTitle(std::string_view title) noexcept
+void sgf::platform::GLFWWindow::setTitle(std::string_view title) noexcept
 {
     glfwSetWindowTitle(handle_, title.data());
 }
 
-void pf::platform::GLFWWindow::position(std::int32_t& x, std::int32_t& y) const noexcept
+void sgf::platform::GLFWWindow::position(std::int32_t& x, std::int32_t& y) const noexcept
 {
     glfwGetWindowPos(handle_, &x, &y);
 }
 
-void pf::platform::GLFWWindow::setPosition(std::int32_t x, std::int32_t y) noexcept
+void sgf::platform::GLFWWindow::setPosition(std::int32_t x, std::int32_t y) noexcept
 {
     glfwSetWindowPos(handle_, x, y);
 }
 
-void pf::platform::GLFWWindow::size(std::int32_t& width, std::int32_t& height) const noexcept
+void sgf::platform::GLFWWindow::size(std::int32_t& width, std::int32_t& height) const noexcept
 {
     glfwGetWindowSize(handle_, &width, &height);
 }
 
-void pf::platform::GLFWWindow::setSize(std::int32_t width, std::int32_t height) noexcept
+void sgf::platform::GLFWWindow::setSize(std::int32_t width, std::int32_t height) noexcept
 {
     glfwSetWindowSize(handle_, width, height);
 }
 
-pf::platform::GLFWWindow& pf::platform::GLFWWindow::operator=(GLFWWindow&& other) noexcept
+sgf::platform::GLFWWindow& sgf::platform::GLFWWindow::operator=(GLFWWindow&& other) noexcept
 {
     if(this == std::addressof(other)) return *this;
 
@@ -56,7 +56,7 @@ pf::platform::GLFWWindow& pf::platform::GLFWWindow::operator=(GLFWWindow&& other
     return *this;
 }
 
-std::error_code pf::platform::GLFWWindow::create(const WindowCreateInfo& create_info, GLFWWindow& output) noexcept
+std::error_code sgf::platform::GLFWWindow::create(const WindowCreateInfo& create_info, GLFWWindow& output) noexcept
 {
     output.debug_output_ = create_info.debug_output;
 
@@ -87,7 +87,10 @@ std::error_code pf::platform::GLFWWindow::create(const WindowCreateInfo& create_
                                       create_info.fullscreen ? glfwGetPrimaryMonitor() : nullptr, nullptr);
     if (!output.handle_)
     {
-        output.debug_output_(core::LogLevel::kError, "Cannot create GLFW window.");
+        if(output.debug_output_)
+        {
+            (*output.debug_output_)(core::LogLevel::kError, "Cannot create GLFW window.");
+        }
         return GLFWError::kCannotCreateWindow;
     }
 
@@ -106,7 +109,7 @@ std::error_code pf::platform::GLFWWindow::create(const WindowCreateInfo& create_
     return {};
 }
 
-void pf::platform::GLFWWindow::destroy() noexcept
+void sgf::platform::GLFWWindow::destroy() noexcept
 {
     if(handle_)
     {
@@ -115,17 +118,17 @@ void pf::platform::GLFWWindow::destroy() noexcept
     }
 }
 
-void pf::platform::GLFWWindow::nativeCloseCallback(GLFWwindow* window) noexcept
+void sgf::platform::GLFWWindow::nativeCloseCallback(GLFWwindow* window) noexcept
 {
     auto* my_window = static_cast<GLFWWindow*>(glfwGetWindowUserPointer(window));
 }
 
-void pf::platform::GLFWWindow::nativeIconifyCallback(GLFWwindow* window, int iconified) noexcept
+void sgf::platform::GLFWWindow::nativeIconifyCallback(GLFWwindow* window, int iconified) noexcept
 {
     auto* my_window = static_cast<GLFWWindow*>(glfwGetWindowUserPointer(window));
 }
 
-void pf::platform::GLFWWindow::nativeFramebufferSizeCallback(GLFWwindow* window, int width, int height) noexcept
+void sgf::platform::GLFWWindow::nativeFramebufferSizeCallback(GLFWwindow* window, int width, int height) noexcept
 {
     auto* my_window = static_cast<GLFWWindow*>(glfwGetWindowUserPointer(window));
 }

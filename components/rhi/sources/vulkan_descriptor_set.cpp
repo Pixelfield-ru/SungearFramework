@@ -2,18 +2,18 @@
 // Created by stuka on 06.10.2026.
 //
 
-#include "pixelfield/rhi/vulkan/vulkan_descriptor_set.h"
+#include "sgf/rhi/vulkan/vulkan_descriptor_set.h"
 
-#include "pixelfield/rhi/vulkan/vulkan_buffer.h"
-#include "pixelfield/rhi/vulkan/vulkan_context.h"
-#include "pixelfield/rhi/vulkan/vulkan_errors.h"
-#include "pixelfield/rhi/vulkan/vulkan_image.h"
-#include "pixelfield/rhi/vulkan/vulkan_image_view.h"
-#include "pixelfield/rhi/vulkan/vulkan_logical_device.h"
-#include "pixelfield/rhi/vulkan/vulkan_sampler.h"
-#include "pixelfield/rhi/vulkan/vulkan_types.h"
+#include "sgf/rhi/vulkan/vulkan_buffer.h"
+#include "sgf/rhi/vulkan/vulkan_context.h"
+#include "sgf/rhi/vulkan/vulkan_errors.h"
+#include "sgf/rhi/vulkan/vulkan_image.h"
+#include "sgf/rhi/vulkan/vulkan_image_view.h"
+#include "sgf/rhi/vulkan/vulkan_logical_device.h"
+#include "sgf/rhi/vulkan/vulkan_sampler.h"
+#include "sgf/rhi/vulkan/vulkan_types.h"
 
-pf::rhi::VulkanDescriptorSet::VulkanDescriptorSet(VulkanDescriptorSet&& other) noexcept :
+sgf::rhi::VulkanDescriptorSet::VulkanDescriptorSet(VulkanDescriptorSet&& other) noexcept :
     context_(std::exchange(other.context_, {})),
     logical_device_(std::exchange(other.logical_device_, {})),
     pool_(std::exchange(other.pool_, VK_NULL_HANDLE)),
@@ -22,12 +22,12 @@ pf::rhi::VulkanDescriptorSet::VulkanDescriptorSet(VulkanDescriptorSet&& other) n
 {
 }
 
-pf::rhi::VulkanDescriptorSet::~VulkanDescriptorSet() noexcept
+sgf::rhi::VulkanDescriptorSet::~VulkanDescriptorSet() noexcept
 {
     destroy();
 }
 
-void pf::rhi::VulkanDescriptorSet::update(std::span<DescriptorInfo> descriptors) noexcept
+void sgf::rhi::VulkanDescriptorSet::update(std::span<DescriptorInfo> descriptors) noexcept
 {
     std::vector<VkWriteDescriptorSet> vulkan_descriptors(descriptors.size());
     // Must outlive vkUpdateDescriptorSets — WriteDescriptorSet only stores pointers.
@@ -89,7 +89,7 @@ void pf::rhi::VulkanDescriptorSet::update(std::span<DescriptorInfo> descriptors)
                            vulkan_descriptors.data(), 0, nullptr);
 }
 
-pf::rhi::VulkanDescriptorSet& pf::rhi::VulkanDescriptorSet::operator=(VulkanDescriptorSet&& other) noexcept
+sgf::rhi::VulkanDescriptorSet& sgf::rhi::VulkanDescriptorSet::operator=(VulkanDescriptorSet&& other) noexcept
 {
     if(std::addressof(other) == this) return *this;
 
@@ -104,7 +104,7 @@ pf::rhi::VulkanDescriptorSet& pf::rhi::VulkanDescriptorSet::operator=(VulkanDesc
     return *this;
 }
 
-void pf::rhi::VulkanDescriptorSet::destroy()
+void sgf::rhi::VulkanDescriptorSet::destroy()
 {
     if(handle_)
     {
@@ -119,7 +119,7 @@ void pf::rhi::VulkanDescriptorSet::destroy()
     }
 }
 
-std::error_code pf::rhi::VulkanDescriptorSet::create(const DescriptorSetCreateInfo& create_info)
+std::error_code sgf::rhi::VulkanDescriptorSet::create(const DescriptorSetCreateInfo& create_info)
 {
     const auto* vulkan_context = static_cast<const VulkanContext*>(create_info.context);
     auto* vulkan_logical_device = static_cast<VulkanLogicalDevice*>(create_info.logical_device);

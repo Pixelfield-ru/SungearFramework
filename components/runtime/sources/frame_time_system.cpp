@@ -2,19 +2,21 @@
 // Created by stuka on 14.10.2026.
 //
 
-#include "pixelfield/runtime/system/frame_time_system.h"
+#include <iostream>
 
-std::span<const std::uint32_t> pf::runtime::FrameTimeSystem::reads() const noexcept
+#include "sgf/runtime/system/frame_time_system.h"
+
+std::span<const std::uint32_t> sgf::runtime::FrameTimeSystem::reads() const noexcept
 {
     return read_ids_;
 }
 
-std::span<const std::uint32_t> pf::runtime::FrameTimeSystem::writes() const noexcept
+std::span<const std::uint32_t> sgf::runtime::FrameTimeSystem::writes() const noexcept
 {
     return write_ids_;
 }
 
-std::error_code pf::runtime::FrameTimeSystem::execute(SystemContext& context) noexcept
+std::error_code sgf::runtime::FrameTimeSystem::execute(SystemContext& context) noexcept
 {
     pf_assert(context.resources.hasType<std::chrono::steady_clock::time_point>(), "Cannot find resource in context.");
     pf_assert(context.resources.hasType<FrameTime>(), "Type was not registered. Maybe system initialize() was not called.");
@@ -37,7 +39,7 @@ std::error_code pf::runtime::FrameTimeSystem::execute(SystemContext& context) no
     return {};
 }
 
-std::error_code pf::runtime::FrameTimeSystem::initialize(SystemContext& context) noexcept
+std::error_code sgf::runtime::FrameTimeSystem::initialize(SystemContext& context) noexcept
 {
     context.resources.emplace<FrameTime>();
 

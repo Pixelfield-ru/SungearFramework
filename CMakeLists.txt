@@ -1,8 +1,8 @@
 include(cmake/platform.cmake)
 include(cmake/cmake_utils.cmake)
 
-set(LIBRARY_NAMESPACE pixelfield)
-set(CODE_NAMESPACE pf)
+set(LIBRARY_NAMESPACE sgf)
+set(CODE_NAMESPACE sgf)
 
 cmake_minimum_required(VERSION 3.22)
 project(SungearEngine)
@@ -127,7 +127,7 @@ endif()
 # set(SG_BUILD_TESTS ON)
 
 # including externals
-add_subdirectory(Externals/rectpack2D)
+add_subdirectory(externals/rectpack2D)
 
 # components
 add_subdirectory(components)

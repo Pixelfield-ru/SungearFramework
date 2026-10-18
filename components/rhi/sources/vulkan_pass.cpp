@@ -2,14 +2,14 @@
 // Created by stuka on 29.09.2026.
 //
 
-#include "pixelfield/rhi/vulkan/vulkan_pass.h"
+#include "sgf/rhi/vulkan/vulkan_pass.h"
 
-#include "pixelfield/rhi/vulkan/vulkan_context.h"
-#include "pixelfield/rhi/vulkan/vulkan_errors.h"
-#include "pixelfield/rhi/vulkan/vulkan_logical_device.h"
-#include "pixelfield/rhi/vulkan/vulkan_types.h"
+#include "sgf/rhi/vulkan/vulkan_context.h"
+#include "sgf/rhi/vulkan/vulkan_errors.h"
+#include "sgf/rhi/vulkan/vulkan_logical_device.h"
+#include "sgf/rhi/vulkan/vulkan_types.h"
 
-pf::rhi::VulkanPass::VulkanPass(VulkanPass&& other) noexcept :
+sgf::rhi::VulkanPass::VulkanPass(VulkanPass&& other) noexcept :
     context_(std::exchange(other.context_, nullptr)),
     logical_device_(std::exchange(other.logical_device_, nullptr)),
     handle_(std::exchange(other.handle_, VK_NULL_HANDLE)),
@@ -18,17 +18,17 @@ pf::rhi::VulkanPass::VulkanPass(VulkanPass&& other) noexcept :
 {
 }
 
-pf::rhi::VulkanPass::~VulkanPass()
+sgf::rhi::VulkanPass::~VulkanPass()
 {
     destroy();
 }
 
-bool pf::rhi::VulkanPass::valid() const noexcept
+bool sgf::rhi::VulkanPass::valid() const noexcept
 {
     return handle_ != nullptr;
 }
 
-pf::rhi::VulkanPass& pf::rhi::VulkanPass::operator=(VulkanPass&& other) noexcept
+sgf::rhi::VulkanPass& sgf::rhi::VulkanPass::operator=(VulkanPass&& other) noexcept
 {
     if(this == std::addressof(other)) return *this;
 
@@ -43,7 +43,7 @@ pf::rhi::VulkanPass& pf::rhi::VulkanPass::operator=(VulkanPass&& other) noexcept
     return *this;
 }
 
-void pf::rhi::VulkanPass::destroy() noexcept
+void sgf::rhi::VulkanPass::destroy() noexcept
 {
     if(handle_)
     {
@@ -55,7 +55,7 @@ void pf::rhi::VulkanPass::destroy() noexcept
     attachments_refs_.clear();
 }
 
-std::error_code pf::rhi::VulkanPass::create(const PassCreateInfo& create_info) noexcept
+std::error_code sgf::rhi::VulkanPass::create(const PassCreateInfo& create_info) noexcept
 {
     const auto* vulkan_context = static_cast<const VulkanContext*>(create_info.context);
     const auto* vulkan_logical_device = static_cast<const VulkanLogicalDevice*>(create_info.logical_device);

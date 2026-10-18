@@ -2,7 +2,7 @@
 // Created by stuka on 12.09.2026.
 //
 
-#include "pixelfield/rhi/opengl/opengl_types.h"
+#include "sgf/rhi/opengl/opengl_types.h"
 
 #include <utility>
 
@@ -18,7 +18,7 @@
 #define GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT5_EXT 0x8C4F
 #endif
 
-namespace pf::rhi
+namespace sgf::rhi
 {
     GLFormatInfo toGLFormat(Format format) noexcept
     {

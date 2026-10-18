@@ -2,22 +2,22 @@
 // Created by stuka on 10.09.2026.
 //
 
-#include "pixelfield/rhi/vulkan/vulkan_context.h"
+#include "sgf/rhi/vulkan/vulkan_context.h"
 
 #include <iostream>
 #include <utility>
 
-#include "pixelfield/rhi/vulkan/vulkan_framebuffer.h"
-#include "pixelfield/rhi/vulkan/vulkan_image.h"
-#include "pixelfield/rhi/vulkan/vulkan_image_view.h"
-#include "pixelfield/rhi/vulkan/vulkan_logical_device.h"
-#include "pixelfield/rhi/vulkan/vulkan_physical_device.h"
-#include "pixelfield/rhi/vulkan/vulkan_pipeline_state.h"
-#include "pixelfield/rhi/vulkan/vulkan_shader.h"
-#include "pixelfield/rhi/vulkan/vulkan_swapchain.h"
-#include "pixelfield/rhi/physical_device.h"
+#include "sgf/rhi/vulkan/vulkan_framebuffer.h"
+#include "sgf/rhi/vulkan/vulkan_image.h"
+#include "sgf/rhi/vulkan/vulkan_image_view.h"
+#include "sgf/rhi/vulkan/vulkan_logical_device.h"
+#include "sgf/rhi/vulkan/vulkan_physical_device.h"
+#include "sgf/rhi/vulkan/vulkan_pipeline_state.h"
+#include "sgf/rhi/vulkan/vulkan_shader.h"
+#include "sgf/rhi/vulkan/vulkan_swapchain.h"
+#include "sgf/rhi/physical_device.h"
 
-VkBool32 pf::rhi::debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT message_severity,
+VkBool32 sgf::rhi::debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT message_severity,
                             VkDebugUtilsMessageTypeFlagsEXT message_type,
                             const VkDebugUtilsMessengerCallbackDataEXT* p_callback_data,
                             void* p_user_data)
@@ -55,7 +55,7 @@ VkBool32 pf::rhi::debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT message_s
     return VK_FALSE;
 }
 
-pf::rhi::VulkanContext::VulkanContext(VulkanContext&& other) noexcept :
+sgf::rhi::VulkanContext::VulkanContext(VulkanContext&& other) noexcept :
     create_messenger_(std::exchange(other.create_messenger_, VK_NULL_HANDLE)),
     destroy_messenger_(std::exchange(other.destroy_messenger_, VK_NULL_HANDLE)),
     allocator_(std::move(other.allocator_)),
@@ -68,12 +68,12 @@ pf::rhi::VulkanContext::VulkanContext(VulkanContext&& other) noexcept :
     rhi_debug_output_ = std::move(other.rhi_debug_output_);
 }
 
-pf::rhi::VulkanContext::~VulkanContext() noexcept
+sgf::rhi::VulkanContext::~VulkanContext() noexcept
 {
     destroy();
 }
 
-std::error_code pf::rhi::VulkanContext::create(VulkanContextCreateInfo create_info,
+std::error_code sgf::rhi::VulkanContext::create(VulkanContextCreateInfo create_info,
                                                VulkanContext& output) noexcept
 {
     output.allocator_ = std::move(create_info.allocator);
@@ -184,12 +184,12 @@ std::error_code pf::rhi::VulkanContext::create(VulkanContextCreateInfo create_in
     return {};
 }
 
-bool pf::rhi::VulkanContext::valid() const noexcept
+bool sgf::rhi::VulkanContext::valid() const noexcept
 {
     return instance_ != nullptr;
 }
 
-std::vector<std::shared_ptr<pf::rhi::IPhysicalDevice>> pf::rhi::VulkanContext::physicalDevices() noexcept
+std::vector<std::shared_ptr<sgf::rhi::IPhysicalDevice>> sgf::rhi::VulkanContext::physicalDevices() noexcept
 {
     uint32_t device_count = 0;
     vkEnumeratePhysicalDevices(instance_, &device_count, nullptr);
@@ -328,7 +328,7 @@ std::vector<std::shared_ptr<pf::rhi::IPhysicalDevice>> pf::rhi::VulkanContext::p
     return physical_devices;
 }
 
-std::expected<std::unique_ptr<pf::rhi::ILogicalDevice>, std::error_code> pf::rhi::VulkanContext::createLogicalDevice(
+std::expected<std::unique_ptr<sgf::rhi::ILogicalDevice>, std::error_code> sgf::rhi::VulkanContext::createLogicalDevice(
     const LogicalDeviceCreateInfo& create_info) noexcept
 {
     auto output = std::make_unique<VulkanLogicalDevice>();
@@ -341,7 +341,7 @@ std::expected<std::unique_ptr<pf::rhi::ILogicalDevice>, std::error_code> pf::rhi
     return output;
 }
 
-pf::rhi::VulkanContext& pf::rhi::VulkanContext::operator=(VulkanContext&& other) noexcept
+sgf::rhi::VulkanContext& sgf::rhi::VulkanContext::operator=(VulkanContext&& other) noexcept
 {
     if(this == std::addressof(other)) return *this;
 
@@ -360,7 +360,7 @@ pf::rhi::VulkanContext& pf::rhi::VulkanContext::operator=(VulkanContext&& other)
     return *this;
 }
 
-void pf::rhi::VulkanContext::destroy() noexcept
+void sgf::rhi::VulkanContext::destroy() noexcept
 {
     if(surface_)
     {

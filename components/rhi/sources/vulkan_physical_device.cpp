@@ -2,9 +2,9 @@
 // Created by stuka on 16.09.2026.
 //
 
-#include "pixelfield/rhi/vulkan/vulkan_physical_device.h"
+#include "sgf/rhi/vulkan/vulkan_physical_device.h"
 
-pf::rhi::VulkanPhysicalDevice::VulkanPhysicalDevice(VulkanPhysicalDevice&& other) noexcept :
+sgf::rhi::VulkanPhysicalDevice::VulkanPhysicalDevice(VulkanPhysicalDevice&& other) noexcept :
     handle_(std::exchange(other.handle_, VK_NULL_HANDLE)),
     features_(std::exchange(other.features_, {})),
     surface_support_(std::move(other.surface_support_)),
@@ -13,12 +13,12 @@ pf::rhi::VulkanPhysicalDevice::VulkanPhysicalDevice(VulkanPhysicalDevice&& other
 
 }
 
-bool pf::rhi::VulkanPhysicalDevice::valid() const noexcept
+bool sgf::rhi::VulkanPhysicalDevice::valid() const noexcept
 {
     return handle_ != nullptr;
 }
 
-pf::rhi::VulkanPhysicalDevice& pf::rhi::VulkanPhysicalDevice::operator=(VulkanPhysicalDevice&& other) noexcept
+sgf::rhi::VulkanPhysicalDevice& sgf::rhi::VulkanPhysicalDevice::operator=(VulkanPhysicalDevice&& other) noexcept
 {
     if(this == std::addressof(other)) return *this;
 
@@ -30,7 +30,7 @@ pf::rhi::VulkanPhysicalDevice& pf::rhi::VulkanPhysicalDevice::operator=(VulkanPh
     return *this;
 }
 
-std::int32_t pf::rhi::VulkanPhysicalDevice::findMemoryIndex(VkMemoryRequirements requirements,
+std::int32_t sgf::rhi::VulkanPhysicalDevice::findMemoryIndex(VkMemoryRequirements requirements,
                                                         VkMemoryPropertyFlags properties) const noexcept
 {
     VkPhysicalDeviceMemoryProperties mem_props;

@@ -2,31 +2,31 @@
 // Created by stuka on 23.09.2026.
 //
 
-#include "pixelfield/rhi/vulkan/vulkan_command_buffer.h"
+#include "sgf/rhi/vulkan/vulkan_command_buffer.h"
 
-#include "pixelfield/rhi/vulkan/vulkan_buffer.h"
-#include "pixelfield/rhi/vulkan/vulkan_context.h"
-#include "pixelfield/rhi/vulkan/vulkan_descriptor_set.h"
-#include "pixelfield/rhi/vulkan/vulkan_errors.h"
-#include "pixelfield/rhi/vulkan/vulkan_framebuffer.h"
-#include "pixelfield/rhi/vulkan/vulkan_logical_device.h"
-#include "pixelfield/rhi/vulkan/vulkan_pass.h"
-#include "pixelfield/rhi/vulkan/vulkan_pipeline_state.h"
-#include "pixelfield/rhi/vulkan/vulkan_types.h"
+#include "sgf/rhi/vulkan/vulkan_buffer.h"
+#include "sgf/rhi/vulkan/vulkan_context.h"
+#include "sgf/rhi/vulkan/vulkan_descriptor_set.h"
+#include "sgf/rhi/vulkan/vulkan_errors.h"
+#include "sgf/rhi/vulkan/vulkan_framebuffer.h"
+#include "sgf/rhi/vulkan/vulkan_logical_device.h"
+#include "sgf/rhi/vulkan/vulkan_pass.h"
+#include "sgf/rhi/vulkan/vulkan_pipeline_state.h"
+#include "sgf/rhi/vulkan/vulkan_types.h"
 
-pf::rhi::VulkanCommandBuffer::VulkanCommandBuffer(VulkanCommandBuffer&& other) noexcept :
+sgf::rhi::VulkanCommandBuffer::VulkanCommandBuffer(VulkanCommandBuffer&& other) noexcept :
     logical_device_(std::exchange(other.logical_device_, nullptr)),
     pool_(std::exchange(other.pool_, VK_NULL_HANDLE)),
     handle_(std::exchange(other.handle_, VK_NULL_HANDLE))
 {
 }
 
-pf::rhi::VulkanCommandBuffer::~VulkanCommandBuffer() noexcept
+sgf::rhi::VulkanCommandBuffer::~VulkanCommandBuffer() noexcept
 {
     destroy();
 }
 
-std::error_code pf::rhi::VulkanCommandBuffer::begin() noexcept
+std::error_code sgf::rhi::VulkanCommandBuffer::begin() noexcept
 {
     VkCommandBufferBeginInfo begin_info{};
     begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -41,7 +41,7 @@ std::error_code pf::rhi::VulkanCommandBuffer::begin() noexcept
     return {};
 }
 
-std::error_code pf::rhi::VulkanCommandBuffer::beginRendering(const BeginRenderingInfo& info) noexcept
+std::error_code sgf::rhi::VulkanCommandBuffer::beginRendering(const BeginRenderingInfo& info) noexcept
 {
     const auto* vulkan_pipeline_state = static_cast<const VulkanPipelineState*>(info.pipeline_state);
     const auto* vulkan_framebuffer = static_cast<const VulkanFramebuffer*>(info.framebuffer);
@@ -83,21 +83,21 @@ std::error_code pf::rhi::VulkanCommandBuffer::beginRendering(const BeginRenderin
     return {};
 }
 
-void pf::rhi::VulkanCommandBuffer::bindVertexBuffer(const IBuffer& buffer) noexcept
+void sgf::rhi::VulkanCommandBuffer::bindVertexBuffer(const IBuffer& buffer) noexcept
 {
     VkBuffer vertex_buffers[] { static_cast<const VulkanBuffer&>(buffer).handle_ };
     VkDeviceSize offsets[] { 0 };
     vkCmdBindVertexBuffers(handle_, 0, 1, vertex_buffers, offsets);
 }
 
-void pf::rhi::VulkanCommandBuffer::bindIndexBuffer(const IBuffer& buffer, IndexType index_type) noexcept
+void sgf::rhi::VulkanCommandBuffer::bindIndexBuffer(const IBuffer& buffer, IndexType index_type) noexcept
 {
     const VkBuffer index_buffer = static_cast<const VulkanBuffer&>(buffer).handle_;
     constexpr VkDeviceSize offset = 0;
     vkCmdBindIndexBuffer(handle_, index_buffer, offset, toVkIndexType(index_type));
 }
 
-void pf::rhi::VulkanCommandBuffer::bindDescriptorSet(const IDescriptorSet& set, const IPipelineState& pipeline_state) noexcept
+void sgf::rhi::VulkanCommandBuffer::bindDescriptorSet(const IDescriptorSet& set, const IPipelineState& pipeline_state) noexcept
 {
     const auto& vulkan_descriptor_set = static_cast<const VulkanDescriptorSet&>(set);
     const auto& vulkan_pipeline_state = static_cast<const VulkanPipelineState&>(pipeline_state);
@@ -112,19 +112,19 @@ void pf::rhi::VulkanCommandBuffer::bindDescriptorSet(const IDescriptorSet& set, 
                             nullptr);
 }
 
-void pf::rhi::VulkanCommandBuffer::draw(std::size_t vertex_count, std::size_t instance_count,
+void sgf::rhi::VulkanCommandBuffer::draw(std::size_t vertex_count, std::size_t instance_count,
                                     std::size_t first_vertex, std::size_t first_instance) noexcept
 {
     vkCmdDraw(handle_, vertex_count, instance_count, first_vertex, first_instance);
 }
 
-void pf::rhi::VulkanCommandBuffer::drawIndexed(std::size_t index_count, std::size_t instance_count, std::size_t first_index,
+void sgf::rhi::VulkanCommandBuffer::drawIndexed(std::size_t index_count, std::size_t instance_count, std::size_t first_index,
                                            std::int64_t vertex_offset, std::size_t first_instance)
 {
     vkCmdDrawIndexed(handle_, index_count, instance_count, first_index, vertex_offset, first_instance);
 }
 
-void pf::rhi::VulkanCommandBuffer::setViewport(const ViewportInfo& viewport) noexcept
+void sgf::rhi::VulkanCommandBuffer::setViewport(const ViewportInfo& viewport) noexcept
 {
     VkViewport vulkan_viewport{};
     vulkan_viewport.x = viewport.rect.x;
@@ -137,7 +137,7 @@ void pf::rhi::VulkanCommandBuffer::setViewport(const ViewportInfo& viewport) noe
     vkCmdSetViewport(handle_, 0, 1, &vulkan_viewport);
 }
 
-void pf::rhi::VulkanCommandBuffer::setScissor(const Rect<std::int32_t>& scissor) noexcept
+void sgf::rhi::VulkanCommandBuffer::setScissor(const Rect<std::int32_t>& scissor) noexcept
 {
     VkRect2D vulkan_scissor{};
     vulkan_scissor.offset = { scissor.x, scissor.y };
@@ -146,7 +146,7 @@ void pf::rhi::VulkanCommandBuffer::setScissor(const Rect<std::int32_t>& scissor)
     vkCmdSetScissor(handle_, 0, 1, &vulkan_scissor);
 }
 
-void pf::rhi::VulkanCommandBuffer::copyBuffer(const IBuffer& src, IBuffer& dst, size_t src_offset, size_t dst_offset,
+void sgf::rhi::VulkanCommandBuffer::copyBuffer(const IBuffer& src, IBuffer& dst, size_t src_offset, size_t dst_offset,
                                           size_t size) noexcept
 {
     const auto& vulkan_src_buffer = static_cast<const VulkanBuffer&>(src);
@@ -159,14 +159,14 @@ void pf::rhi::VulkanCommandBuffer::copyBuffer(const IBuffer& src, IBuffer& dst, 
     vkCmdCopyBuffer(handle_, vulkan_src_buffer.handle_, vulkan_dst_buffer.handle_, 1, &copyRegion);
 }
 
-std::error_code pf::rhi::VulkanCommandBuffer::endRendering() noexcept
+std::error_code sgf::rhi::VulkanCommandBuffer::endRendering() noexcept
 {
     vkCmdEndRenderPass(handle_);
 
     return {};
 }
 
-std::error_code pf::rhi::VulkanCommandBuffer::end() noexcept
+std::error_code sgf::rhi::VulkanCommandBuffer::end() noexcept
 {
     if(vkEndCommandBuffer(handle_) != VK_SUCCESS)
     {
@@ -176,12 +176,12 @@ std::error_code pf::rhi::VulkanCommandBuffer::end() noexcept
     return {};
 }
 
-bool pf::rhi::VulkanCommandBuffer::valid() const noexcept
+bool sgf::rhi::VulkanCommandBuffer::valid() const noexcept
 {
     return handle_ != VK_NULL_HANDLE;
 }
 
-pf::rhi::VulkanCommandBuffer& pf::rhi::VulkanCommandBuffer::operator=(VulkanCommandBuffer&& other) noexcept
+sgf::rhi::VulkanCommandBuffer& sgf::rhi::VulkanCommandBuffer::operator=(VulkanCommandBuffer&& other) noexcept
 {
     if(this == std::addressof(other)) return *this;
 
@@ -194,7 +194,7 @@ pf::rhi::VulkanCommandBuffer& pf::rhi::VulkanCommandBuffer::operator=(VulkanComm
     return *this;
 }
 
-void pf::rhi::VulkanCommandBuffer::destroy() noexcept
+void sgf::rhi::VulkanCommandBuffer::destroy() noexcept
 {
     if(handle_)
     {
@@ -203,7 +203,7 @@ void pf::rhi::VulkanCommandBuffer::destroy() noexcept
     }
 }
 
-std::error_code pf::rhi::VulkanCommandBuffer::create(const CommandBufferCreateInfo& create_info) noexcept
+std::error_code sgf::rhi::VulkanCommandBuffer::create(const CommandBufferCreateInfo& create_info) noexcept
 {
     const auto* vulkan_context = static_cast<const VulkanContext*>(create_info.context);
     auto* vulkan_logical_device = static_cast<VulkanLogicalDevice*>(create_info.logical_device);

@@ -2,15 +2,15 @@
 // Created by stuka on 02.10.2026.
 //
 
-#include "pixelfield/rhi/vulkan/vulkan_buffer.h"
+#include "sgf/rhi/vulkan/vulkan_buffer.h"
 
-#include "pixelfield/rhi/vulkan/vulkan_context.h"
-#include "pixelfield/rhi/vulkan/vulkan_errors.h"
-#include "pixelfield/rhi/vulkan/vulkan_logical_device.h"
-#include "pixelfield/rhi/vulkan/vulkan_physical_device.h"
-#include "pixelfield/rhi/vulkan/vulkan_types.h"
+#include "sgf/rhi/vulkan/vulkan_context.h"
+#include "sgf/rhi/vulkan/vulkan_errors.h"
+#include "sgf/rhi/vulkan/vulkan_logical_device.h"
+#include "sgf/rhi/vulkan/vulkan_physical_device.h"
+#include "sgf/rhi/vulkan/vulkan_types.h"
 
-pf::rhi::VulkanBuffer::VulkanBuffer(VulkanBuffer&& other) noexcept :
+sgf::rhi::VulkanBuffer::VulkanBuffer(VulkanBuffer&& other) noexcept :
     context_(std::exchange(other.context_, {})),
     logical_device_(std::exchange(other.logical_device_, {})),
     handle_(std::exchange(other.handle_, VK_NULL_HANDLE)),
@@ -19,27 +19,27 @@ pf::rhi::VulkanBuffer::VulkanBuffer(VulkanBuffer&& other) noexcept :
 {
 }
 
-pf::rhi::VulkanBuffer::~VulkanBuffer() noexcept
+sgf::rhi::VulkanBuffer::~VulkanBuffer() noexcept
 {
     destroy();
 }
 
-bool pf::rhi::VulkanBuffer::valid() const noexcept
+bool sgf::rhi::VulkanBuffer::valid() const noexcept
 {
     return handle_ != VK_NULL_HANDLE;
 }
 
-std::error_code pf::rhi::VulkanBuffer::update(void* data, size_t offset, size_t size)
+std::error_code sgf::rhi::VulkanBuffer::update(void* data, size_t offset, size_t size)
 {
     return logical_device_->updateBuffer(data, *this, offset, size);
 }
 
-size_t pf::rhi::VulkanBuffer::size()
+size_t sgf::rhi::VulkanBuffer::size()
 {
     return size_;
 }
 
-pf::rhi::VulkanBuffer& pf::rhi::VulkanBuffer::operator=(VulkanBuffer&& other) noexcept
+sgf::rhi::VulkanBuffer& sgf::rhi::VulkanBuffer::operator=(VulkanBuffer&& other) noexcept
 {
     if(this == std::addressof(other)) return *this;
 
@@ -54,7 +54,7 @@ pf::rhi::VulkanBuffer& pf::rhi::VulkanBuffer::operator=(VulkanBuffer&& other) no
     return *this;
 }
 
-std::error_code pf::rhi::VulkanBuffer::createBuffer(VkBufferUsageFlags usage, VkMemoryPropertyFlags properties,
+std::error_code sgf::rhi::VulkanBuffer::createBuffer(VkBufferUsageFlags usage, VkMemoryPropertyFlags properties,
                                                 VkBuffer& out_buffer, VkDeviceMemory& out_memory) const noexcept
 {
     VkBufferCreateInfo vk_create_info{};
@@ -91,7 +91,7 @@ std::error_code pf::rhi::VulkanBuffer::createBuffer(VkBufferUsageFlags usage, Vk
     return {};
 }
 
-void pf::rhi::VulkanBuffer::destroy()
+void sgf::rhi::VulkanBuffer::destroy()
 {
     if(handle_)
     {
@@ -106,7 +106,7 @@ void pf::rhi::VulkanBuffer::destroy()
     }
 }
 
-std::error_code pf::rhi::VulkanBuffer::create(const BufferCreateInfo& create_info)
+std::error_code sgf::rhi::VulkanBuffer::create(const BufferCreateInfo& create_info)
 {
     const auto* vulkan_context = static_cast<const VulkanContext*>(create_info.context_);
     auto* vulkan_logical_device = static_cast<VulkanLogicalDevice*>(create_info.logical_device_);

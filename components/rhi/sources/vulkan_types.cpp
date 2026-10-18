@@ -2,9 +2,9 @@
 // Created by stuka on 12.09.2026.
 //
 
-#include "pixelfield/rhi/vulkan/vulkan_types.h"
+#include "sgf/rhi/vulkan/vulkan_types.h"
 
-namespace pf::rhi
+namespace sgf::rhi
 {
     VkFormat toVkFormat(Format format) noexcept
     {

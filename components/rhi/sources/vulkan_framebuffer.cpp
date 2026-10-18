@@ -2,15 +2,15 @@
 // Created by stuka on 20.09.2026.
 //
 
-#include "pixelfield/rhi/vulkan/vulkan_framebuffer.h"
+#include "sgf/rhi/vulkan/vulkan_framebuffer.h"
 
-#include "pixelfield/rhi/vulkan/vulkan_context.h"
-#include "pixelfield/rhi/vulkan/vulkan_image_view.h"
-#include "pixelfield/rhi/vulkan/vulkan_logical_device.h"
-#include "pixelfield/rhi/vulkan/vulkan_pass.h"
-#include "pixelfield/rhi/vulkan/vulkan_pipeline_state.h"
+#include "sgf/rhi/vulkan/vulkan_context.h"
+#include "sgf/rhi/vulkan/vulkan_image_view.h"
+#include "sgf/rhi/vulkan/vulkan_logical_device.h"
+#include "sgf/rhi/vulkan/vulkan_pass.h"
+#include "sgf/rhi/vulkan/vulkan_pipeline_state.h"
 
-pf::rhi::VulkanFramebuffer::VulkanFramebuffer(VulkanFramebuffer&& other) noexcept :
+sgf::rhi::VulkanFramebuffer::VulkanFramebuffer(VulkanFramebuffer&& other) noexcept :
     context_(std::exchange(other.context_, nullptr)),
     logical_device_(std::exchange(other.logical_device_, nullptr)),
     handle_(std::exchange(other.handle_, VK_NULL_HANDLE))
@@ -18,12 +18,12 @@ pf::rhi::VulkanFramebuffer::VulkanFramebuffer(VulkanFramebuffer&& other) noexcep
 
 }
 
-pf::rhi::VulkanFramebuffer::~VulkanFramebuffer()
+sgf::rhi::VulkanFramebuffer::~VulkanFramebuffer()
 {
     destroy();
 }
 
-pf::rhi::VulkanFramebuffer& pf::rhi::VulkanFramebuffer::operator=(VulkanFramebuffer&& other) noexcept
+sgf::rhi::VulkanFramebuffer& sgf::rhi::VulkanFramebuffer::operator=(VulkanFramebuffer&& other) noexcept
 {
     if(this == std::addressof(other)) return *this;
 
@@ -36,7 +36,7 @@ pf::rhi::VulkanFramebuffer& pf::rhi::VulkanFramebuffer::operator=(VulkanFramebuf
     return *this;
 }
 
-void pf::rhi::VulkanFramebuffer::destroy() noexcept
+void sgf::rhi::VulkanFramebuffer::destroy() noexcept
 {
     if(handle_)
     {
@@ -45,7 +45,7 @@ void pf::rhi::VulkanFramebuffer::destroy() noexcept
     }
 }
 
-std::error_code pf::rhi::VulkanFramebuffer::create(const FramebufferCreateInfo& create_info) noexcept
+std::error_code sgf::rhi::VulkanFramebuffer::create(const FramebufferCreateInfo& create_info) noexcept
 {
     const auto* vulkan_context = static_cast<const VulkanContext*>(create_info.context);
     const auto* vulkan_logical_device = static_cast<const VulkanLogicalDevice*>(create_info.logical_device);
