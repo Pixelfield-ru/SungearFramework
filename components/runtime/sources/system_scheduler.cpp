@@ -8,7 +8,6 @@
 #include "sgf/runtime/system/system_graph.h"
 
 // todo: review
-// todo: fix run time
 
 std::error_code sgf::runtime::SystemScheduler::create(SystemSchedulerCreateInfo create_info,
     SystemScheduler& output) noexcept
