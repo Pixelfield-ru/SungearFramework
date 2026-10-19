@@ -23,7 +23,7 @@ namespace sgf::runtime
     struct SystemSchedule final
     {
         SystemScheduleType type = SystemScheduleType::kFrame;
-        std::chrono::nanoseconds interval = std::chrono::nanoseconds(1);
+        std::chrono::nanoseconds interval {};
         std::uint32_t max_catch_up_steps = 1;
     };
 

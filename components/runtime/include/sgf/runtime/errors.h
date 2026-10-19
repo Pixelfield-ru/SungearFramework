@@ -11,7 +11,8 @@ namespace sgf::runtime
     enum class Error
     {
         kIncompleteSystemContext = 1,
-        kCyclicSystemGraph
+        kCyclicSystemGraph,
+        kInvalidScheduleInterval
     };
 
     struct ErrorCategory final : public std::error_category
@@ -23,6 +24,8 @@ namespace sgf::runtime
             switch(static_cast<Error>(ev))
             {
                 case Error::kIncompleteSystemContext: return "Incomplete context was passed.";
+                case Error::kCyclicSystemGraph: return "System graph is cyclic";
+                case Error::kInvalidScheduleInterval: return "Schedule has zero interval.";
                 default: return "Unknown error";
             }
         }

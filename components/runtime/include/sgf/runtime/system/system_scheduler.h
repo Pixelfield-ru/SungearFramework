@@ -26,7 +26,7 @@ namespace sgf::runtime
 
     struct SystemScheduler final
     {
-        SystemScheduler(SystemSchedulerCreateInfo create_info) noexcept;
+        SystemScheduler() noexcept = default;
         SystemScheduler(const SystemScheduler&) noexcept = delete;
         SystemScheduler(SystemScheduler&&) noexcept = delete;
         ~SystemScheduler() noexcept;
@@ -34,6 +34,8 @@ namespace sgf::runtime
         void run() noexcept;
         void stop() noexcept;
         std::error_code runOnce() noexcept;
+
+        static std::error_code create(SystemSchedulerCreateInfo create_info, SystemScheduler& output) noexcept;
 
     private:
         SystemSchedulerCreateInfo create_info_ {};
