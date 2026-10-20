@@ -19,7 +19,7 @@ namespace sgf::runtime
     {
         const SystemGraph* graph {};
         SystemContext* context;
-        std::vector<SystemSchedule> schedules;
+        std::vector<SystemScheduleState> schedules;
         ThreadPool* thread_pool {};
         const core::LogCallback* debug_output {};
     };
@@ -46,10 +46,10 @@ namespace sgf::runtime
         std::uint32_t running_systems_ {};
         std::vector<std::uint32_t> executable_systems_;
         std::error_code last_error_{};
-        std::vector<SystemSchedule> schedules_;
-        std::vector<SystemScheduleState> schedules_state_;
+        std::vector<SystemScheduleState> schedules_;
         std::optional<std::chrono::steady_clock::time_point> last_run_time_ {};
 
-        void executeNode(SystemContext& context, SystemGraphState& graph_state, const SystemGraph::Node& node) noexcept;
+        void executeNode(SystemContext& context, SystemGraphState& graph_state, const SystemGraph::Node& node, bool ignore_schedule) noexcept;
+        std::error_code runImpl(bool ignore_schedule) noexcept;
     };
 }

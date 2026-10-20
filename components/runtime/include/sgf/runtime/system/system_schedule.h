@@ -20,16 +20,12 @@ namespace sgf::runtime
         kCount
     };
 
-    struct SystemSchedule final
+    struct SystemScheduleState final
     {
         SystemScheduleType type = SystemScheduleType::kFrame;
         std::chrono::nanoseconds interval {};
         std::uint32_t max_catch_up_steps = 1;
-    };
-
-    struct SystemScheduleState final
-    {
-        SystemScheduleType schedule_type = SystemScheduleType::kFrame;
         std::chrono::steady_clock::duration accumulator {};
+        size_t steps {};
     };
 }
