@@ -10,17 +10,39 @@
 
 #include "sgf/runtime/system/system.h"
 #include "sgf/runtime/errors.h"
+#include "sgf/core/errors.h"
 
 std::expected<sgf::runtime::SystemGraph, std::error_code> sgf::runtime::SystemGraph::build(
-    const SystemGraphBuildInfo& build_info) noexcept
+    const SystemGraphBuildInfo& build_info)
 {
     // todo: maybe needs optimization
+    if(!build_info.context) return std::unexpected(core::Error::kInvalidArgument);
+    if(!build_info.debug_output) return std::unexpected(core::Error::kInvalidArgument);
 
     auto* logger = build_info.debug_output;
 
     SystemGraph graph;
+    graph.nodes.reserve(build_info.systems.size());
+    graph.entries.reserve(build_info.systems.size());
 
     const auto& context = build_info.context;
+
+    const auto validate_access = [&](ISystem& system,
+                                     std::span<const std::uint32_t> types,
+                                     std::string_view access) {
+        for(const auto type : types)
+        {
+            if(context->resources.hasType(type)) continue;
+            if(logger)
+            {
+                (*logger)(core::LogLevel::kError,
+                          std::format("System '{}' {} missing type {}.",
+                                      typeid(system).name(), access, type));
+            }
+            return false;
+        }
+        return true;
+    };
 
     // adding nodes
     for(size_t i = 0; i < build_info.systems.size(); ++i)
@@ -29,30 +51,16 @@ std::expected<sgf::runtime::SystemGraph, std::error_code> sgf::runtime::SystemGr
 
         // validation
         const auto system_reads = system->reads();
-        if(!std::ranges::all_of(system_reads, [&](std::uint32_t read_id) {
-            const bool has_type = context->resources.hasType(read_id);
-            if(logger && !has_type)
-            {
-                (*logger)(core::LogLevel::kError,
-                          std::format(
-                              "System '{}' reads the type with ID {} and context does not have that type.",
-                              typeid(*system).name(), read_id));
-            }
-            return has_type;
-        })) return std::unexpected(Error::kIncompleteSystemContext);
+        if(!validate_access(*system, system_reads, "reads"))
+        {
+            return std::unexpected(Error::kIncompleteSystemContext);
+        }
 
         const auto system_writes = system->writes();
-        if(!std::ranges::all_of(system_writes, [&](std::uint32_t write_id) {
-            const bool has_type = context->resources.hasType(write_id);
-            if(logger && !has_type)
-            {
-                (*logger)(core::LogLevel::kError,
-                          std::format(
-                              "System '{}' writes the type with ID {} and context does not have that type.",
-                              typeid(*system).name(), write_id));
-            }
-            return has_type;
-        })) return std::unexpected(Error::kIncompleteSystemContext);
+        if(!validate_access(*system, system_writes, "writes"))
+        {
+            return std::unexpected(Error::kIncompleteSystemContext);
+        }
 
         Node node;
         node.system = system;
@@ -74,23 +82,29 @@ std::expected<sgf::runtime::SystemGraph, std::error_code> sgf::runtime::SystemGr
             {
                 if(other.index == node.index) continue;
 
-                const auto other_reads = other.system->reads();
-                const auto other_writes = other.system->writes();
+                const auto other_sys_reads = other.system->reads();
+                const auto other_sys_writes = other.system->writes();
 
-                if(std::ranges::any_of(other_reads, [&](std::uint32_t other_read_id) {
-                    return write_id == other_read_id && std::ranges::count(other_writes, other_read_id) == 0;
-                }) ||
-                std::ranges::any_of(other_writes, [&](std::uint32_t other_write_id) {
-                    // prevent data race (two systems are writing one type)
-                    return write_id == other_write_id && node.index < other.index;
-                }))
-                {
-                    if(successors_set.contains(other.index)) continue;
+                const bool other_reads =
+                    std::ranges::contains(other_sys_reads, write_id);
+                const bool other_writes =
+                    std::ranges::contains(other_sys_writes, write_id);
 
-                    ++other.dependency_count;
-                    node.successors.push_back(other.index);
-                    successors_set.insert(other.index);
-                }
+                const bool writer_to_reader =
+                    other_reads && !other_writes;
+                const bool writer_to_writer =
+                    other_writes && node.index < other.index;
+
+                // no edge (nodes dont depend on each other)
+                if (!writer_to_reader && !writer_to_writer)
+                    continue;
+
+                // if current node has this successor then skipping the successor
+                if(!successors_set.insert(other.index).second)
+                    continue;
+
+                ++other.dependency_count;
+                node.successors.push_back(other.index);
             }
         }
 
@@ -130,22 +144,22 @@ std::expected<sgf::runtime::SystemGraph, std::error_code> sgf::runtime::SystemGr
         }
     }
 
-    std::uint32_t system_index {};
-    if(std::ranges::any_of(state.remaining, [&](std::uint32_t remaining) {
-        const bool has_remaining = remaining != 0;
+    // check if any node has remaining edges
+    for(const auto& node : graph.nodes)
+    {
+        const auto remaining = state.remaining[node.index];
+        if(remaining == 0) continue;
 
-        if(logger && has_remaining)
+        if(logger)
         {
-            (*logger)(core::LogLevel::kError, std::format("Graph is cyclic. System {} has {} unfulfilled edges left.",
-                                                          typeid(*build_info.systems[system_index]).name(), remaining));
+            (*logger)(core::LogLevel::kError,
+                      std::format("Graph is cyclic. System {} has {} unfulfilled edges left.",
+                                  typeid(*node.system).name(), remaining));
         }
 
-        ++system_index;
-        return has_remaining;
-    }))
-    {
         return std::unexpected(Error::kCyclicSystemGraph);
     }
+
 
     return graph;
 }

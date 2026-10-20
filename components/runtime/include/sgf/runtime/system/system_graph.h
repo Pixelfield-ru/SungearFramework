@@ -50,6 +50,6 @@ namespace sgf::runtime
         /// Entry nodes.
         std::vector<std::uint32_t> entries;
 
-        [[nodiscard]] static std::expected<SystemGraph, std::error_code> build(const SystemGraphBuildInfo& build_info) noexcept;
+        [[nodiscard]] static std::expected<SystemGraph, std::error_code> build(const SystemGraphBuildInfo& build_info);
     };
 }

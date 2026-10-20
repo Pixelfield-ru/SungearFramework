@@ -31,9 +31,9 @@ namespace sgf::runtime
         SystemScheduler(SystemScheduler&&) noexcept = delete;
         ~SystemScheduler() noexcept;
 
-        void run() noexcept;
+        void run();
         void stop() noexcept;
-        std::error_code runOnce() noexcept;
+        std::error_code runOnce();
 
         static std::error_code create(SystemSchedulerCreateInfo create_info, SystemScheduler& output) noexcept;
 
@@ -49,7 +49,7 @@ namespace sgf::runtime
         std::vector<SystemScheduleState> schedules_;
         std::optional<std::chrono::steady_clock::time_point> last_run_time_ {};
 
-        void executeNode(SystemContext& context, SystemGraphState& graph_state, const SystemGraph::Node& node, bool ignore_schedule) noexcept;
-        std::error_code runImpl(bool ignore_schedule) noexcept;
+        void executeNode(SystemContext& context, SystemGraphState& graph_state, const SystemGraph::Node& node, bool ignore_schedule);
+        std::error_code runImpl(bool ignore_schedule);
     };
 }
