@@ -10,6 +10,7 @@
 #include <memory>
 
 #include "shader_stage.h"
+#include "sgf/core/memory.h"
 
 namespace sgf::rhi
 {
@@ -18,7 +19,7 @@ namespace sgf::rhi
 
     struct IShaderCompiler
     {
-        std::unordered_map<ShaderStageType, std::string> standard_entry_points {
+        core::UnorderedMap<ShaderStageType, core::String> standard_entry_points {
             { ShaderStageType::kVertex, "vertexMain" },
             { ShaderStageType::kFragment, "fragmentMain" },
             { ShaderStageType::kCompute, "computeMain" },
@@ -27,8 +28,10 @@ namespace sgf::rhi
             { ShaderStageType::kGeometry, "geometryMain" }
         };
 
-        std::vector<std::filesystem::path> search_paths;
+        core::Vector<std::filesystem::path> search_paths;
         std::filesystem::path cache_path = "cache/shaders";
+
+        std::pmr::memory_resource* memory_resource = std::pmr::get_default_resource();
 
         virtual ~IShaderCompiler() = default;
 

@@ -7,6 +7,7 @@
 #include <string>
 
 #include "types.h"
+#include "sgf/core/memory.h"
 
 namespace sgf::rhi
 {
@@ -16,7 +17,7 @@ namespace sgf::rhi
 
         [[nodiscard]] virtual bool valid() const noexcept = 0;
 
-        [[nodiscard]] std::string name() const noexcept
+        [[nodiscard]] core::String name() const noexcept
         {
             return name_;
         }
@@ -27,7 +28,7 @@ namespace sgf::rhi
         }
 
     protected:
-        std::string name_;
+        core::String name_;
         DeviceType type_ = DeviceType::kIntegratedGpu;
     };
 }

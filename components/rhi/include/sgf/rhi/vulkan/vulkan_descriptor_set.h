@@ -38,6 +38,8 @@ namespace sgf::rhi
         VkDescriptorSet handle_ = VK_NULL_HANDLE;
         VkDescriptorSetLayout layout_ = VK_NULL_HANDLE;
 
+        std::pmr::memory_resource* memory_resource_ {};
+
         void destroy() override;
         [[nodiscard]] std::error_code create(const DescriptorSetCreateInfo& create_info) override;
     };

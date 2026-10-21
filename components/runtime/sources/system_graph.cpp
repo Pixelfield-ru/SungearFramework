@@ -22,8 +22,8 @@ std::expected<sgf::runtime::SystemGraph, std::error_code> sgf::runtime::SystemGr
     auto* logger = build_info.debug_output;
 
     SystemGraph graph;
-    graph.nodes.reserve(build_info.systems.size());
-    graph.entries.reserve(build_info.systems.size());
+    graph.nodes = core::Vector<Node>(build_info.systems.size(), build_info.resource);
+    graph.entries = core::Vector<std::uint32_t>(build_info.systems.size(), build_info.resource);
 
     const auto& context = build_info.context;
 
@@ -65,11 +65,12 @@ std::expected<sgf::runtime::SystemGraph, std::error_code> sgf::runtime::SystemGr
         Node node;
         node.system = system;
         node.index = i;
+        node.successors = core::Vector<std::uint32_t>(build_info.resource);
 
-        graph.nodes.push_back(std::move(node));
+        graph.nodes[i] = std::move(node);
     }
 
-    std::unordered_set<std::uint32_t> successors_set;
+    core::UnorderedSet<std::uint32_t> successors_set(build_info.resource);
 
     // building dependencies
     for(auto& node : graph.nodes)
@@ -112,16 +113,17 @@ std::expected<sgf::runtime::SystemGraph, std::error_code> sgf::runtime::SystemGr
     }
 
     // getting entries
-    for(auto& node : graph.nodes)
+    for(size_t i = 0; i < graph.nodes.size(); ++i)
     {
+        const auto& node = graph.nodes[i];
         if(node.dependency_count > 0) continue;
 
-        graph.entries.push_back(node.index);
+        graph.entries[i] = node.index;
     }
 
     // initializing state to check cycles
     SystemGraphState state;
-    state.remaining.resize(graph.nodes.size());
+    state.remaining = core::Vector<std::uint32_t>(graph.nodes.size(), build_info.resource);
     for(const auto& node : graph.nodes)
     {
         state.remaining[node.index] = node.dependency_count;

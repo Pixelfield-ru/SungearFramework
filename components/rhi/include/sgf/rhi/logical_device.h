@@ -27,6 +27,8 @@ namespace sgf::rhi
     {
         const IContext* context {};
         const IPhysicalDevice* physical_device {};
+
+        std::pmr::memory_resource* memory_resource = std::pmr::get_default_resource();
     };
 
     struct SubmitInfo final
@@ -51,17 +53,17 @@ namespace sgf::rhi
         [[nodiscard]] virtual std::error_code submit(const SubmitInfo& submit_info) = 0;
         [[nodiscard]] virtual std::error_code waitIdle() = 0;
 
-        [[nodiscard]] virtual std::expected<std::unique_ptr<ISwapchain>, std::error_code> createSwapchain(const SwapchainCreateInfo& create_info) noexcept = 0;
-        [[nodiscard]] virtual std::expected<std::unique_ptr<IImage>, std::error_code> createImage(const ImageCreateInfo& create_info) noexcept = 0;
-        [[nodiscard]] virtual std::expected<std::unique_ptr<IImageView>, std::error_code> createImageView(const ImageViewCreateInfo& create_info) noexcept = 0;
-        [[nodiscard]] virtual std::expected<std::unique_ptr<ISampler>, std::error_code> createSampler(const SamplerCreateInfo& create_info) noexcept = 0;
-        [[nodiscard]] virtual std::expected<std::unique_ptr<IShader>, std::error_code> createShader(const ShaderCreateInfo& create_info) noexcept = 0;
-        [[nodiscard]] virtual std::expected<std::unique_ptr<IPass>, std::error_code> createPass(const PassCreateInfo& create_info) noexcept = 0;
-        [[nodiscard]] virtual std::expected<std::unique_ptr<IPipelineState>, std::error_code> createPipelineState(const PipelineStateCreateInfo& create_info) noexcept = 0;
-        [[nodiscard]] virtual std::expected<std::unique_ptr<IFramebuffer>, std::error_code> createFramebuffer(const FramebufferCreateInfo& create_info) noexcept = 0;
-        [[nodiscard]] virtual std::expected<std::unique_ptr<ICommandBuffer>, std::error_code> createCommandBuffer(const CommandBufferCreateInfo& create_info) noexcept = 0;
-        [[nodiscard]] virtual std::expected<std::unique_ptr<IBuffer>, std::error_code> createBuffer(const BufferCreateInfo& create_info) noexcept = 0;
-        [[nodiscard]] virtual std::expected<std::unique_ptr<IDescriptorSet>, std::error_code> createDescriptorSet(const DescriptorSetCreateInfo& create_info) noexcept = 0;
+        [[nodiscard]] virtual std::expected<core::UniquePtr<ISwapchain>, std::error_code> createSwapchain(const SwapchainCreateInfo& create_info) noexcept = 0;
+        [[nodiscard]] virtual std::expected<core::UniquePtr<IImage>, std::error_code> createImage(const ImageCreateInfo& create_info) noexcept = 0;
+        [[nodiscard]] virtual std::expected<core::UniquePtr<IImageView>, std::error_code> createImageView(const ImageViewCreateInfo& create_info) noexcept = 0;
+        [[nodiscard]] virtual std::expected<core::UniquePtr<ISampler>, std::error_code> createSampler(const SamplerCreateInfo& create_info) noexcept = 0;
+        [[nodiscard]] virtual std::expected<core::UniquePtr<IShader>, std::error_code> createShader(const ShaderCreateInfo& create_info) noexcept = 0;
+        [[nodiscard]] virtual std::expected<core::UniquePtr<IPass>, std::error_code> createPass(const PassCreateInfo& create_info) noexcept = 0;
+        [[nodiscard]] virtual std::expected<core::UniquePtr<IPipelineState>, std::error_code> createPipelineState(const PipelineStateCreateInfo& create_info) noexcept = 0;
+        [[nodiscard]] virtual std::expected<core::UniquePtr<IFramebuffer>, std::error_code> createFramebuffer(const FramebufferCreateInfo& create_info) noexcept = 0;
+        [[nodiscard]] virtual std::expected<core::UniquePtr<ICommandBuffer>, std::error_code> createCommandBuffer(const CommandBufferCreateInfo& create_info) noexcept = 0;
+        [[nodiscard]] virtual std::expected<core::UniquePtr<IBuffer>, std::error_code> createBuffer(const BufferCreateInfo& create_info) noexcept = 0;
+        [[nodiscard]] virtual std::expected<core::UniquePtr<IDescriptorSet>, std::error_code> createDescriptorSet(const DescriptorSetCreateInfo& create_info) noexcept = 0;
 
     private:
         virtual void destroy() = 0;

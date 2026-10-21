@@ -14,7 +14,9 @@ std::error_code sgf::runtime::SystemScheduler::create(SystemSchedulerCreateInfo 
 {
     output.create_info_ = std::move(create_info);
 
-    output.schedules_.resize(SystemScheduleType::kCount);
+    output.memory_resource_ = output.create_info_.memory_resource;
+    output.schedules_ = core::Vector<SystemScheduleState>(SystemScheduleType::kCount, output.memory_resource_);
+    output.executable_systems_ = core::Vector<std::uint32_t>(output.memory_resource_);
 
     // creating schedules
     for(size_t i = 0; i < SystemScheduleType::kCount; ++i)
@@ -123,7 +125,6 @@ void sgf::runtime::SystemScheduler::executeNode(SystemContext& context, SystemGr
     auto execution = [this, system, &context, notify_successors, steps_count] {
         std::error_code execute_res {};
 
-
         for(size_t i = 0; i < steps_count; ++i)
         {
             execute_res = system->execute(context);
@@ -189,7 +190,7 @@ std::error_code sgf::runtime::SystemScheduler::runImpl(bool ignore_schedule)
     auto& context = *create_info_.context;
 
     SystemGraphState state;
-    state.remaining.resize(graph.nodes.size());
+    state.remaining = core::Vector<std::uint32_t>(graph.nodes.size(), memory_resource_);
     for(const auto& node : graph.nodes)
     {
         state.remaining[node.index] = node.dependency_count;

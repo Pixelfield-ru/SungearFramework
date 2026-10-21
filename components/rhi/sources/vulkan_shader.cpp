@@ -4,6 +4,7 @@
 
 #include "sgf/rhi/vulkan/vulkan_shader.h"
 
+#include "sgf/core/errors.h"
 #include "sgf/rhi/vulkan/vulkan_context.h"
 #include "sgf/rhi/vulkan/vulkan_logical_device.h"
 #include "sgf/rhi/vulkan/vulkan_types.h"
@@ -11,7 +12,8 @@
 sgf::rhi::VulkanShader::VulkanShader(VulkanShader&& other) noexcept :
     context_(std::exchange(other.context_, nullptr)),
     logical_device_(std::exchange(other.logical_device_, nullptr)),
-    stages_(std::move(other.stages_))
+    stages_(std::move(other.stages_)),
+    memory_resource_(std::move(other.memory_resource_))
 {
 }
 
@@ -34,6 +36,7 @@ sgf::rhi::VulkanShader& sgf::rhi::VulkanShader::operator=(VulkanShader&& other) 
     context_ = std::exchange(other.context_, nullptr);
     logical_device_ = std::exchange(other.logical_device_, nullptr);
     stages_ = std::move(other.stages_);
+    memory_resource_ = std::move(other.memory_resource_);
 
     return *this;
 }
@@ -49,12 +52,16 @@ void sgf::rhi::VulkanShader::destroy() noexcept
 
 std::error_code sgf::rhi::VulkanShader::create(const ShaderCreateInfo& create_info) noexcept
 {
+    if(!create_info.memory_resource) return core::Error::kInvalidArgument;
+
     const auto* vulkan_context = static_cast<const VulkanContext*>(create_info.context);
     const auto* vulkan_logical_device = static_cast<const VulkanLogicalDevice*>(create_info.logical_device);
 
     context_ = vulkan_context;
     logical_device_ = vulkan_logical_device;
+    memory_resource_ = create_info.memory_resource;
 
+    stages_ = core::Vector<Stage>(memory_resource_);
     stages_.reserve(create_info.stages_create_info.size());
 
     for(const auto& stage : create_info.stages_create_info)

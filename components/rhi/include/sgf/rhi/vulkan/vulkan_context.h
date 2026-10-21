@@ -12,6 +12,7 @@
 #include <GLFW/glfw3.h>
 
 #include "sgf/rhi/context.h"
+#include "sgf/core/memory.h"
 
 namespace sgf::rhi
 {
@@ -24,9 +25,9 @@ namespace sgf::rhi
     struct VulkanContextCreateInfo final : ContextCreateInfo
     {
         /// Optional.
-        std::vector<std::string> validation_layers;
+        core::Vector<std::string> validation_layers;
         /// Optional.
-        std::vector<std::string> extensions {
+        core::Vector<std::string> extensions {
             VK_KHR_SWAPCHAIN_EXTENSION_NAME
         };
         /// Optional.
@@ -38,7 +39,7 @@ namespace sgf::rhi
                                          p_callback_data,
                                          void* p_user_data) { };
         /// Optional. Defaults to new/delete-backed host allocator.
-        std::unique_ptr<VkAllocationCallbacks> allocator;
+        core::UniquePtr<VkAllocationCallbacks> allocator;
     };
 
     struct VulkanContext final : IContext
@@ -62,9 +63,9 @@ namespace sgf::rhi
 
         [[nodiscard]] bool valid() const noexcept override;
 
-        [[nodiscard]] std::vector<std::shared_ptr<IPhysicalDevice>> physicalDevices() noexcept override;
+        [[nodiscard]] core::Vector<core::SharedPtr<IPhysicalDevice>> physicalDevices() noexcept override;
 
-        [[nodiscard]] std::expected<std::unique_ptr<ILogicalDevice>, std::error_code> createLogicalDevice(const LogicalDeviceCreateInfo& create_info) noexcept override;
+        [[nodiscard]] std::expected<core::UniquePtr<ILogicalDevice>, std::error_code> createLogicalDevice(const LogicalDeviceCreateInfo& create_info) noexcept override;
 
         VulkanContext& operator=(const VulkanContext&) = delete;
         VulkanContext& operator=(VulkanContext&& other) noexcept;
@@ -75,14 +76,16 @@ namespace sgf::rhi
         PFN_vkCreateDebugUtilsMessengerEXT create_messenger_ {};
         PFN_vkDestroyDebugUtilsMessengerEXT destroy_messenger_ {};
 
-        std::unique_ptr<VkAllocationCallbacks> allocator_;
+        core::UniquePtr<VkAllocationCallbacks> allocator_;
 
         VkInstance instance_ {};
         VkSurfaceKHR surface_ {};
         VkDebugUtilsMessengerEXT messenger_ {};
 
-        std::vector<std::string> enabled_validation_layers_;
-        std::vector<std::string> enabled_extensions_;
+        std::pmr::memory_resource* memory_resource_ {};
+
+        core::Vector<std::string> enabled_validation_layers_;
+        core::Vector<std::string> enabled_extensions_;
 
         void destroy() noexcept;
     };

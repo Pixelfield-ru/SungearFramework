@@ -9,12 +9,24 @@
 
 #include "sgf/core/utility/type_traits.h"
 #include "sgf/core/utility/assert.h"
+#include "sgf/core/memory.h"
 
 namespace sgf::core
 {
     // todo: use pmr
     struct TypeMap final
     {
+        TypeMap(std::pmr::memory_resource* resource) noexcept :
+            memory_resource_(resource),
+            storage_(resource)
+        {
+
+        }
+
+        TypeMap() noexcept = default;
+        TypeMap(const TypeMap&) = default;
+        TypeMap(TypeMap&&) = default;
+
         template<typename T, typename... Args>
         T& emplace(Args&&... args) noexcept
         {
@@ -24,7 +36,7 @@ namespace sgf::core
                 storage_.resize(index + 1);
             }
 
-            auto storage = std::make_unique<Storage<T>>(std::forward<Args>(args)...);
+            auto storage = core::make_unique<Storage<T>>(memory_resource_, std::forward<Args>(args)...);
             auto& value = storage->value;
             storage_[index] = std::move(storage);
 
@@ -62,6 +74,9 @@ namespace sgf::core
             return type_index < storage_.size() && storage_[type_index];
         }
 
+        TypeMap& operator=(const TypeMap&) = default;
+        TypeMap& operator=(TypeMap&&) = default;
+
     private:
         struct Erased
         {
@@ -77,6 +92,7 @@ namespace sgf::core
             T value;
         };
 
-        std::vector<std::unique_ptr<Erased>> storage_;
+        std::pmr::memory_resource* memory_resource_ = std::pmr::get_default_resource();
+        Vector<UniquePtr<Erased>> storage_;
     };
 }

@@ -43,7 +43,7 @@ namespace sgf::rhi
         bool enable_alpha_to_coverage = false;
         bool enable_alpha_to_one = false;
 
-        std::vector<AttachmentBlendInfo> attachments_blend_info;
+        core::Vector<AttachmentBlendInfo> attachments_blend_info;
 
         const IPass* pass {};
 
@@ -51,10 +51,12 @@ namespace sgf::rhi
         LogicOp logic_op = LogicOp::kCopy;
         glm::vec4 blend_constants{};
 
-        std::vector<VertexBindingDescription> vertex_bindings;
-        std::vector<const IDescriptorSet*> descriptor_sets;
+        core::Vector<VertexBindingDescription> vertex_bindings;
+        core::Vector<const IDescriptorSet*> descriptor_sets;
 
         IShader* shader {};
+
+        std::pmr::memory_resource* memory_resource = std::pmr::get_default_resource();
     };
 
     struct IPipelineState

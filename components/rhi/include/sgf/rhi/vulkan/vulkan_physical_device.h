@@ -23,6 +23,7 @@ namespace sgf::rhi
         friend struct VulkanBuffer;
         friend struct VulkanImage;
 
+        VulkanPhysicalDevice() = default;
         VulkanPhysicalDevice(const VulkanPhysicalDevice&) = delete;
         VulkanPhysicalDevice(VulkanPhysicalDevice&& other) noexcept;
 
@@ -34,8 +35,8 @@ namespace sgf::rhi
     private:
         struct SurfaceSupport
         {
-            std::vector<VkSurfaceFormatKHR> formats_;
-            std::vector<VkPresentModeKHR> present_modes_;
+            core::Vector<VkSurfaceFormatKHR> formats_;
+            core::Vector<VkPresentModeKHR> present_modes_;
         };
 
         // destroys with VkInstance
@@ -47,7 +48,5 @@ namespace sgf::rhi
         std::array<std::optional<std::uint32_t>, std::to_underlying(QueueFamilyType::kCount)> queue_families_indices_ {};
 
         [[nodiscard]] std::int32_t findMemoryIndex(VkMemoryRequirements requirements, VkMemoryPropertyFlags properties) const noexcept;
-
-        VulkanPhysicalDevice() = default;
     };
 }

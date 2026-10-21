@@ -7,6 +7,7 @@
 #include <unordered_map>
 #include <slang-com-ptr.h>
 
+#include "sgf/core/memory.h"
 #include "sgf/rhi/compiled_shader.h"
 
 namespace sgf::rhi
@@ -23,7 +24,7 @@ namespace sgf::rhi
         Slang::ComPtr<slang::IModule> module;
         Slang::ComPtr<slang::IBlob> code_cache;
 
-        std::unordered_map<ShaderStageType, Stage> entry_points;
+        core::UnorderedMap<ShaderStageType, Stage> entry_points;
 
         void getIR(ShaderStageType stage_type, const void** ir_buffer, size_t* ir_buffer_size) override;
     };

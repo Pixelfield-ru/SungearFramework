@@ -9,6 +9,7 @@
 #include <system_error>
 
 #include "types.h"
+#include "sgf/core/memory.h"
 
 namespace sgf::rhi
 {
@@ -25,6 +26,7 @@ namespace sgf::rhi
         ILogicalDevice* logical_device {};
 
         QueueFamilyType queue_family = QueueFamilyType::kGraphics;
+        std::pmr::memory_resource* memory_resource = std::pmr::get_default_resource();
     };
 
     struct DepthStencilClearInfo final
@@ -45,7 +47,7 @@ namespace sgf::rhi
         const IFramebuffer* framebuffer {};
 
         Rect<std::int32_t> render_area {};
-        std::vector<ClearInfo> clear_infos;
+        core::Vector<ClearInfo> clear_infos;
     };
 
     struct ICommandBuffer

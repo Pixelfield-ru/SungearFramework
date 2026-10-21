@@ -4,6 +4,7 @@
 
 #include "sgf/rhi/vulkan/vulkan_descriptor_set.h"
 
+#include "sgf/core/errors.h"
 #include "sgf/rhi/vulkan/vulkan_buffer.h"
 #include "sgf/rhi/vulkan/vulkan_context.h"
 #include "sgf/rhi/vulkan/vulkan_errors.h"
@@ -18,7 +19,8 @@ sgf::rhi::VulkanDescriptorSet::VulkanDescriptorSet(VulkanDescriptorSet&& other) 
     logical_device_(std::exchange(other.logical_device_, {})),
     pool_(std::exchange(other.pool_, VK_NULL_HANDLE)),
     handle_(std::exchange(other.handle_, VK_NULL_HANDLE)),
-    layout_(std::exchange(other.layout_, VK_NULL_HANDLE))
+    layout_(std::exchange(other.layout_, VK_NULL_HANDLE)),
+    memory_resource_(std::exchange(other.memory_resource_, {}))
 {
 }
 
@@ -29,10 +31,10 @@ sgf::rhi::VulkanDescriptorSet::~VulkanDescriptorSet() noexcept
 
 void sgf::rhi::VulkanDescriptorSet::update(std::span<DescriptorInfo> descriptors) noexcept
 {
-    std::vector<VkWriteDescriptorSet> vulkan_descriptors(descriptors.size());
+    core::Vector<VkWriteDescriptorSet> vulkan_descriptors(descriptors.size(), memory_resource_);
     // Must outlive vkUpdateDescriptorSets — WriteDescriptorSet only stores pointers.
-    std::vector<std::vector<VkDescriptorBufferInfo>> buffer_infos(descriptors.size());
-    std::vector<std::vector<VkDescriptorImageInfo>> image_infos(descriptors.size());
+    core::Vector<std::vector<VkDescriptorBufferInfo>> buffer_infos(descriptors.size(), memory_resource_);
+    core::Vector<std::vector<VkDescriptorImageInfo>> image_infos(descriptors.size(), memory_resource_);
 
     for(size_t i = 0; i < descriptors.size(); ++i)
     {
@@ -100,6 +102,7 @@ sgf::rhi::VulkanDescriptorSet& sgf::rhi::VulkanDescriptorSet::operator=(VulkanDe
     pool_ = std::exchange(other.pool_, VK_NULL_HANDLE);
     handle_ = std::exchange(other.handle_, VK_NULL_HANDLE);
     layout_ = std::exchange(other.layout_, VK_NULL_HANDLE);
+    memory_resource_ = std::exchange(other.memory_resource_, {});
 
     return *this;
 }
@@ -121,11 +124,14 @@ void sgf::rhi::VulkanDescriptorSet::destroy()
 
 std::error_code sgf::rhi::VulkanDescriptorSet::create(const DescriptorSetCreateInfo& create_info)
 {
+    if(!create_info.memory_resource) return core::Error::kInvalidArgument;
+
     const auto* vulkan_context = static_cast<const VulkanContext*>(create_info.context);
     auto* vulkan_logical_device = static_cast<VulkanLogicalDevice*>(create_info.logical_device);
 
     context_ = vulkan_context;
     logical_device_ = vulkan_logical_device;
+    memory_resource_ = create_info.memory_resource;
 
     if(const auto res = logical_device_->descriptorPool())
     {
@@ -136,7 +142,7 @@ std::error_code sgf::rhi::VulkanDescriptorSet::create(const DescriptorSetCreateI
         return res.error();
     }
 
-    std::vector<VkDescriptorSetLayoutBinding> vulkan_bindings(create_info.bindings.size());
+    core::Vector<VkDescriptorSetLayoutBinding> vulkan_bindings(create_info.bindings.size(), memory_resource_);
     for(size_t i = 0; i < create_info.bindings.size(); ++i)
     {
         const auto& binding = create_info.bindings[i];

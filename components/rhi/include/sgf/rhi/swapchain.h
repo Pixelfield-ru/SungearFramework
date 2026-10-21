@@ -27,6 +27,7 @@ namespace sgf::rhi
         Format preferred_format = Format::kBgra8Unorm;
         ColorSpace preferred_color_space = ColorSpace::kSrgbNonlinear;
         std::int8_t max_frames_in_flight = 2;
+        std::pmr::memory_resource* memory_resource = std::pmr::get_default_resource();
     };
 
     struct AcquiredFrame final

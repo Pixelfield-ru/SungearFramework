@@ -19,9 +19,10 @@ namespace sgf::runtime
     {
         const SystemGraph* graph {};
         SystemContext* context;
-        std::vector<SystemScheduleState> schedules;
+        core::Vector<SystemScheduleState> schedules;
         ThreadPool* thread_pool {};
         const core::LogCallback* debug_output {};
+        std::pmr::memory_resource* memory_resource = std::pmr::get_default_resource();
     };
 
     struct SystemScheduler final
@@ -44,10 +45,12 @@ namespace sgf::runtime
         std::condition_variable systems_cv_;
         std::atomic<bool> running_;
         std::uint32_t running_systems_ {};
-        std::vector<std::uint32_t> executable_systems_;
+        core::Vector<std::uint32_t> executable_systems_;
         std::error_code last_error_{};
-        std::vector<SystemScheduleState> schedules_;
+        core::Vector<SystemScheduleState> schedules_;
         std::optional<std::chrono::steady_clock::time_point> last_run_time_ {};
+
+        std::pmr::memory_resource* memory_resource_ {};
 
         void executeNode(SystemContext& context, SystemGraphState& graph_state, const SystemGraph::Node& node, bool ignore_schedule);
         std::error_code runImpl(bool ignore_schedule);

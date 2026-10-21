@@ -10,6 +10,8 @@
 
 #include "types.h"
 
+#include "sgf/core/memory.h"
+
 namespace sgf::rhi
 {
     struct IContext;
@@ -21,8 +23,10 @@ namespace sgf::rhi
         const ILogicalDevice* logical_device {};
 
         // targets
-        std::vector<ColorAttachmentCreateInfo> color_attachments;
+        core::Vector<ColorAttachmentCreateInfo> color_attachments;
         std::optional<DepthStencilAttachmentCreateInfo> depth_stencil_attachment;
+
+        std::pmr::memory_resource* memory_resource = std::pmr::get_default_resource();
     };
 
     struct IPass

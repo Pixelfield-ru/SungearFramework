@@ -16,15 +16,17 @@ namespace sgf::rhi
     struct ContextCreateInfo
     {
         /// Required.
-        std::string app_name;
+        core::String app_name;
         /// Required.
-        std::string engine_name;
+        core::String engine_name;
         /// Optional.
         bool enable_api_debug_output {};
         //// Required.
         GLFWwindow* window {};
         /// Optional.
         const core::LogCallback* rhi_debug_output {};
+
+        std::pmr::memory_resource* memory_resource = std::pmr::get_default_resource();
     };
 
     struct IPhysicalDevice;
@@ -35,16 +37,19 @@ namespace sgf::rhi
 
         [[nodiscard]] virtual bool valid() const noexcept = 0;
 
-        [[nodiscard]] virtual std::vector<std::shared_ptr<IPhysicalDevice>> physicalDevices() noexcept = 0;
+        [[nodiscard]] virtual core::Vector<core::SharedPtr<IPhysicalDevice>> physicalDevices() noexcept = 0;
 
-        [[nodiscard]] virtual std::expected<std::unique_ptr<ILogicalDevice>, std::error_code> createLogicalDevice(const LogicalDeviceCreateInfo& create_info) noexcept = 0;
+        [[nodiscard]] virtual std::expected<core::UniquePtr<ILogicalDevice>, std::error_code> createLogicalDevice(const LogicalDeviceCreateInfo& create_info) noexcept = 0;
 
         void printDebugMessage(core::LogLevel level, std::string_view msg) const noexcept
         {
-            rhi_debug_output_(level, msg);
+            if(rhi_debug_output_)
+            {
+                (*rhi_debug_output_)(level, msg);
+            }
         }
 
     protected:
-        core::LogCallback rhi_debug_output_;
+        const core::LogCallback* rhi_debug_output_ {};
     };
 }

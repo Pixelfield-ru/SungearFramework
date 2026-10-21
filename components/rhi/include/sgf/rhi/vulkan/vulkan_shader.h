@@ -39,7 +39,9 @@ namespace sgf::rhi
         const VulkanContext* context_ {};
         const VulkanLogicalDevice* logical_device_ {};
 
-        std::vector<Stage> stages_;
+        core::Vector<Stage> stages_;
+
+        std::pmr::memory_resource* memory_resource_ {};
 
         void destroy() noexcept override;
         [[nodiscard]] std::error_code create(const ShaderCreateInfo& create_info) noexcept override;

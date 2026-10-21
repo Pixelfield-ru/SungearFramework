@@ -7,6 +7,7 @@
 #include <iostream>
 #include <utility>
 
+#include "sgf/core/errors.h"
 #include "sgf/rhi/vulkan/vulkan_framebuffer.h"
 #include "sgf/rhi/vulkan/vulkan_image.h"
 #include "sgf/rhi/vulkan/vulkan_image_view.h"
@@ -33,7 +34,7 @@ VkBool32 sgf::rhi::debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT message_
     else if(message_severity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) { msg_severity = "warn"; }
     else if(message_severity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) { msg_severity = "error"; }
 
-    std::string objects_desc;
+    core::String objects_desc;
     for(std::uint32_t i = 0; i < p_callback_data->objectCount; ++i)
     {
         auto& object = p_callback_data->pObjects[i];
@@ -62,6 +63,7 @@ sgf::rhi::VulkanContext::VulkanContext(VulkanContext&& other) noexcept :
     instance_(std::exchange(other.instance_, VK_NULL_HANDLE)),
     surface_(std::exchange(other.surface_, VK_NULL_HANDLE)),
     messenger_(std::exchange(other.messenger_, VK_NULL_HANDLE)),
+    memory_resource_(std::exchange(other.memory_resource_, {})),
     enabled_validation_layers_(std::move(other.enabled_validation_layers_)),
     enabled_extensions_(std::move(other.enabled_extensions_))
 {
@@ -74,19 +76,25 @@ sgf::rhi::VulkanContext::~VulkanContext() noexcept
 }
 
 std::error_code sgf::rhi::VulkanContext::create(VulkanContextCreateInfo create_info,
-                                               VulkanContext& output) noexcept
+                                                VulkanContext& output) noexcept
 {
+    if(!create_info.memory_resource)
+    {
+        return core::Error::kInvalidArgument;
+    }
+
     output.allocator_ = std::move(create_info.allocator);
     output.enabled_extensions_ = std::move(create_info.extensions);
     output.enabled_validation_layers_ = std::move(create_info.validation_layers);
     output.rhi_debug_output_ = std::move(create_info.rhi_debug_output);
+    output.memory_resource_ = std::move(create_info.memory_resource);
 
     // getting count of extensions that are supported by instance
     uint32_t extension_count = 0;
     vkEnumerateInstanceExtensionProperties(nullptr, &extension_count, nullptr);
 
     // getting extensions supported by instance
-    std::vector<VkExtensionProperties> extensions(extension_count);
+    core::Vector<VkExtensionProperties> extensions(extension_count, output.memory_resource_);
     vkEnumerateInstanceExtensionProperties(nullptr, &extension_count, extensions.data());
 
     uint32_t glfw_extension_count = 0;
@@ -95,20 +103,20 @@ std::error_code sgf::rhi::VulkanContext::create(VulkanContextCreateInfo create_i
     // getting required by glfw extensions
     glfw_extensions = glfwGetRequiredInstanceExtensions(&glfw_extension_count);
 
-    std::vector<const char*> required_extensions(glfw_extensions, glfw_extensions + glfw_extension_count);
+    core::Vector<const char*> required_extensions(glfw_extensions, glfw_extensions + glfw_extension_count, output.memory_resource_);
     if(create_info.enable_api_debug_output)
     {
         required_extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
     }
 
-    std::vector<const char*> validation_layers;
+    core::Vector<const char*> validation_layers(output.memory_resource_);
 
     if(create_info.enable_validation_layers)
     {
         uint32_t layer_count;
         vkEnumerateInstanceLayerProperties(&layer_count, nullptr);
 
-        std::vector<VkLayerProperties> available_layers(layer_count);
+        core::Vector<VkLayerProperties> available_layers(layer_count, output.memory_resource_);
         vkEnumerateInstanceLayerProperties(&layer_count, available_layers.data());
 
         for(const auto& layer : output.enabled_validation_layers_)
@@ -189,17 +197,19 @@ bool sgf::rhi::VulkanContext::valid() const noexcept
     return instance_ != nullptr;
 }
 
-std::vector<std::shared_ptr<sgf::rhi::IPhysicalDevice>> sgf::rhi::VulkanContext::physicalDevices() noexcept
+sgf::core::Vector<sgf::core::SharedPtr<sgf::rhi::IPhysicalDevice>> sgf::rhi::VulkanContext::physicalDevices() noexcept
 {
     uint32_t device_count = 0;
     vkEnumeratePhysicalDevices(instance_, &device_count, nullptr);
 
     if(device_count == 0) return {};
 
-    std::vector<VkPhysicalDevice> vulkan_devices(device_count);
+    core::Vector<VkPhysicalDevice> vulkan_devices(device_count, memory_resource_);
     vkEnumeratePhysicalDevices(instance_, &device_count, vulkan_devices.data());
 
-    std::vector<std::shared_ptr<IPhysicalDevice>> physical_devices(vulkan_devices.size());
+    core::Vector<core::SharedPtr<IPhysicalDevice>> physical_devices(vulkan_devices.size(), memory_resource_);
+
+    std::pmr::polymorphic_allocator<VulkanPhysicalDevice> devices_allocator { memory_resource_ };
 
     for(size_t i = 0; i < vulkan_devices.size(); ++i)
     {
@@ -213,10 +223,11 @@ std::vector<std::shared_ptr<sgf::rhi::IPhysicalDevice>> sgf::rhi::VulkanContext:
         uint32_t extension_count;
         vkEnumerateDeviceExtensionProperties(vulkan_device, nullptr, &extension_count, nullptr);
 
-        std::vector<VkExtensionProperties> available_extensions(extension_count);
+        core::Vector<VkExtensionProperties> available_extensions(extension_count, memory_resource_);
         vkEnumerateDeviceExtensionProperties(vulkan_device, nullptr, &extension_count, available_extensions.data());
 
-        auto physical_device = std::shared_ptr<VulkanPhysicalDevice>(new VulkanPhysicalDevice);
+        auto physical_device = core::make_shared<VulkanPhysicalDevice>(memory_resource_);
+        // auto physical_device = core::SharedPtr<VulkanPhysicalDevice>(devices_allocator.new_object<VulkanPhysicalDevice>());
         physical_device->name_ = std::string(device_properties.deviceName);
         switch(device_properties.deviceType)
         {
@@ -243,6 +254,8 @@ std::vector<std::shared_ptr<sgf::rhi::IPhysicalDevice>> sgf::rhi::VulkanContext:
         physical_device->features_ = device_features;
         physical_device->handle_ = vulkan_device;
         auto& surface_support = physical_device->surface_support_;
+        surface_support.formats_ = core::Vector<VkSurfaceFormatKHR>(memory_resource_);
+        surface_support.present_modes_ = core::Vector<VkPresentModeKHR>(memory_resource_);
 
         // =========================================
 
@@ -270,7 +283,7 @@ std::vector<std::shared_ptr<sgf::rhi::IPhysicalDevice>> sgf::rhi::VulkanContext:
         uint32_t queue_family_count = 0;
         vkGetPhysicalDeviceQueueFamilyProperties(vulkan_device, &queue_family_count, nullptr);
 
-        std::vector<VkQueueFamilyProperties> queue_families(queue_family_count);
+        core::Vector<VkQueueFamilyProperties> queue_families(queue_family_count, memory_resource_);
         vkGetPhysicalDeviceQueueFamilyProperties(vulkan_device, &queue_family_count, queue_families.data());
 
         for(size_t i = 0; i < queue_families.size(); ++i)
@@ -328,10 +341,10 @@ std::vector<std::shared_ptr<sgf::rhi::IPhysicalDevice>> sgf::rhi::VulkanContext:
     return physical_devices;
 }
 
-std::expected<std::unique_ptr<sgf::rhi::ILogicalDevice>, std::error_code> sgf::rhi::VulkanContext::createLogicalDevice(
+std::expected<sgf::core::UniquePtr<sgf::rhi::ILogicalDevice>, std::error_code> sgf::rhi::VulkanContext::createLogicalDevice(
     const LogicalDeviceCreateInfo& create_info) noexcept
 {
-    auto output = std::make_unique<VulkanLogicalDevice>();
+    auto output = core::make_unique<VulkanLogicalDevice>(memory_resource_);
 
     if(const auto err = output->create(create_info))
     {
@@ -353,6 +366,7 @@ sgf::rhi::VulkanContext& sgf::rhi::VulkanContext::operator=(VulkanContext&& othe
     instance_ = std::exchange(other.instance_, VK_NULL_HANDLE);
     surface_ = std::exchange(other.surface_, VK_NULL_HANDLE);
     messenger_ = std::exchange(other.messenger_, VK_NULL_HANDLE);
+    memory_resource_ = std::exchange(other.memory_resource_, {});
     enabled_validation_layers_ = std::move(other.enabled_validation_layers_);
     enabled_extensions_ = std::move(other.enabled_extensions_);
     rhi_debug_output_ = std::move(other.rhi_debug_output_);

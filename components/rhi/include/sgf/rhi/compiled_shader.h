@@ -12,7 +12,8 @@ namespace sgf::rhi
 {
     struct ICompiledShader
     {
-        std::vector<ShaderStage> stages;
+        std::pmr::memory_resource* memory_resource = std::pmr::get_default_resource();
+        core::Vector<ShaderStage> stages;
 
         virtual ~ICompiledShader() = default;
 

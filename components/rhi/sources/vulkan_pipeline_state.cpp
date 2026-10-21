@@ -4,6 +4,7 @@
 
 #include "sgf/rhi/vulkan/vulkan_pipeline_state.h"
 
+#include "sgf/core/errors.h"
 #include "sgf/rhi/vulkan/vulkan_context.h"
 #include "sgf/rhi/vulkan/vulkan_descriptor_set.h"
 #include "sgf/rhi/vulkan/vulkan_errors.h"
@@ -17,7 +18,8 @@ sgf::rhi::VulkanPipelineState::VulkanPipelineState(VulkanPipelineState&& other) 
     logical_device_(std::exchange(other.logical_device_, nullptr)),
     pass_(std::exchange(other.pass_, nullptr)),
     pipeline_layout_(std::exchange(other.pipeline_layout_, VK_NULL_HANDLE)),
-    graphics_pipeline_(std::exchange(other.graphics_pipeline_, VK_NULL_HANDLE))
+    graphics_pipeline_(std::exchange(other.graphics_pipeline_, VK_NULL_HANDLE)),
+    memory_resource_(std::exchange(other.memory_resource_, VK_NULL_HANDLE))
 {
 
 }
@@ -38,6 +40,7 @@ sgf::rhi::VulkanPipelineState& sgf::rhi::VulkanPipelineState::operator=(VulkanPi
     pass_ = std::exchange(other.pass_, nullptr);
     pipeline_layout_ = std::exchange(other.pipeline_layout_, VK_NULL_HANDLE);
     graphics_pipeline_ = std::exchange(other.graphics_pipeline_, VK_NULL_HANDLE);
+    memory_resource_ = std::exchange(other.memory_resource_, VK_NULL_HANDLE);
 
     return *this;
 }
@@ -59,6 +62,8 @@ void sgf::rhi::VulkanPipelineState::destroy() noexcept
 
 std::error_code sgf::rhi::VulkanPipelineState::create(const PipelineStateCreateInfo& create_info) noexcept
 {
+    if(!create_info.memory_resource) return core::Error::kInvalidArgument;
+
     const auto* vulkan_context = static_cast<const VulkanContext*>(create_info.context);
     const auto* vulkan_logical_device = static_cast<const VulkanLogicalDevice*>(create_info.logical_device);
     const auto* vulkan_pass = static_cast<const VulkanPass*>(create_info.pass);
@@ -67,9 +72,10 @@ std::error_code sgf::rhi::VulkanPipelineState::create(const PipelineStateCreateI
     context_ = vulkan_context;
     logical_device_ = vulkan_logical_device;
     pass_ = vulkan_pass;
+    memory_resource_ = create_info.memory_resource;
 
-    std::vector<VkVertexInputBindingDescription> vk_vertex_bindings;
-    std::vector<VkVertexInputAttributeDescription> vk_vertex_attribs;
+    core::Vector<VkVertexInputBindingDescription> vk_vertex_bindings(memory_resource_);
+    core::Vector<VkVertexInputAttributeDescription> vk_vertex_attribs(memory_resource_);
     for(const auto& binding : create_info.vertex_bindings)
     {
         auto& vk_binding = vk_vertex_bindings.emplace_back();
@@ -138,7 +144,7 @@ std::error_code sgf::rhi::VulkanPipelineState::create(const PipelineStateCreateI
     dynamic_state.dynamicStateCount = dynamic_states.size();
     dynamic_state.pDynamicStates = dynamic_states.data();
 
-    auto vulkan_blend_states = std::vector<VkPipelineColorBlendAttachmentState>(create_info.attachments_blend_info.size());
+    auto vulkan_blend_states = core::Vector<VkPipelineColorBlendAttachmentState>(create_info.attachments_blend_info.size(), memory_resource_);
 
     for(size_t i = 0; i < create_info.attachments_blend_info.size(); ++i)
     {
@@ -168,7 +174,7 @@ std::error_code sgf::rhi::VulkanPipelineState::create(const PipelineStateCreateI
     color_blending.blendConstants[2] = create_info.blend_constants.z; // Optional
     color_blending.blendConstants[3] = create_info.blend_constants.w; // Optional
 
-    std::vector<VkDescriptorSetLayout> set_layouts(create_info.descriptor_sets.size());
+    core::Vector<VkDescriptorSetLayout> set_layouts(create_info.descriptor_sets.size(), memory_resource_);
     for(size_t i = 0; i < create_info.descriptor_sets.size(); ++i)
     {
         set_layouts[i] = static_cast<const VulkanDescriptorSet*>(create_info.descriptor_sets[i])->layout_;
@@ -186,7 +192,7 @@ std::error_code sgf::rhi::VulkanPipelineState::create(const PipelineStateCreateI
         return VulkanError::kCannotCreatePipelineLayout;
     }
 
-    std::vector<VkPipelineShaderStageCreateInfo> shader_stages_info(vulkan_shader->stages_.size());
+    core::Vector<VkPipelineShaderStageCreateInfo> shader_stages_info(vulkan_shader->stages_.size(), memory_resource_);
     for(size_t i = 0; i < vulkan_shader->stages_.size(); ++i)
     {
         shader_stages_info[i] = vulkan_shader->stages_[i].pipeline_stage_info;

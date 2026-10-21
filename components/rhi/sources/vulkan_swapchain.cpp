@@ -4,6 +4,7 @@
 
 #include "sgf/rhi/vulkan/vulkan_swapchain.h"
 
+#include "sgf/core/errors.h"
 #include "sgf/rhi/vulkan/vulkan_context.h"
 #include "sgf/rhi/vulkan/vulkan_image.h"
 #include "sgf/rhi/vulkan/vulkan_image_view.h"
@@ -23,7 +24,8 @@ sgf::rhi::VulkanSwapchain::VulkanSwapchain(VulkanSwapchain&& other) noexcept :
     images_view_(std::move(other.images_view_)),
     image_available_semaphores_(std::move(other.image_available_semaphores_)),
     render_finished_semaphores_(std::move(other.render_finished_semaphores_)),
-    busy_frames_fences_(std::move(other.busy_frames_fences_))
+    busy_frames_fences_(std::move(other.busy_frames_fences_)),
+    memory_resource_(std::move(other.memory_resource_))
 {
 
 }
@@ -135,6 +137,7 @@ sgf::rhi::VulkanSwapchain& sgf::rhi::VulkanSwapchain::operator=(VulkanSwapchain&
     image_available_semaphores_ = std::move(other.image_available_semaphores_);
     render_finished_semaphores_ = std::move(other.render_finished_semaphores_);
     busy_frames_fences_ = std::move(other.busy_frames_fences_);
+    memory_resource_ = std::move(other.memory_resource_);
 
     return *this;
 }
@@ -173,12 +176,15 @@ void sgf::rhi::VulkanSwapchain::destroy() noexcept
 
 std::error_code sgf::rhi::VulkanSwapchain::create(const SwapchainCreateInfo& create_info) noexcept
 {
+    if(!create_info.memory_resource) return core::Error::kInvalidArgument;
+
     auto* vulkan_context = static_cast<const VulkanContext*>(create_info.context);
     auto* vulkan_logical_device = static_cast<const VulkanLogicalDevice*>(create_info.logical_device);
     auto* vulkan_physical_device = static_cast<VulkanPhysicalDevice*>(create_info.physical_device);
 
     logical_device_ = vulkan_logical_device;
     context_ = vulkan_context;
+    memory_resource_ = create_info.memory_resource;
 
     auto& surface_support = vulkan_physical_device->surface_support_;
 
@@ -299,7 +305,7 @@ std::error_code sgf::rhi::VulkanSwapchain::create(const SwapchainCreateInfo& cre
         return VulkanError::kCannotCreateSwapchain;
     }
 
-    std::vector<VkImage> swapchain_images {};
+    core::Vector<VkImage> swapchain_images(memory_resource_);
 
     vkGetSwapchainImagesKHR(logical_device_->handle_, handle_, &image_count, nullptr);
     swapchain_images.resize(image_count);
@@ -329,6 +335,10 @@ std::error_code sgf::rhi::VulkanSwapchain::create(const SwapchainCreateInfo& cre
             return res;
         }
     }
+
+    image_available_semaphores_ = core::Vector<VkSemaphore>(memory_resource_);
+    render_finished_semaphores_ = core::Vector<VkSemaphore>(memory_resource_);
+    busy_frames_fences_ = core::Vector<VkFence>(memory_resource_);
 
     // creating render semaphores & fences
     // image_available / fences — per frame-in-flight

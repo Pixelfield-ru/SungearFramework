@@ -25,7 +25,9 @@ namespace sgf::rhi
     {
         const IContext* context {};
         const ILogicalDevice* logical_device {};
-        std::vector<ShaderStageCreateInfo> stages_create_info;
+        core::Vector<ShaderStageCreateInfo> stages_create_info;
+
+        std::pmr::memory_resource* memory_resource = std::pmr::get_default_resource();
     };
 
     struct IShader

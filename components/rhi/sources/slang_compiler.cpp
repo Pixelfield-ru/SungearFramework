@@ -27,6 +27,8 @@ std::error_code sgf::rhi::SlangShaderCompiler::compileShader(const IContext& con
         return core::Error::kInvalidArgument;
     }
 
+    std::pmr::polymorphic_allocator<char> char_allocator { memory_resource };
+
     slang_shader->stages.clear();
 
     slang::SessionDesc session_desc {};
@@ -42,14 +44,14 @@ std::error_code sgf::rhi::SlangShaderCompiler::compileShader(const IContext& con
         slang::PreprocessorMacroDesc { "SG_ENABLE_ZHOPA", "true" }
     };
 
-    std::vector<std::string> search_path_storage;
+    core::Vector<core::String> search_path_storage(memory_resource);
     search_path_storage.reserve(search_paths.size());
     for (const auto& path : search_paths)
     {
-        search_path_storage.push_back(path.generic_string());
+        search_path_storage.push_back(path.generic_string<char>(char_allocator));
     }
 
-    std::vector<const char*> search_paths;
+    core::Vector<const char*> search_paths(memory_resource);
     search_paths.reserve(search_path_storage.size());
     for (const auto& s : search_path_storage)
     {
@@ -84,7 +86,7 @@ std::error_code sgf::rhi::SlangShaderCompiler::compileShader(const IContext& con
     {
         Slang::ComPtr<slang::IBlob> diagnostics_blob;
 
-        const auto module_path = shader_path.string();
+        const auto module_path = shader_path.string<char>(char_allocator);
 
         // loading from file
         slang_shader->module = slang_shader->session->loadModule(module_path.c_str(), diagnostics_blob.writeRef());
@@ -106,7 +108,7 @@ std::error_code sgf::rhi::SlangShaderCompiler::compileShader(const IContext& con
         slang_shader->module->writeToFile(cache_file_path.c_str());
     }
 
-    const auto get_stage = [&](std::string entry_point_name, ShaderStageType type) -> std::pair<ShaderStage, Slang::ComPtr<slang::IEntryPoint>> {
+    const auto get_stage = [&](core::String entry_point_name, ShaderStageType type) -> std::pair<ShaderStage, Slang::ComPtr<slang::IEntryPoint>> {
         ShaderStage stage;
         stage.entry_point_name = std::move(entry_point_name);
         stage.type = type;
@@ -138,9 +140,8 @@ std::error_code sgf::rhi::SlangShaderCompiler::compileShader(const IContext& con
         }
     }
 
-    std::vector<slang::IComponentType*> component_types {
-        slang_shader->module,
-    };
+    core::Vector<slang::IComponentType*> component_types(memory_resource);
+    component_types.push_back(slang_shader->module);
 
    for(const auto& stage : slang_shader->stages)
    {

@@ -6,6 +6,7 @@
 
 #include <string>
 
+#include "sgf/core/memory.h"
 #include "types.h"
 
 namespace sgf::rhi
@@ -13,6 +14,6 @@ namespace sgf::rhi
     struct ShaderStage
     {
         ShaderStageType type = ShaderStageType::kUnknown;
-        std::string entry_point_name;
+        core::String entry_point_name;
     };
 }

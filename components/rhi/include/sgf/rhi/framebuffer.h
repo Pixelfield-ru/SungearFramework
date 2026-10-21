@@ -20,9 +20,11 @@ namespace sgf::rhi
         const ILogicalDevice* logical_device {};
 
         const IPass* pass {};
-        std::vector<const IImageView*> images;
+        core::Vector<const IImageView*> images;
 
         glm::uvec2 size {};
+
+        std::pmr::memory_resource* memory_resource = std::pmr::get_default_resource();
     };
 
     struct IFramebuffer

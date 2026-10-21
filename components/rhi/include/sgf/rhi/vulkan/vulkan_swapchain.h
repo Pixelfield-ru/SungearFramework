@@ -9,6 +9,7 @@
 
 #include "sgf/rhi/swapchain.h"
 #include "vulkan_errors.h"
+#include "sgf/core/memory.h"
 
 namespace sgf::rhi
 {
@@ -46,11 +47,13 @@ namespace sgf::rhi
         VkPresentModeKHR present_mode_ = VK_PRESENT_MODE_MAILBOX_KHR;
         VkExtent2D extent_ {};
 
-        std::vector<VulkanImageView> images_view_;
+        core::Vector<VulkanImageView> images_view_;
 
-        std::vector<VkSemaphore> image_available_semaphores_;
-        std::vector<VkSemaphore> render_finished_semaphores_;
-        std::vector<VkFence> busy_frames_fences_;
+        core::Vector<VkSemaphore> image_available_semaphores_;
+        core::Vector<VkSemaphore> render_finished_semaphores_;
+        core::Vector<VkFence> busy_frames_fences_;
+
+        std::pmr::memory_resource* memory_resource_ {};
 
         std::uint32_t current_frame_idx_ {};
 

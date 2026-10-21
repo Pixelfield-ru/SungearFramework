@@ -10,6 +10,8 @@
 
 #include "types.h"
 
+#include "sgf/core/memory.h"
+
 namespace sgf::rhi
 {
     struct IContext;
@@ -36,10 +38,11 @@ namespace sgf::rhi
     {
         std::int16_t binding {};
         DescriptorType type = DescriptorType::kStorageBuffer;
-        std::vector<DescriptorBuffer> buffers;
-        std::vector<DescriptorImage> images;
+        core::Vector<DescriptorBuffer> buffers;
+        core::Vector<DescriptorImage> images;
         /// Offset in buffers or images.
         std::uint32_t array_offset {};
+        std::pmr::memory_resource* memory_resource = std::pmr::get_default_resource();
     };
 
     struct DescriptorSetLayoutBinding final
@@ -54,7 +57,8 @@ namespace sgf::rhi
     {
         const IContext* context {};
         ILogicalDevice* logical_device {};
-        std::vector<DescriptorSetLayoutBinding> bindings;
+        core::Vector<DescriptorSetLayoutBinding> bindings;
+        std::pmr::memory_resource* memory_resource = std::pmr::get_default_resource();
     };
 
     struct IDescriptorSet
