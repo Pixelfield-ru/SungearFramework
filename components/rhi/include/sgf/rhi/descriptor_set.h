@@ -42,7 +42,6 @@ namespace sgf::rhi
         core::Vector<DescriptorImage> images;
         /// Offset in buffers or images.
         std::uint32_t array_offset {};
-        std::pmr::memory_resource* memory_resource = std::pmr::get_default_resource();
     };
 
     struct DescriptorSetLayoutBinding final

@@ -27,7 +27,9 @@ std::error_code sgf::rhi::SlangShaderCompiler::compileShader(const IContext& con
         return core::Error::kInvalidArgument;
     }
 
-    std::pmr::polymorphic_allocator<char> char_allocator { memory_resource };
+    std::byte stack[core::stack_optimal_size];
+    std::pmr::monotonic_buffer_resource stack_resource(stack, sizeof(stack));
+    std::pmr::polymorphic_allocator<char> char_allocator { &stack_resource };
 
     slang_shader->stages.clear();
 
@@ -44,14 +46,14 @@ std::error_code sgf::rhi::SlangShaderCompiler::compileShader(const IContext& con
         slang::PreprocessorMacroDesc { "SG_ENABLE_ZHOPA", "true" }
     };
 
-    core::Vector<core::String> search_path_storage(memory_resource);
+    core::Vector<core::String> search_path_storage(&stack_resource);
     search_path_storage.reserve(search_paths.size());
     for (const auto& path : search_paths)
     {
         search_path_storage.push_back(path.generic_string<char>(char_allocator));
     }
 
-    core::Vector<const char*> search_paths(memory_resource);
+    core::Vector<const char*> search_paths(&stack_resource);
     search_paths.reserve(search_path_storage.size());
     for (const auto& s : search_path_storage)
     {
@@ -140,7 +142,7 @@ std::error_code sgf::rhi::SlangShaderCompiler::compileShader(const IContext& con
         }
     }
 
-    core::Vector<slang::IComponentType*> component_types(memory_resource);
+    core::Vector<slang::IComponentType*> component_types(&stack_resource);
     component_types.push_back(slang_shader->module);
 
    for(const auto& stage : slang_shader->stages)

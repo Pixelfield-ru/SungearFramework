@@ -11,6 +11,8 @@
 
 namespace sgf::core
 {
+    static constexpr std::uint32_t stack_optimal_size = 2048;
+
     template<typename T>
     struct MemoryResourceDeleter
     {

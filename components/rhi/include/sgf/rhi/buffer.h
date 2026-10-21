@@ -23,6 +23,8 @@ namespace sgf::rhi
         BufferType type = BufferType::kVertex;
         size_t size {};
         void* data {};
+
+        std::pmr::memory_resource* memory_resource = std::pmr::get_default_resource();
     };
 
     struct IBuffer

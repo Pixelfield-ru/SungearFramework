@@ -67,7 +67,7 @@ sgf::rhi::VulkanContext::VulkanContext(VulkanContext&& other) noexcept :
     enabled_validation_layers_(std::move(other.enabled_validation_layers_)),
     enabled_extensions_(std::move(other.enabled_extensions_))
 {
-    rhi_debug_output_ = std::move(other.rhi_debug_output_);
+    rhi_debug_output_ = std::exchange(other.rhi_debug_output_, {});
 }
 
 sgf::rhi::VulkanContext::~VulkanContext() noexcept
@@ -83,18 +83,21 @@ std::error_code sgf::rhi::VulkanContext::create(VulkanContextCreateInfo create_i
         return core::Error::kInvalidArgument;
     }
 
+    std::byte stack[core::stack_optimal_size];
+    std::pmr::monotonic_buffer_resource stack_resource(stack, sizeof(stack));
+
     output.allocator_ = std::move(create_info.allocator);
     output.enabled_extensions_ = std::move(create_info.extensions);
     output.enabled_validation_layers_ = std::move(create_info.validation_layers);
-    output.rhi_debug_output_ = std::move(create_info.rhi_debug_output);
-    output.memory_resource_ = std::move(create_info.memory_resource);
+    output.rhi_debug_output_ = std::exchange(create_info.rhi_debug_output, {});
+    output.memory_resource_ = std::exchange(create_info.memory_resource, {});
 
     // getting count of extensions that are supported by instance
     uint32_t extension_count = 0;
     vkEnumerateInstanceExtensionProperties(nullptr, &extension_count, nullptr);
 
     // getting extensions supported by instance
-    core::Vector<VkExtensionProperties> extensions(extension_count, output.memory_resource_);
+    core::Vector<VkExtensionProperties> extensions(extension_count, &stack_resource);
     vkEnumerateInstanceExtensionProperties(nullptr, &extension_count, extensions.data());
 
     uint32_t glfw_extension_count = 0;
@@ -103,20 +106,20 @@ std::error_code sgf::rhi::VulkanContext::create(VulkanContextCreateInfo create_i
     // getting required by glfw extensions
     glfw_extensions = glfwGetRequiredInstanceExtensions(&glfw_extension_count);
 
-    core::Vector<const char*> required_extensions(glfw_extensions, glfw_extensions + glfw_extension_count, output.memory_resource_);
+    core::Vector<const char*> required_extensions(glfw_extensions, glfw_extensions + glfw_extension_count, &stack_resource);
     if(create_info.enable_api_debug_output)
     {
         required_extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
     }
 
-    core::Vector<const char*> validation_layers(output.memory_resource_);
+    core::Vector<const char*> validation_layers(&stack_resource);
 
     if(create_info.enable_validation_layers)
     {
         uint32_t layer_count;
         vkEnumerateInstanceLayerProperties(&layer_count, nullptr);
 
-        core::Vector<VkLayerProperties> available_layers(layer_count, output.memory_resource_);
+        core::Vector<VkLayerProperties> available_layers(layer_count, &stack_resource);
         vkEnumerateInstanceLayerProperties(&layer_count, available_layers.data());
 
         for(const auto& layer : output.enabled_validation_layers_)
@@ -199,17 +202,18 @@ bool sgf::rhi::VulkanContext::valid() const noexcept
 
 sgf::core::Vector<sgf::core::SharedPtr<sgf::rhi::IPhysicalDevice>> sgf::rhi::VulkanContext::physicalDevices() noexcept
 {
+    std::byte stack[core::stack_optimal_size];
+    std::pmr::monotonic_buffer_resource stack_resource(stack, sizeof(stack));
+
     uint32_t device_count = 0;
     vkEnumeratePhysicalDevices(instance_, &device_count, nullptr);
 
     if(device_count == 0) return {};
 
-    core::Vector<VkPhysicalDevice> vulkan_devices(device_count, memory_resource_);
+    core::Vector<VkPhysicalDevice> vulkan_devices(device_count, &stack_resource);
     vkEnumeratePhysicalDevices(instance_, &device_count, vulkan_devices.data());
 
     core::Vector<core::SharedPtr<IPhysicalDevice>> physical_devices(vulkan_devices.size(), memory_resource_);
-
-    std::pmr::polymorphic_allocator<VulkanPhysicalDevice> devices_allocator { memory_resource_ };
 
     for(size_t i = 0; i < vulkan_devices.size(); ++i)
     {
@@ -223,12 +227,12 @@ sgf::core::Vector<sgf::core::SharedPtr<sgf::rhi::IPhysicalDevice>> sgf::rhi::Vul
         uint32_t extension_count;
         vkEnumerateDeviceExtensionProperties(vulkan_device, nullptr, &extension_count, nullptr);
 
-        core::Vector<VkExtensionProperties> available_extensions(extension_count, memory_resource_);
+        core::Vector<VkExtensionProperties> available_extensions(extension_count, &stack_resource);
         vkEnumerateDeviceExtensionProperties(vulkan_device, nullptr, &extension_count, available_extensions.data());
 
         auto physical_device = core::make_shared<VulkanPhysicalDevice>(memory_resource_);
         // auto physical_device = core::SharedPtr<VulkanPhysicalDevice>(devices_allocator.new_object<VulkanPhysicalDevice>());
-        physical_device->name_ = std::string(device_properties.deviceName);
+        physical_device->name_ = core::String(device_properties.deviceName, memory_resource_);
         switch(device_properties.deviceType)
         {
             case VK_PHYSICAL_DEVICE_TYPE_OTHER:
@@ -283,53 +287,53 @@ sgf::core::Vector<sgf::core::SharedPtr<sgf::rhi::IPhysicalDevice>> sgf::rhi::Vul
         uint32_t queue_family_count = 0;
         vkGetPhysicalDeviceQueueFamilyProperties(vulkan_device, &queue_family_count, nullptr);
 
-        core::Vector<VkQueueFamilyProperties> queue_families(queue_family_count, memory_resource_);
+        core::Vector<VkQueueFamilyProperties> queue_families(queue_family_count, &stack_resource);
         vkGetPhysicalDeviceQueueFamilyProperties(vulkan_device, &queue_family_count, queue_families.data());
 
-        for(size_t i = 0; i < queue_families.size(); ++i)
+        for(size_t k = 0; k < queue_families.size(); ++k)
         {
-            const auto& family = queue_families[i];
+            const auto& family = queue_families[k];
             if(family.queueFlags & VK_QUEUE_GRAPHICS_BIT)
             {
-                physical_device->queue_families_indices_[std::to_underlying(QueueFamilyType::kGraphics)] = i;
+                physical_device->queue_families_indices_[std::to_underlying(QueueFamilyType::kGraphics)] = k;
             }
 
             if(family.queueFlags & VK_QUEUE_COMPUTE_BIT)
             {
-                physical_device->queue_families_indices_[std::to_underlying(QueueFamilyType::kCompute)] = i;
+                physical_device->queue_families_indices_[std::to_underlying(QueueFamilyType::kCompute)] = k;
             }
 
             if(family.queueFlags & VK_QUEUE_TRANSFER_BIT)
             {
-                physical_device->queue_families_indices_[std::to_underlying(QueueFamilyType::kTransfer)] = i;
+                physical_device->queue_families_indices_[std::to_underlying(QueueFamilyType::kTransfer)] = k;
             }
 
             if(family.queueFlags & VK_QUEUE_SPARSE_BINDING_BIT)
             {
-                physical_device->queue_families_indices_[std::to_underlying(QueueFamilyType::kSparseBinding)] = i;
+                physical_device->queue_families_indices_[std::to_underlying(QueueFamilyType::kSparseBinding)] = k;
             }
 
             if(family.queueFlags & VK_QUEUE_VIDEO_DECODE_BIT_KHR)
             {
-                physical_device->queue_families_indices_[std::to_underlying(QueueFamilyType::kVideoDecode)] = i;
+                physical_device->queue_families_indices_[std::to_underlying(QueueFamilyType::kVideoDecode)] = k;
             }
 
             if(family.queueFlags & VK_QUEUE_VIDEO_ENCODE_BIT_KHR)
             {
-                physical_device->queue_families_indices_[std::to_underlying(QueueFamilyType::kVideoEncode)] = i;
+                physical_device->queue_families_indices_[std::to_underlying(QueueFamilyType::kVideoEncode)] = k;
             }
 
             if(family.queueFlags & VK_QUEUE_OPTICAL_FLOW_BIT_NV)
             {
-                physical_device->queue_families_indices_[std::to_underlying(QueueFamilyType::kOpticalFlow)] = i;
+                physical_device->queue_families_indices_[std::to_underlying(QueueFamilyType::kOpticalFlow)] = k;
             }
 
             VkBool32 present_support = false;
-            vkGetPhysicalDeviceSurfaceSupportKHR(vulkan_device, i, surface_, &present_support);
+            vkGetPhysicalDeviceSurfaceSupportKHR(vulkan_device, k, surface_, &present_support);
 
             if(present_support)
             {
-                physical_device->queue_families_indices_[std::to_underlying(QueueFamilyType::kPresent)] = i;
+                physical_device->queue_families_indices_[std::to_underlying(QueueFamilyType::kPresent)] = k;
             }
         }
 
@@ -369,7 +373,7 @@ sgf::rhi::VulkanContext& sgf::rhi::VulkanContext::operator=(VulkanContext&& othe
     memory_resource_ = std::exchange(other.memory_resource_, {});
     enabled_validation_layers_ = std::move(other.enabled_validation_layers_);
     enabled_extensions_ = std::move(other.enabled_extensions_);
-    rhi_debug_output_ = std::move(other.rhi_debug_output_);
+    rhi_debug_output_ = std::exchange(other.rhi_debug_output_, {});
 
     return *this;
 }

@@ -13,7 +13,7 @@ sgf::rhi::VulkanShader::VulkanShader(VulkanShader&& other) noexcept :
     context_(std::exchange(other.context_, nullptr)),
     logical_device_(std::exchange(other.logical_device_, nullptr)),
     stages_(std::move(other.stages_)),
-    memory_resource_(std::move(other.memory_resource_))
+    memory_resource_(std::exchange(other.memory_resource_, {}))
 {
 }
 
@@ -36,7 +36,7 @@ sgf::rhi::VulkanShader& sgf::rhi::VulkanShader::operator=(VulkanShader&& other) 
     context_ = std::exchange(other.context_, nullptr);
     logical_device_ = std::exchange(other.logical_device_, nullptr);
     stages_ = std::move(other.stages_);
-    memory_resource_ = std::move(other.memory_resource_);
+    memory_resource_ = std::exchange(other.memory_resource_, {});
 
     return *this;
 }

@@ -13,19 +13,24 @@
 
 namespace sgf::core
 {
-    // todo: use pmr
     struct TypeMap final
     {
-        TypeMap(std::pmr::memory_resource* resource) noexcept :
-            memory_resource_(resource),
-            storage_(resource)
+        using allocator_type = std::pmr::polymorphic_allocator<TypeMap>;
+
+        TypeMap(allocator_type alloc) noexcept :
+            storage_(alloc)
         {
 
         }
-
         TypeMap() noexcept = default;
-        TypeMap(const TypeMap&) = default;
+        TypeMap(const TypeMap&) = delete;
+        TypeMap(const TypeMap& other, allocator_type alloc) = delete;
         TypeMap(TypeMap&&) = default;
+        TypeMap(TypeMap&& other, allocator_type alloc) :
+            storage_(std::move(other.storage_), alloc)
+        {
+
+        }
 
         template<typename T, typename... Args>
         T& emplace(Args&&... args) noexcept
@@ -36,7 +41,7 @@ namespace sgf::core
                 storage_.resize(index + 1);
             }
 
-            auto storage = core::make_unique<Storage<T>>(memory_resource_, std::forward<Args>(args)...);
+            auto storage = core::make_unique<Storage<T>>(storage_.get_allocator().resource(), std::forward<Args>(args)...);
             auto& value = storage->value;
             storage_[index] = std::move(storage);
 
@@ -74,8 +79,16 @@ namespace sgf::core
             return type_index < storage_.size() && storage_[type_index];
         }
 
-        TypeMap& operator=(const TypeMap&) = default;
-        TypeMap& operator=(TypeMap&&) = default;
+        TypeMap& operator=(const TypeMap&) = delete;
+
+        TypeMap& operator=(TypeMap&& other) noexcept
+        {
+            if(std::addressof(other) == this) return *this;
+
+            storage_ = std::move(other.storage_);
+
+            return *this;
+        }
 
     private:
         struct Erased
@@ -92,7 +105,6 @@ namespace sgf::core
             T value;
         };
 
-        std::pmr::memory_resource* memory_resource_ = std::pmr::get_default_resource();
         Vector<UniquePtr<Erased>> storage_;
     };
 }

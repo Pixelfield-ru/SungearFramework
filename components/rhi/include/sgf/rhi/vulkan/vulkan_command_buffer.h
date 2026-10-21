@@ -58,8 +58,6 @@ namespace sgf::rhi
 
         VkCommandBuffer handle_ {};
 
-        std::pmr::memory_resource* memory_resource_ {};
-
         void destroy() noexcept override;
         [[nodiscard]] std::error_code create(const CommandBufferCreateInfo& create_info) noexcept override;
     };

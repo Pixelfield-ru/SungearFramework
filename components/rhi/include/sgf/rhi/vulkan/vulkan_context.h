@@ -25,9 +25,9 @@ namespace sgf::rhi
     struct VulkanContextCreateInfo final : ContextCreateInfo
     {
         /// Optional.
-        core::Vector<std::string> validation_layers;
+        core::Vector<core::String> validation_layers;
         /// Optional.
-        core::Vector<std::string> extensions {
+        core::Vector<core::String> extensions {
             VK_KHR_SWAPCHAIN_EXTENSION_NAME
         };
         /// Optional.
@@ -84,8 +84,8 @@ namespace sgf::rhi
 
         std::pmr::memory_resource* memory_resource_ {};
 
-        core::Vector<std::string> enabled_validation_layers_;
-        core::Vector<std::string> enabled_extensions_;
+        core::Vector<core::String> enabled_validation_layers_;
+        core::Vector<core::String> enabled_extensions_;
 
         void destroy() noexcept;
     };

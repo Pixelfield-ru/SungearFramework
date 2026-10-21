@@ -35,8 +35,6 @@ namespace sgf::rhi
         VkPipelineLayout pipeline_layout_ {};
         VkPipeline graphics_pipeline_ {};
 
-        std::pmr::memory_resource* memory_resource_ {};
-
         void destroy() noexcept override;
         [[nodiscard]] std::error_code create(const PipelineStateCreateInfo& create_info) noexcept override;
     };

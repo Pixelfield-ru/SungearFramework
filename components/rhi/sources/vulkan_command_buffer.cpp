@@ -18,8 +18,7 @@
 sgf::rhi::VulkanCommandBuffer::VulkanCommandBuffer(VulkanCommandBuffer&& other) noexcept :
     logical_device_(std::exchange(other.logical_device_, nullptr)),
     pool_(std::exchange(other.pool_, VK_NULL_HANDLE)),
-    handle_(std::exchange(other.handle_, VK_NULL_HANDLE)),
-    memory_resource_(std::exchange(other.memory_resource_, {}))
+    handle_(std::exchange(other.handle_, VK_NULL_HANDLE))
 {
 }
 
@@ -48,6 +47,9 @@ std::error_code sgf::rhi::VulkanCommandBuffer::beginRendering(const BeginRenderi
     const auto* vulkan_pipeline_state = static_cast<const VulkanPipelineState*>(info.pipeline_state);
     const auto* vulkan_framebuffer = static_cast<const VulkanFramebuffer*>(info.framebuffer);
 
+    std::byte stack[core::stack_optimal_size];
+    std::pmr::monotonic_buffer_resource stack_resource(stack, sizeof(stack));
+
     VkRenderPassBeginInfo render_pass_begin_info{};
     render_pass_begin_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
     render_pass_begin_info.renderPass = vulkan_pipeline_state->pass_->handle_;
@@ -55,7 +57,7 @@ std::error_code sgf::rhi::VulkanCommandBuffer::beginRendering(const BeginRenderi
     render_pass_begin_info.renderArea.offset = { info.render_area.x, info.render_area.y };
     render_pass_begin_info.renderArea.extent = { (std::uint32_t) info.render_area.width, (std::uint32_t) info.render_area.height };
 
-    core::Vector<VkClearValue> vulkan_clear(info.clear_infos.size(), memory_resource_);
+    core::Vector<VkClearValue> vulkan_clear(info.clear_infos.size(), &stack_resource);
     for(size_t i = 0; i < info.clear_infos.size(); ++i)
     {
         const auto& clear_info = info.clear_infos[i];
@@ -192,7 +194,6 @@ sgf::rhi::VulkanCommandBuffer& sgf::rhi::VulkanCommandBuffer::operator=(VulkanCo
     logical_device_ = std::exchange(other.logical_device_, nullptr);
     pool_ = std::exchange(other.pool_, VK_NULL_HANDLE);
     handle_ = std::exchange(other.handle_, VK_NULL_HANDLE);
-    memory_resource_ = std::exchange(other.memory_resource_, {});
 
     return *this;
 }
@@ -221,7 +222,6 @@ std::error_code sgf::rhi::VulkanCommandBuffer::create(const CommandBufferCreateI
 
     logical_device_ = vulkan_logical_device;
     pool_ = *pool;
-    memory_resource_ = create_info.memory_resource;
 
     VkCommandBufferAllocateInfo alloc_info{};
     alloc_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;

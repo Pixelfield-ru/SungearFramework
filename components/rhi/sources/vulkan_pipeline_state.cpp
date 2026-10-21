@@ -18,8 +18,7 @@ sgf::rhi::VulkanPipelineState::VulkanPipelineState(VulkanPipelineState&& other) 
     logical_device_(std::exchange(other.logical_device_, nullptr)),
     pass_(std::exchange(other.pass_, nullptr)),
     pipeline_layout_(std::exchange(other.pipeline_layout_, VK_NULL_HANDLE)),
-    graphics_pipeline_(std::exchange(other.graphics_pipeline_, VK_NULL_HANDLE)),
-    memory_resource_(std::exchange(other.memory_resource_, VK_NULL_HANDLE))
+    graphics_pipeline_(std::exchange(other.graphics_pipeline_, VK_NULL_HANDLE))
 {
 
 }
@@ -40,7 +39,6 @@ sgf::rhi::VulkanPipelineState& sgf::rhi::VulkanPipelineState::operator=(VulkanPi
     pass_ = std::exchange(other.pass_, nullptr);
     pipeline_layout_ = std::exchange(other.pipeline_layout_, VK_NULL_HANDLE);
     graphics_pipeline_ = std::exchange(other.graphics_pipeline_, VK_NULL_HANDLE);
-    memory_resource_ = std::exchange(other.memory_resource_, VK_NULL_HANDLE);
 
     return *this;
 }
@@ -69,13 +67,15 @@ std::error_code sgf::rhi::VulkanPipelineState::create(const PipelineStateCreateI
     const auto* vulkan_pass = static_cast<const VulkanPass*>(create_info.pass);
     const auto* vulkan_shader = static_cast<const VulkanShader*>(create_info.shader);
 
+    std::byte stack[core::stack_optimal_size];
+    std::pmr::monotonic_buffer_resource stack_resource(stack, sizeof(stack));
+
     context_ = vulkan_context;
     logical_device_ = vulkan_logical_device;
     pass_ = vulkan_pass;
-    memory_resource_ = create_info.memory_resource;
 
-    core::Vector<VkVertexInputBindingDescription> vk_vertex_bindings(memory_resource_);
-    core::Vector<VkVertexInputAttributeDescription> vk_vertex_attribs(memory_resource_);
+    core::Vector<VkVertexInputBindingDescription> vk_vertex_bindings(&stack_resource);
+    core::Vector<VkVertexInputAttributeDescription> vk_vertex_attribs(&stack_resource);
     for(const auto& binding : create_info.vertex_bindings)
     {
         auto& vk_binding = vk_vertex_bindings.emplace_back();
@@ -144,7 +144,7 @@ std::error_code sgf::rhi::VulkanPipelineState::create(const PipelineStateCreateI
     dynamic_state.dynamicStateCount = dynamic_states.size();
     dynamic_state.pDynamicStates = dynamic_states.data();
 
-    auto vulkan_blend_states = core::Vector<VkPipelineColorBlendAttachmentState>(create_info.attachments_blend_info.size(), memory_resource_);
+    auto vulkan_blend_states = core::Vector<VkPipelineColorBlendAttachmentState>(create_info.attachments_blend_info.size(), &stack_resource);
 
     for(size_t i = 0; i < create_info.attachments_blend_info.size(); ++i)
     {
@@ -174,7 +174,7 @@ std::error_code sgf::rhi::VulkanPipelineState::create(const PipelineStateCreateI
     color_blending.blendConstants[2] = create_info.blend_constants.z; // Optional
     color_blending.blendConstants[3] = create_info.blend_constants.w; // Optional
 
-    core::Vector<VkDescriptorSetLayout> set_layouts(create_info.descriptor_sets.size(), memory_resource_);
+    core::Vector<VkDescriptorSetLayout> set_layouts(create_info.descriptor_sets.size(), &stack_resource);
     for(size_t i = 0; i < create_info.descriptor_sets.size(); ++i)
     {
         set_layouts[i] = static_cast<const VulkanDescriptorSet*>(create_info.descriptor_sets[i])->layout_;
@@ -192,7 +192,7 @@ std::error_code sgf::rhi::VulkanPipelineState::create(const PipelineStateCreateI
         return VulkanError::kCannotCreatePipelineLayout;
     }
 
-    core::Vector<VkPipelineShaderStageCreateInfo> shader_stages_info(vulkan_shader->stages_.size(), memory_resource_);
+    core::Vector<VkPipelineShaderStageCreateInfo> shader_stages_info(vulkan_shader->stages_.size(), &stack_resource);
     for(size_t i = 0; i < vulkan_shader->stages_.size(); ++i)
     {
         shader_stages_info[i] = vulkan_shader->stages_[i].pipeline_stage_info;

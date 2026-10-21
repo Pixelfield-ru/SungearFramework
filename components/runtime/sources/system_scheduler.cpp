@@ -158,6 +158,9 @@ void sgf::runtime::SystemScheduler::executeNode(SystemContext& context, SystemGr
 
 std::error_code sgf::runtime::SystemScheduler::runImpl(bool ignore_schedule)
 {
+    std::byte stack[512];
+    std::pmr::monotonic_buffer_resource stack_resource(stack, sizeof(stack));
+
     last_error_ = {};
 
     const auto current_run_time = std::chrono::steady_clock::now();
@@ -190,7 +193,7 @@ std::error_code sgf::runtime::SystemScheduler::runImpl(bool ignore_schedule)
     auto& context = *create_info_.context;
 
     SystemGraphState state;
-    state.remaining = core::Vector<std::uint32_t>(graph.nodes.size(), memory_resource_);
+    state.remaining = core::Vector<std::uint32_t>(graph.nodes.size(), &stack_resource);
     for(const auto& node : graph.nodes)
     {
         state.remaining[node.index] = node.dependency_count;
