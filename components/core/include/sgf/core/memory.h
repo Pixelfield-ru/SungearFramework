@@ -50,14 +50,13 @@ namespace sgf::core
     using UniquePtr = std::unique_ptr<T, MemoryResourceDeleter<T>>;
 
     template<typename T, typename... Args>
-    UniquePtr<T> make_unique(std::pmr::memory_resource* resource, Args&&... args)
+    UniquePtr<T> make_unique(const std::pmr::polymorphic_allocator<T>& allocator, Args&&... args)
     {
-        std::pmr::polymorphic_allocator<T> allocator { resource };
         T* object = allocator.template new_object<T>(std::forward<Args>(args)...);
 
         return UniquePtr<T> {
             object,
-            MemoryResourceDeleter<T> { resource, object }
+            MemoryResourceDeleter<T> { allocator.resource(), object }
         };
     }
 
@@ -65,10 +64,8 @@ namespace sgf::core
     using SharedPtr = std::shared_ptr<T>;
 
     template<typename T, typename... Args>
-    SharedPtr<T> make_shared(std::pmr::memory_resource* resource, Args&&... args)
+    SharedPtr<T> make_shared(const std::pmr::polymorphic_allocator<T>& allocator, Args&&... args)
     {
-        std::pmr::polymorphic_allocator<T> allocator { resource };
-
         return std::allocate_shared<T>(allocator, std::forward<Args>(args)...);
     }
 

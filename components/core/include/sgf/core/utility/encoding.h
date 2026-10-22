@@ -7,7 +7,9 @@
 #include <string>
 #include <filesystem>
 
+#include "sgf/core/memory.h"
+
 namespace sgf::core
 {
-    std::string pathToUtf8(const std::filesystem::path& p) noexcept;
+    String pathToUtf8(const std::filesystem::path& p) noexcept;
 }

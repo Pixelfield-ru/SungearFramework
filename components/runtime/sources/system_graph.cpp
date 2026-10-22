@@ -12,18 +12,21 @@
 #include "sgf/runtime/errors.h"
 #include "sgf/core/errors.h"
 
-std::expected<sgf::runtime::SystemGraph, std::error_code> sgf::runtime::SystemGraph::build(
-    const SystemGraphBuildInfo& build_info)
+std::error_code sgf::runtime::SystemGraph::build(
+    const SystemGraphBuildInfo& build_info,
+    SystemGraph& output)
 {
     // todo: maybe needs optimization
-    if(!build_info.context) return std::unexpected(core::Error::kInvalidArgument);
-    if(!build_info.debug_output) return std::unexpected(core::Error::kInvalidArgument);
+    if(!build_info.context) return core::Error::kInvalidArgument;
+    if(!build_info.debug_output) return core::Error::kInvalidArgument;
 
     auto* logger = build_info.debug_output;
 
-    SystemGraph graph;
-    graph.nodes = core::Vector<Node>(build_info.systems.size(), build_info.memory_resource);
-    graph.entries = core::Vector<std::uint32_t>(build_info.systems.size(), build_info.memory_resource);
+    output.nodes.clear();
+    output.entries.clear();
+
+    output.nodes.resize(build_info.systems.size());
+    output.entries.resize(build_info.systems.size());
 
     const auto& context = build_info.context;
 
@@ -53,33 +56,32 @@ std::expected<sgf::runtime::SystemGraph, std::error_code> sgf::runtime::SystemGr
         const auto system_reads = system->reads();
         if(!validate_access(*system, system_reads, "reads"))
         {
-            return std::unexpected(Error::kIncompleteSystemContext);
+            return Error::kIncompleteSystemContext;
         }
 
         const auto system_writes = system->writes();
         if(!validate_access(*system, system_writes, "writes"))
         {
-            return std::unexpected(Error::kIncompleteSystemContext);
+            return Error::kIncompleteSystemContext;
         }
 
-        Node node;
+        Node node(output.get_allocator());
         node.system = system;
         node.index = i;
-        node.successors = core::Vector<std::uint32_t>(build_info.memory_resource);
 
-        graph.nodes[i] = std::move(node);
+        output.nodes[i] = std::move(node);
     }
 
     core::UnorderedSet<std::uint32_t> successors_set;
 
     // building dependencies
-    for(auto& node : graph.nodes)
+    for(auto& node : output.nodes)
     {
         const auto system_writes = node.system->writes();
 
         for(const auto write_id : system_writes)
         {
-            for(auto& other : graph.nodes)
+            for(auto& other : output.nodes)
             {
                 if(other.index == node.index) continue;
 
@@ -113,27 +115,27 @@ std::expected<sgf::runtime::SystemGraph, std::error_code> sgf::runtime::SystemGr
     }
 
     // getting entries
-    for(size_t i = 0; i < graph.nodes.size(); ++i)
+    for(size_t i = 0; i < output.nodes.size(); ++i)
     {
-        const auto& node = graph.nodes[i];
+        const auto& node = output.nodes[i];
         if(node.dependency_count > 0) continue;
 
-        graph.entries[i] = node.index;
+        output.entries[i] = node.index;
     }
 
     // initializing state to check cycles
     SystemGraphState state;
-    state.remaining = core::Vector<std::uint32_t>(graph.nodes.size());
-    for(const auto& node : graph.nodes)
+    state.remaining = core::Vector<std::uint32_t>(output.nodes.size());
+    for(const auto& node : output.nodes)
     {
         state.remaining[node.index] = node.dependency_count;
     }
 
     // check for cycles
-    auto executable_systems = graph.entries;
+    auto executable_systems = output.entries;
     while(!executable_systems.empty())
     {
-        const auto& node = graph.nodes[executable_systems.back()];
+        const auto& node = output.nodes[executable_systems.back()];
         executable_systems.pop_back();
 
         for(const auto successor_index : node.successors)
@@ -147,7 +149,7 @@ std::expected<sgf::runtime::SystemGraph, std::error_code> sgf::runtime::SystemGr
     }
 
     // check if any node has remaining edges
-    for(const auto& node : graph.nodes)
+    for(const auto& node : output.nodes)
     {
         const auto remaining = state.remaining[node.index];
         if(remaining == 0) continue;
@@ -159,9 +161,9 @@ std::expected<sgf::runtime::SystemGraph, std::error_code> sgf::runtime::SystemGr
                                   typeid(*node.system).name(), remaining));
         }
 
-        return std::unexpected(Error::kCyclicSystemGraph);
+        return Error::kCyclicSystemGraph;
     }
 
 
-    return graph;
+    return {};
 }

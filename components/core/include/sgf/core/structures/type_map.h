@@ -17,20 +17,16 @@ namespace sgf::core
     {
         using allocator_type = std::pmr::polymorphic_allocator<TypeMap>;
 
-        TypeMap(allocator_type alloc) noexcept :
-            storage_(alloc)
-        {
-
-        }
         TypeMap() noexcept = default;
+        TypeMap(const allocator_type& alloc) noexcept :
+            storage_(alloc)
+        { }
         TypeMap(const TypeMap&) = delete;
-        TypeMap(const TypeMap& other, allocator_type alloc) = delete;
+        TypeMap(const TypeMap& other, const allocator_type& alloc) = delete;
         TypeMap(TypeMap&&) = default;
-        TypeMap(TypeMap&& other, allocator_type alloc) :
+        TypeMap(TypeMap&& other, const allocator_type& alloc) :
             storage_(std::move(other.storage_), alloc)
-        {
-
-        }
+        { }
 
         template<typename T, typename... Args>
         T& emplace(Args&&... args) noexcept
@@ -52,7 +48,7 @@ namespace sgf::core
         const T& read() const noexcept
         {
             static const auto index = typeIndex<T>();
-            pf_assert(index < storage_.size(), "Index out of bounds");
+            sgf_assert(index < storage_.size(), "Index out of bounds");
 
             return static_cast<Storage<T>*>(storage_[index].get())->value;
         }
@@ -61,7 +57,7 @@ namespace sgf::core
         T& write() noexcept
         {
             static const auto index = typeIndex<T>();
-            pf_assert(index < storage_.size(), "Index out of bounds");
+            sgf_assert(index < storage_.size(), "Index out of bounds");
 
             return static_cast<Storage<T>*>(storage_[index].get())->value;
         }
@@ -77,6 +73,11 @@ namespace sgf::core
         [[nodiscard]] bool hasType(std::uint32_t type_index) const noexcept
         {
             return type_index < storage_.size() && storage_[type_index];
+        }
+
+        [[nodiscard]] allocator_type get_allocator() const noexcept
+        {
+            return storage_.get_allocator();
         }
 
         TypeMap& operator=(const TypeMap&) = delete;

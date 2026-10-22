@@ -26,7 +26,6 @@ namespace sgf::rhi
         ILogicalDevice* logical_device {};
 
         QueueFamilyType queue_family = QueueFamilyType::kGraphics;
-        std::pmr::memory_resource* memory_resource = std::pmr::get_default_resource();
     };
 
     struct DepthStencilClearInfo final
@@ -43,11 +42,41 @@ namespace sgf::rhi
 
     struct BeginRenderingInfo final
     {
+        using allocator_type = std::pmr::polymorphic_allocator<>;
+
         const IPipelineState* pipeline_state {};
         const IFramebuffer* framebuffer {};
 
         Rect<std::int32_t> render_area {};
         core::Vector<ClearInfo> clear_infos;
+
+        BeginRenderingInfo() = default;
+        BeginRenderingInfo(const allocator_type& alloc) :
+            clear_infos(alloc)
+        { }
+        BeginRenderingInfo(const BeginRenderingInfo&) = default;
+        BeginRenderingInfo(BeginRenderingInfo&&) noexcept = default;
+
+        BeginRenderingInfo(const BeginRenderingInfo& other, const allocator_type& alloc) :
+            pipeline_state(other.pipeline_state),
+            framebuffer(other.framebuffer),
+            render_area(other.render_area),
+            clear_infos(other.clear_infos, alloc)
+        { }
+        BeginRenderingInfo(BeginRenderingInfo&& other, const allocator_type& alloc) noexcept :
+            pipeline_state(other.pipeline_state),
+            framebuffer(other.framebuffer),
+            render_area(other.render_area),
+            clear_infos(std::move(other.clear_infos), alloc)
+        { }
+
+        [[nodiscard]] allocator_type get_allocator() const noexcept
+        {
+            return clear_infos.get_allocator();
+        }
+
+        BeginRenderingInfo& operator=(const BeginRenderingInfo&) = default;
+        BeginRenderingInfo& operator=(BeginRenderingInfo&&) = default;
     };
 
     struct ICommandBuffer

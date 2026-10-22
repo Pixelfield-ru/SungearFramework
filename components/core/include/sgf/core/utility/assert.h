@@ -8,10 +8,10 @@
 #include <source_location>
 
 #ifndef NDEBUG
-#define pf_assert(expr, msg) \
+#define sgf_assert(expr, msg) \
     sgf::core::impl::assert_(#expr, expr, __FILE__, __LINE__, msg)
 #else
-#define pf_assert(expr, msg) ((void)0)
+#define sgf_assert(expr, msg) ((void)0)
 #endif
 
 namespace sgf::core::impl

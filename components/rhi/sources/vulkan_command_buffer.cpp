@@ -209,8 +209,6 @@ void sgf::rhi::VulkanCommandBuffer::destroy() noexcept
 
 std::error_code sgf::rhi::VulkanCommandBuffer::create(const CommandBufferCreateInfo& create_info) noexcept
 {
-    if(!create_info.memory_resource) return core::Error::kInvalidArgument;
-
     const auto* vulkan_context = static_cast<const VulkanContext*>(create_info.context);
     auto* vulkan_logical_device = static_cast<VulkanLogicalDevice*>(create_info.logical_device);
 

@@ -15,6 +15,8 @@ namespace sgf::rhi
 {
     struct ContextCreateInfo
     {
+        using allocator_type = std::pmr::polymorphic_allocator<>;
+
         /// Required.
         core::String app_name;
         /// Required.
@@ -26,7 +28,37 @@ namespace sgf::rhi
         /// Optional.
         const core::LogCallback* rhi_debug_output {};
 
-        std::pmr::memory_resource* memory_resource = std::pmr::get_default_resource();
+        ContextCreateInfo() = default;
+        ContextCreateInfo(const allocator_type& alloc) :
+            app_name(alloc),
+            engine_name(alloc)
+        { }
+        ContextCreateInfo(const ContextCreateInfo&) = default;
+        ContextCreateInfo(const ContextCreateInfo& other, const allocator_type& alloc) :
+            app_name(other.app_name, alloc),
+            engine_name(other.engine_name, alloc),
+            enable_api_debug_output(other.enable_api_debug_output),
+            window(other.window),
+            rhi_debug_output(other.rhi_debug_output)
+        { }
+        ContextCreateInfo(ContextCreateInfo&&) = default;
+        ContextCreateInfo(ContextCreateInfo&& other, const allocator_type& alloc) :
+            app_name(std::move(other.app_name), alloc),
+            engine_name(std::move(other.engine_name), alloc),
+            enable_api_debug_output(other.enable_api_debug_output),
+            window(other.window),
+            rhi_debug_output(other.rhi_debug_output)
+        { }
+
+        virtual ~ContextCreateInfo() = default;
+
+        [[nodiscard]] allocator_type get_allocator() const noexcept
+        {
+            return app_name.get_allocator();
+        }
+
+        ContextCreateInfo& operator=(const ContextCreateInfo&) = default;
+        ContextCreateInfo& operator=(ContextCreateInfo&&) noexcept = default;
     };
 
     struct IPhysicalDevice;

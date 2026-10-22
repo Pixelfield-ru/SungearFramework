@@ -26,6 +26,17 @@ namespace sgf::rhi
 
         core::UnorderedMap<ShaderStageType, Stage> entry_points;
 
+        SlangCompiledShader() = default;
+        SlangCompiledShader(const allocator_type& alloc) :
+            ICompiledShader(alloc),
+            entry_points(alloc)
+        { }
+        SlangCompiledShader(const SlangCompiledShader&) = delete;
+        SlangCompiledShader(SlangCompiledShader&&) noexcept = default;
+
         void getIR(ShaderStageType stage_type, const void** ir_buffer, size_t* ir_buffer_size) override;
+
+        SlangCompiledShader& operator=(const SlangCompiledShader&) = delete;
+        SlangCompiledShader& operator=(SlangCompiledShader&&) = default;
     };
 }

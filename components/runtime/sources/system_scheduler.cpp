@@ -14,9 +14,7 @@ std::error_code sgf::runtime::SystemScheduler::create(SystemSchedulerCreateInfo 
 {
     output.create_info_ = std::move(create_info);
 
-    output.memory_resource_ = output.create_info_.memory_resource;
-    output.schedules_ = core::Vector<SystemScheduleState>(SystemScheduleType::kCount, output.memory_resource_);
-    output.executable_systems_ = core::Vector<std::uint32_t>(output.memory_resource_);
+    output.schedules_.resize(SystemScheduleType::kCount);
 
     // creating schedules
     for(size_t i = 0; i < SystemScheduleType::kCount; ++i)

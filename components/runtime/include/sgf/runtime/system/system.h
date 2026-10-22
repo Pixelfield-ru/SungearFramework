@@ -17,7 +17,27 @@ namespace sgf::runtime
 {
     struct SystemContext final
     {
+        using allocator_type = std::pmr::polymorphic_allocator<>;
+
         core::TypeMap resources;
+
+        SystemContext(const allocator_type& alloc) noexcept :
+            resources(alloc)
+        { }
+        SystemContext() noexcept = default;
+        SystemContext(const SystemContext& other) noexcept = delete;
+        SystemContext(SystemContext&&) noexcept = default;
+        SystemContext(SystemContext&& other, const allocator_type& alloc) :
+            resources(std::move(other.resources), alloc)
+        { }
+
+        [[nodiscard]] allocator_type get_allocator() const noexcept
+        {
+            return resources.get_allocator();
+        }
+
+        SystemContext& operator=(const SystemContext&) = delete;
+        SystemContext& operator=(SystemContext&&) noexcept = default;
     };
 
     struct ISystem
