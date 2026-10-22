@@ -7,6 +7,8 @@
 #include <vector>
 #include <glm/vec2.hpp>
 
+#include "sgf/core/memory.h"
+
 namespace sgf::rhi
 {
     struct IContext;
@@ -16,6 +18,8 @@ namespace sgf::rhi
 
     struct FramebufferCreateInfo final
     {
+        using allocator_type = std::pmr::polymorphic_allocator<>;
+
         const IContext* context {};
         const ILogicalDevice* logical_device {};
 
@@ -24,7 +28,34 @@ namespace sgf::rhi
 
         glm::uvec2 size {};
 
-        std::pmr::memory_resource* memory_resource = std::pmr::get_default_resource();
+        FramebufferCreateInfo() = default;
+        FramebufferCreateInfo(const allocator_type& alloc) :
+            images(alloc)
+        { }
+        FramebufferCreateInfo(const FramebufferCreateInfo&) = default;
+        FramebufferCreateInfo(const FramebufferCreateInfo& other, const allocator_type& alloc) :
+            context(other.context),
+            logical_device(other.logical_device),
+            pass(other.pass),
+            images(other.images, alloc),
+            size(other.size)
+        { }
+        FramebufferCreateInfo(FramebufferCreateInfo&&) = default;
+        FramebufferCreateInfo(FramebufferCreateInfo&& other, const allocator_type& alloc) :
+            context(other.context),
+            logical_device(other.logical_device),
+            pass(other.pass),
+            images(std::move(other.images), alloc),
+            size(other.size)
+        { }
+
+        [[nodiscard]] allocator_type get_allocator() const noexcept
+        {
+            return images.get_allocator();
+        }
+
+        FramebufferCreateInfo& operator=(const FramebufferCreateInfo&) = default;
+        FramebufferCreateInfo& operator=(FramebufferCreateInfo&&) = default;
     };
 
     struct IFramebuffer

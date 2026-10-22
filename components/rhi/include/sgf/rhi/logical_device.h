@@ -27,8 +27,6 @@ namespace sgf::rhi
     {
         const IContext* context {};
         const IPhysicalDevice* physical_device {};
-
-        std::pmr::memory_resource* memory_resource = std::pmr::get_default_resource();
     };
 
     struct SubmitInfo final

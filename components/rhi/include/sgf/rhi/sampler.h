@@ -37,8 +37,6 @@ namespace sgf::rhi
         float mip_lod_bias {};
 
         bool unnormalized_coordinates {};
-
-        std::pmr::memory_resource* memory_resource = std::pmr::get_default_resource();
     };
 
     struct ISampler

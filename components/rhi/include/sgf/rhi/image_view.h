@@ -29,8 +29,6 @@ namespace sgf::rhi
         std::uint16_t levels_count = 1;
         std::uint16_t base_array_layer = 0;
         std::uint16_t layers_count = 1;
-
-        std::pmr::memory_resource* memory_resource = std::pmr::get_default_resource();
     };
 
     struct IImageView

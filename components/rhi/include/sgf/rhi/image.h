@@ -30,8 +30,6 @@ namespace sgf::rhi
 
         size_t size {};
         void* data {};
-
-        std::pmr::memory_resource* memory_resource = std::pmr::get_default_resource();
     };
 
     struct ImageUpdateInfo final

@@ -5,9 +5,10 @@
 #pragma once
 
 #include <cstdint>
-#include <vector>
 #include <type_traits>
 #include <functional>
+
+#include "sgf/core/memory.h"
 
 namespace sgf::rhi
 {
@@ -707,11 +708,32 @@ namespace sgf::rhi
 
     struct VertexBindingDescription final
     {
+        using allocator_type = std::pmr::polymorphic_allocator<>;
+
         std::uint16_t binding {};
         std::uint32_t stride {};
         InputRate input_rate = InputRate::kPerVertex;
 
-        std::vector<VertexAttributeDescription> attributes;
+        core::Vector<VertexAttributeDescription> attributes;
+
+        VertexBindingDescription() = default;
+        VertexBindingDescription(const allocator_type& alloc) :
+            attributes(alloc)
+        { }
+        VertexBindingDescription(const VertexBindingDescription&) = default;
+        VertexBindingDescription(const VertexBindingDescription& other, const allocator_type& alloc) :
+            binding(other.binding),
+            stride(other.stride),
+            input_rate(other.input_rate),
+            attributes(other.attributes, alloc)
+        { }
+        VertexBindingDescription(VertexBindingDescription&&) = default;
+        VertexBindingDescription(VertexBindingDescription&& other, const allocator_type& alloc) noexcept :
+            binding(other.binding),
+            stride(other.stride),
+            input_rate(other.input_rate),
+            attributes(std::move(other.attributes), alloc)
+        { }
     };
 
     template<typename ScalarT>
