@@ -9,9 +9,11 @@
 #include "sgf/core/structures/type_map.h"
 
 #include "asset_storage.h"
+#include "errors.h"
 
 namespace sgf::assets
 {
+    // todo: use log callback
     struct AssetsServer final
     {
         using allocator_type = std::pmr::polymorphic_allocator<>;
@@ -29,6 +31,26 @@ namespace sgf::assets
             storages_map_(std::move(other.storages_map_), alloc),
             page_size_(other.page_size_)
         { }
+
+        template<typename AssetT>
+        std::expected<Handle<AssetT>, std::error_code> load(const std::filesystem::path& path) noexcept
+        {
+            auto& st = storage<AssetT>();
+            auto* loader = st.loader();
+
+            if(!loader)
+            {
+                return std::unexpected(Error::kLoaderNotSpecified);
+            }
+
+            // todo: check if slot exists and return it or load asset.
+            return nullptr;
+            /*auto asset = loader->loadSource(path);
+            if(!asset)
+            {
+                return std::unexpected(asset.error());
+            }*/
+        }
 
         template<typename AssetT>
         AssetStorage<AssetT>& storage() noexcept
