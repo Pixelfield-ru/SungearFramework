@@ -19,12 +19,21 @@ namespace sgf::rhi
         friend struct VulkanLogicalDevice;
         friend struct VulkanCommandBuffer;
 
+        using allocator_type = std::pmr::polymorphic_allocator<>;
+
         VulkanPass() noexcept = default;
+        explicit VulkanPass(const allocator_type& allocator) noexcept;
         VulkanPass(const VulkanPass&) = delete;
         VulkanPass(VulkanPass&& other) noexcept;
+        VulkanPass(VulkanPass&& other, const allocator_type& allocator);
         ~VulkanPass() override;
 
         [[nodiscard]] bool valid() const noexcept override;
+
+        [[nodiscard]] allocator_type get_allocator() const noexcept
+        {
+            return color_attachments_.get_allocator();
+        }
 
         VulkanPass& operator=(const VulkanPass&) = delete;
         VulkanPass& operator=(VulkanPass&& other) noexcept;

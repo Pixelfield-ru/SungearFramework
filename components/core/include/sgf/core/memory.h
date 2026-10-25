@@ -25,7 +25,7 @@ namespace sgf::core
 
         MemoryResourceDeleter(std::pmr::memory_resource* resource, T* object) : resource { resource },
             object { object },
-            destroy { &destroy_as<T> }
+            destroy { &destroyAs<T> }
         {
         }
 
@@ -40,7 +40,7 @@ namespace sgf::core
         void operator()(T*) const { destroy(resource, object); }
 
         template<typename U>
-        static void destroy_as(std::pmr::memory_resource* resource, void* object)
+        static void destroyAs(std::pmr::memory_resource* resource, void* object)
         {
             std::pmr::polymorphic_allocator<U> { resource }.delete_object(static_cast<U*>(object));
         }
@@ -50,9 +50,9 @@ namespace sgf::core
     using UniquePtr = std::unique_ptr<T, MemoryResourceDeleter<T>>;
 
     template<typename T, typename... Args>
-    UniquePtr<T> make_unique(const std::pmr::polymorphic_allocator<T>& allocator, Args&&... args)
+    UniquePtr<T> makeUnique(std::pmr::polymorphic_allocator<T> allocator, Args&&... args)
     {
-        T* object = allocator.template new_object<T>(std::forward<Args>(args)...);
+        T *const object = allocator.template new_object<T>(std::forward<Args>(args)...);
 
         return UniquePtr<T> {
             object,
@@ -64,7 +64,7 @@ namespace sgf::core
     using SharedPtr = std::shared_ptr<T>;
 
     template<typename T, typename... Args>
-    SharedPtr<T> make_shared(const std::pmr::polymorphic_allocator<T>& allocator, Args&&... args)
+    SharedPtr<T> makeShared(std::pmr::polymorphic_allocator<T> allocator, Args&&... args)
     {
         return std::allocate_shared<T>(allocator, std::forward<Args>(args)...);
     }

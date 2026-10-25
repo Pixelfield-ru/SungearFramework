@@ -9,11 +9,24 @@
 #include "sgf/rhi/vulkan/vulkan_logical_device.h"
 #include "sgf/rhi/vulkan/vulkan_types.h"
 
+sgf::rhi::VulkanShader::VulkanShader(const allocator_type& allocator) noexcept :
+    stages_(allocator)
+{
+}
+
 sgf::rhi::VulkanShader::VulkanShader(VulkanShader&& other) noexcept :
     context_(std::exchange(other.context_, nullptr)),
     logical_device_(std::exchange(other.logical_device_, nullptr)),
     stages_(std::move(other.stages_)),
     memory_resource_(std::exchange(other.memory_resource_, {}))
+{
+}
+
+sgf::rhi::VulkanShader::VulkanShader(VulkanShader&& other, const allocator_type& allocator) :
+    context_(std::exchange(other.context_, nullptr)),
+    logical_device_(std::exchange(other.logical_device_, nullptr)),
+    stages_(std::move(other.stages_), allocator),
+    memory_resource_(allocator.resource())
 {
 }
 

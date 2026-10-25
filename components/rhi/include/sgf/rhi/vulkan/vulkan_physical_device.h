@@ -24,10 +24,17 @@ namespace sgf::rhi
         friend struct VulkanImage;
 
         VulkanPhysicalDevice() = default;
+        explicit VulkanPhysicalDevice(const allocator_type& allocator);
         VulkanPhysicalDevice(const VulkanPhysicalDevice&) = delete;
         VulkanPhysicalDevice(VulkanPhysicalDevice&& other) noexcept;
+        VulkanPhysicalDevice(VulkanPhysicalDevice&& other, const allocator_type& allocator);
 
         [[nodiscard]] bool valid() const noexcept override;
+
+        [[nodiscard]] allocator_type get_allocator() const noexcept
+        {
+            return IPhysicalDevice::get_allocator();
+        }
 
         VulkanPhysicalDevice& operator=(const VulkanPhysicalDevice&) = delete;
         VulkanPhysicalDevice& operator=(VulkanPhysicalDevice&& other) noexcept;
@@ -35,8 +42,34 @@ namespace sgf::rhi
     private:
         struct SurfaceSupport
         {
+            using allocator_type = std::pmr::polymorphic_allocator<>;
+
             core::Vector<VkSurfaceFormatKHR> formats_;
             core::Vector<VkPresentModeKHR> present_modes_;
+
+            SurfaceSupport() = default;
+            explicit SurfaceSupport(const allocator_type& allocator) :
+                formats_(allocator),
+                present_modes_(allocator)
+            { }
+            SurfaceSupport(const SurfaceSupport&) = default;
+            SurfaceSupport(const SurfaceSupport& other, const allocator_type& allocator) :
+                formats_(other.formats_, allocator),
+                present_modes_(other.present_modes_, allocator)
+            { }
+            SurfaceSupport(SurfaceSupport&&) noexcept = default;
+            SurfaceSupport(SurfaceSupport&& other, const allocator_type& allocator) :
+                formats_(std::move(other.formats_), allocator),
+                present_modes_(std::move(other.present_modes_), allocator)
+            { }
+
+            [[nodiscard]] allocator_type get_allocator() const noexcept
+            {
+                return formats_.get_allocator();
+            }
+
+            SurfaceSupport& operator=(const SurfaceSupport&) = default;
+            SurfaceSupport& operator=(SurfaceSupport&&) noexcept = default;
         };
 
         // destroys with VkInstance

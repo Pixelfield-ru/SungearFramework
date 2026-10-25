@@ -734,6 +734,14 @@ namespace sgf::rhi
             input_rate(other.input_rate),
             attributes(std::move(other.attributes), alloc)
         { }
+
+        [[nodiscard]] allocator_type get_allocator() const noexcept
+        {
+            return attributes.get_allocator();
+        }
+
+        VertexBindingDescription& operator=(const VertexBindingDescription&) = default;
+        VertexBindingDescription& operator=(VertexBindingDescription&&) noexcept = default;
     };
 
     template<typename ScalarT>

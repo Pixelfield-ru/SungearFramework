@@ -4,8 +4,10 @@
 
 #include "sgf/core/utility/type_traits.h"
 
-std::uint32_t& sgf::core::impl::counter() noexcept
+#include <atomic>
+
+std::uint32_t sgf::core::impl::nextIndex() noexcept
 {
-    static std::uint32_t current {};
-    return current;
+    static std::atomic<std::uint32_t> current {};
+    return current++;
 }

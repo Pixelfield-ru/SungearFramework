@@ -18,12 +18,21 @@ namespace sgf::rhi
         friend struct VulkanLogicalDevice;
         friend struct VulkanPipelineState;
 
+        using allocator_type = std::pmr::polymorphic_allocator<>;
+
         VulkanShader() noexcept = default;
+        explicit VulkanShader(const allocator_type& allocator) noexcept;
         VulkanShader(const VulkanShader&) = delete;
         VulkanShader(VulkanShader&& other) noexcept;
+        VulkanShader(VulkanShader&& other, const allocator_type& allocator);
         ~VulkanShader() noexcept override;
 
         [[nodiscard]] bool valid() const noexcept override;
+
+        [[nodiscard]] allocator_type get_allocator() const noexcept
+        {
+            return stages_.get_allocator();
+        }
 
         VulkanShader& operator=(const VulkanShader&) = delete;
         VulkanShader& operator=(VulkanShader&&) noexcept;

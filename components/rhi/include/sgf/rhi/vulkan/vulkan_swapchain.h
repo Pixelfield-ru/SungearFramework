@@ -21,9 +21,13 @@ namespace sgf::rhi
     {
         friend struct VulkanLogicalDevice;
 
+        using allocator_type = std::pmr::polymorphic_allocator<>;
+
         VulkanSwapchain() noexcept = default;
+        explicit VulkanSwapchain(const allocator_type& allocator) noexcept;
         VulkanSwapchain(const VulkanSwapchain&) = delete;
         VulkanSwapchain(VulkanSwapchain&& other) noexcept;
+        VulkanSwapchain(VulkanSwapchain&& other, const allocator_type& allocator);
         ~VulkanSwapchain() noexcept override;
 
         [[nodiscard]] bool valid() const noexcept override;
@@ -33,6 +37,11 @@ namespace sgf::rhi
         [[nodiscard]] IImageView* imageView(std::uint16_t idx) noexcept override;
         [[nodiscard]] std::expected<AcquiredFrame, std::error_code> acquireNextFrame() noexcept override;
         [[nodiscard]] std::error_code present(const PresentInfo& present_info) noexcept override;
+
+        [[nodiscard]] allocator_type get_allocator() const noexcept
+        {
+            return images_view_.get_allocator();
+        }
 
         VulkanSwapchain& operator=(const VulkanSwapchain&) = delete;
         VulkanSwapchain& operator=(VulkanSwapchain&& other) noexcept;

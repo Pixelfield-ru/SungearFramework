@@ -56,6 +56,13 @@ VkBool32 sgf::rhi::debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT message_
     return VK_FALSE;
 }
 
+sgf::rhi::VulkanContext::VulkanContext(const allocator_type& allocator) noexcept :
+    memory_resource_(allocator.resource()),
+    enabled_validation_layers_(allocator),
+    enabled_extensions_(allocator)
+{
+}
+
 sgf::rhi::VulkanContext::VulkanContext(VulkanContext&& other) noexcept :
     create_messenger_(std::exchange(other.create_messenger_, VK_NULL_HANDLE)),
     destroy_messenger_(std::exchange(other.destroy_messenger_, VK_NULL_HANDLE)),
@@ -66,6 +73,20 @@ sgf::rhi::VulkanContext::VulkanContext(VulkanContext&& other) noexcept :
     memory_resource_(std::exchange(other.memory_resource_, {})),
     enabled_validation_layers_(std::move(other.enabled_validation_layers_)),
     enabled_extensions_(std::move(other.enabled_extensions_))
+{
+    rhi_debug_output_ = std::exchange(other.rhi_debug_output_, {});
+}
+
+sgf::rhi::VulkanContext::VulkanContext(VulkanContext&& other, const allocator_type& allocator) :
+    create_messenger_(std::exchange(other.create_messenger_, VK_NULL_HANDLE)),
+    destroy_messenger_(std::exchange(other.destroy_messenger_, VK_NULL_HANDLE)),
+    allocator_(std::move(other.allocator_)),
+    instance_(std::exchange(other.instance_, VK_NULL_HANDLE)),
+    surface_(std::exchange(other.surface_, VK_NULL_HANDLE)),
+    messenger_(std::exchange(other.messenger_, VK_NULL_HANDLE)),
+    memory_resource_(allocator.resource()),
+    enabled_validation_layers_(std::move(other.enabled_validation_layers_), allocator),
+    enabled_extensions_(std::move(other.enabled_extensions_), allocator)
 {
     rhi_debug_output_ = std::exchange(other.rhi_debug_output_, {});
 }
@@ -230,7 +251,7 @@ sgf::core::Vector<sgf::core::SharedPtr<sgf::rhi::IPhysicalDevice>> sgf::rhi::Vul
         core::Vector<VkExtensionProperties> available_extensions(extension_count, &stack_resource);
         vkEnumerateDeviceExtensionProperties(vulkan_device, nullptr, &extension_count, available_extensions.data());
 
-        auto physical_device = core::make_shared<VulkanPhysicalDevice>(memory_resource_);
+        auto physical_device = core::makeShared<VulkanPhysicalDevice>(memory_resource_);
         // auto physical_device = core::SharedPtr<VulkanPhysicalDevice>(devices_allocator.new_object<VulkanPhysicalDevice>());
         physical_device->name_ = core::String(device_properties.deviceName, memory_resource_);
         switch(device_properties.deviceType)
@@ -348,7 +369,7 @@ sgf::core::Vector<sgf::core::SharedPtr<sgf::rhi::IPhysicalDevice>> sgf::rhi::Vul
 std::expected<sgf::core::UniquePtr<sgf::rhi::ILogicalDevice>, std::error_code> sgf::rhi::VulkanContext::createLogicalDevice(
     const LogicalDeviceCreateInfo& create_info) noexcept
 {
-    auto output = core::make_unique<VulkanLogicalDevice>(memory_resource_);
+    auto output = core::makeUnique<VulkanLogicalDevice>(memory_resource_);
 
     if(const auto err = output->create(create_info))
     {

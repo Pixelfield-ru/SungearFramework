@@ -10,6 +10,12 @@
 #include "sgf/rhi/vulkan/vulkan_logical_device.h"
 #include "sgf/rhi/vulkan/vulkan_types.h"
 
+sgf::rhi::VulkanPass::VulkanPass(const allocator_type& allocator) noexcept :
+    color_attachments_(allocator),
+    attachments_refs_(allocator)
+{
+}
+
 sgf::rhi::VulkanPass::VulkanPass(VulkanPass&& other) noexcept :
     context_(std::exchange(other.context_, nullptr)),
     logical_device_(std::exchange(other.logical_device_, nullptr)),
@@ -17,6 +23,16 @@ sgf::rhi::VulkanPass::VulkanPass(VulkanPass&& other) noexcept :
     color_attachments_(std::exchange(other.color_attachments_, {})),
     attachments_refs_(std::exchange(other.attachments_refs_, {})),
     memory_resource_(std::exchange(other.memory_resource_, {}))
+{
+}
+
+sgf::rhi::VulkanPass::VulkanPass(VulkanPass&& other, const allocator_type& allocator) :
+    context_(std::exchange(other.context_, nullptr)),
+    logical_device_(std::exchange(other.logical_device_, nullptr)),
+    handle_(std::exchange(other.handle_, VK_NULL_HANDLE)),
+    color_attachments_(std::move(other.color_attachments_), allocator),
+    attachments_refs_(std::move(other.attachments_refs_), allocator),
+    memory_resource_(allocator.resource())
 {
 }
 

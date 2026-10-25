@@ -10,7 +10,7 @@ namespace sgf::core
 {
     namespace impl
     {
-        std::uint32_t& counter() noexcept;
+        std::uint32_t nextIndex() noexcept;
     }
 
     /**
@@ -19,12 +19,7 @@ namespace sgf::core
     template<typename>
     std::uint32_t typeIndex() noexcept
     {
-        static std::uint32_t index = []() {
-            auto& current = impl::counter();
-            const auto idx = current;
-            ++current;
-            return idx;
-        }();
+        static const auto index = impl::nextIndex();
 
         return index;
     }

@@ -23,11 +23,41 @@ namespace sgf::rhi
 
     struct ShaderCreateInfo
     {
+        using allocator_type = std::pmr::polymorphic_allocator<>;
+
         const IContext* context {};
         const ILogicalDevice* logical_device {};
         core::Vector<ShaderStageCreateInfo> stages_create_info;
 
         std::pmr::memory_resource* memory_resource = std::pmr::get_default_resource();
+
+        ShaderCreateInfo() = default;
+        explicit ShaderCreateInfo(const allocator_type& allocator) :
+            stages_create_info(allocator),
+            memory_resource(allocator.resource())
+        { }
+        ShaderCreateInfo(const ShaderCreateInfo&) = default;
+        ShaderCreateInfo(const ShaderCreateInfo& other, const allocator_type& allocator) :
+            context(other.context),
+            logical_device(other.logical_device),
+            stages_create_info(other.stages_create_info, allocator),
+            memory_resource(other.memory_resource)
+        { }
+        ShaderCreateInfo(ShaderCreateInfo&&) noexcept = default;
+        ShaderCreateInfo(ShaderCreateInfo&& other, const allocator_type& allocator) :
+            context(other.context),
+            logical_device(other.logical_device),
+            stages_create_info(std::move(other.stages_create_info), allocator),
+            memory_resource(other.memory_resource)
+        { }
+
+        [[nodiscard]] allocator_type get_allocator() const noexcept
+        {
+            return stages_create_info.get_allocator();
+        }
+
+        ShaderCreateInfo& operator=(const ShaderCreateInfo&) = default;
+        ShaderCreateInfo& operator=(ShaderCreateInfo&&) noexcept = default;
     };
 
     struct IShader

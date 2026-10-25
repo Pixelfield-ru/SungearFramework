@@ -4,13 +4,29 @@
 
 #include "sgf/rhi/vulkan/vulkan_physical_device.h"
 
+sgf::rhi::VulkanPhysicalDevice::VulkanPhysicalDevice(const allocator_type& allocator) :
+    IPhysicalDevice(allocator),
+    surface_support_(allocator)
+{
+}
+
 sgf::rhi::VulkanPhysicalDevice::VulkanPhysicalDevice(VulkanPhysicalDevice&& other) noexcept :
+    IPhysicalDevice(std::move(other)),
     handle_(std::exchange(other.handle_, VK_NULL_HANDLE)),
     features_(std::exchange(other.features_, {})),
     surface_support_(std::move(other.surface_support_)),
     queue_families_indices_(std::exchange(other.queue_families_indices_, {}))
 {
 
+}
+
+sgf::rhi::VulkanPhysicalDevice::VulkanPhysicalDevice(VulkanPhysicalDevice&& other, const allocator_type& allocator) :
+    IPhysicalDevice(std::move(other), allocator),
+    handle_(std::exchange(other.handle_, VK_NULL_HANDLE)),
+    features_(std::exchange(other.features_, {})),
+    surface_support_(std::move(other.surface_support_), allocator),
+    queue_families_indices_(std::exchange(other.queue_families_indices_, {}))
+{
 }
 
 bool sgf::rhi::VulkanPhysicalDevice::valid() const noexcept
@@ -22,6 +38,7 @@ sgf::rhi::VulkanPhysicalDevice& sgf::rhi::VulkanPhysicalDevice::operator=(Vulkan
 {
     if(this == std::addressof(other)) return *this;
 
+    IPhysicalDevice::operator=(std::move(other));
     handle_ = std::exchange(other.handle_, VK_NULL_HANDLE);
     features_ = std::exchange(other.features_, {});
     surface_support_ = std::move(other.surface_support_);

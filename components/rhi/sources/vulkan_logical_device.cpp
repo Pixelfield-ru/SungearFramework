@@ -135,7 +135,7 @@ std::expected<sgf::core::UniquePtr<sgf::rhi::ISwapchain>, std::error_code> sgf::
 {
     if(!create_info.memory_resource) return std::unexpected(core::Error::kInvalidArgument);
 
-    auto output = core::make_unique<VulkanSwapchain>(create_info.memory_resource);
+    auto output = core::makeUnique<VulkanSwapchain>(create_info.memory_resource);
 
     if(const auto err = output->create(create_info))
     {
@@ -150,7 +150,7 @@ std::expected<sgf::core::UniquePtr<sgf::rhi::IImage>, std::error_code> sgf::rhi:
 {
     if(!create_info.memory_resource) return std::unexpected(core::Error::kInvalidArgument);
 
-    auto output = core::make_unique<VulkanImage>(create_info.memory_resource);
+    auto output = core::makeUnique<VulkanImage>(create_info.memory_resource);
 
     if(const auto err = output->create(create_info))
     {
@@ -165,7 +165,7 @@ std::expected<sgf::core::UniquePtr<sgf::rhi::IImageView>, std::error_code> sgf::
 {
     if(!create_info.memory_resource) return std::unexpected(core::Error::kInvalidArgument);
 
-    auto output = core::make_unique<VulkanImageView>(create_info.memory_resource);
+    auto output = core::makeUnique<VulkanImageView>(create_info.memory_resource);
 
     if(const auto err = output->create(create_info))
     {
@@ -180,7 +180,7 @@ std::expected<sgf::core::UniquePtr<sgf::rhi::ISampler>, std::error_code> sgf::rh
 {
     if(!create_info.memory_resource) return std::unexpected(core::Error::kInvalidArgument);
 
-    auto output = core::make_unique<VulkanSampler>(create_info.memory_resource);
+    auto output = core::makeUnique<VulkanSampler>(create_info.memory_resource);
 
     if(const auto err = output->create(create_info))
     {
@@ -195,7 +195,7 @@ std::expected<sgf::core::UniquePtr<sgf::rhi::IShader>, std::error_code> sgf::rhi
 {
     if(!create_info.memory_resource) return std::unexpected(core::Error::kInvalidArgument);
 
-    auto output = core::make_unique<VulkanShader>(create_info.memory_resource);
+    auto output = core::makeUnique<VulkanShader>(create_info.memory_resource);
 
     if(const auto err = output->create(create_info))
     {
@@ -210,7 +210,7 @@ std::expected<sgf::core::UniquePtr<sgf::rhi::IPass>, std::error_code> sgf::rhi::
 {
     if(!create_info.memory_resource) return std::unexpected(core::Error::kInvalidArgument);
 
-    auto output = core::make_unique<VulkanPass>(create_info.memory_resource);
+    auto output = core::makeUnique<VulkanPass>(create_info.memory_resource);
 
     if(const auto err = output->create(create_info))
     {
@@ -225,7 +225,7 @@ std::expected<sgf::core::UniquePtr<sgf::rhi::IPipelineState>, std::error_code> s
 {
     if(!create_info.memory_resource) return std::unexpected(core::Error::kInvalidArgument);
 
-    auto output = core::make_unique<VulkanPipelineState>(create_info.memory_resource);
+    auto output = core::makeUnique<VulkanPipelineState>(create_info.memory_resource);
 
     if(const auto err = output->create(create_info))
     {
@@ -240,7 +240,7 @@ std::expected<sgf::core::UniquePtr<sgf::rhi::IFramebuffer>, std::error_code> sgf
 {
     if(!create_info.memory_resource) return std::unexpected(core::Error::kInvalidArgument);
 
-    auto output = core::make_unique<VulkanFramebuffer>(create_info.memory_resource);
+    auto output = core::makeUnique<VulkanFramebuffer>(create_info.memory_resource);
 
     if(const auto err = output->create(create_info))
     {
@@ -255,7 +255,7 @@ std::expected<sgf::core::UniquePtr<sgf::rhi::ICommandBuffer>, std::error_code> s
 {
     if(!create_info.memory_resource) return std::unexpected(core::Error::kInvalidArgument);
 
-    auto output = core::make_unique<VulkanCommandBuffer>(create_info.memory_resource);
+    auto output = core::makeUnique<VulkanCommandBuffer>(create_info.memory_resource);
 
     if(const auto err = output->create(create_info))
     {
@@ -270,7 +270,7 @@ std::expected<sgf::core::UniquePtr<sgf::rhi::IBuffer>, std::error_code> sgf::rhi
 {
     if(!create_info.memory_resource) return std::unexpected(core::Error::kInvalidArgument);
 
-    auto output = core::make_unique<VulkanBuffer>(create_info.memory_resource);
+    auto output = core::makeUnique<VulkanBuffer>(create_info.memory_resource);
 
     if(const auto err = output->create(create_info))
     {
@@ -285,7 +285,7 @@ std::expected<sgf::core::UniquePtr<sgf::rhi::IDescriptorSet>, std::error_code> s
 {
     if(!create_info.memory_resource) return std::unexpected(core::Error::kInvalidArgument);
 
-    auto output = core::make_unique<VulkanDescriptorSet>(create_info.memory_resource);
+    auto output = core::makeUnique<VulkanDescriptorSet>(create_info.memory_resource);
 
     if(const auto err = output->create(create_info))
     {

@@ -14,6 +14,15 @@
 #include "sgf/rhi/vulkan/vulkan_types.h"
 #include "sgf/rhi/errors.h"
 
+sgf::rhi::VulkanSwapchain::VulkanSwapchain(const allocator_type& allocator) noexcept :
+    images_view_(allocator),
+    image_available_semaphores_(allocator),
+    render_finished_semaphores_(allocator),
+    busy_frames_fences_(allocator),
+    memory_resource_(allocator.resource())
+{
+}
+
 sgf::rhi::VulkanSwapchain::VulkanSwapchain(VulkanSwapchain&& other) noexcept :
     context_(std::exchange(other.context_, nullptr)),
     logical_device_(std::exchange(other.logical_device_, nullptr)),
@@ -28,6 +37,21 @@ sgf::rhi::VulkanSwapchain::VulkanSwapchain(VulkanSwapchain&& other) noexcept :
     memory_resource_(std::exchange(other.memory_resource_, {}))
 {
 
+}
+
+sgf::rhi::VulkanSwapchain::VulkanSwapchain(VulkanSwapchain&& other, const allocator_type& allocator) :
+    context_(std::exchange(other.context_, nullptr)),
+    logical_device_(std::exchange(other.logical_device_, nullptr)),
+    handle_(std::exchange(other.handle_, VK_NULL_HANDLE)),
+    surface_format_(std::exchange(other.surface_format_, {})),
+    present_mode_(std::exchange(other.present_mode_, {})),
+    extent_(std::exchange(other.extent_, {})),
+    images_view_(std::move(other.images_view_), allocator),
+    image_available_semaphores_(std::move(other.image_available_semaphores_), allocator),
+    render_finished_semaphores_(std::move(other.render_finished_semaphores_), allocator),
+    busy_frames_fences_(std::move(other.busy_frames_fences_), allocator),
+    memory_resource_(allocator.resource())
+{
 }
 
 sgf::rhi::VulkanSwapchain::~VulkanSwapchain() noexcept

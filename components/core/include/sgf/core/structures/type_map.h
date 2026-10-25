@@ -37,7 +37,7 @@ namespace sgf::core
                 storage_.resize(index + 1);
             }
 
-            auto storage = core::make_unique<Storage<T>>(storage_.get_allocator().resource(), std::forward<Args>(args)...);
+            auto storage = core::makeUnique<Storage<T>>(storage_.get_allocator(), std::forward<Args>(args)...);
             auto& value = storage->value;
             storage_[index] = std::move(storage);
 
