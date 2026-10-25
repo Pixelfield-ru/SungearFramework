@@ -65,13 +65,16 @@ namespace sgf::rhi
 
     struct IContext
     {
+        using allocator_type = std::pmr::polymorphic_allocator<>;
+
         virtual ~IContext() = default;
 
         [[nodiscard]] virtual bool valid() const noexcept = 0;
 
         [[nodiscard]] virtual core::Vector<core::SharedPtr<IPhysicalDevice>> physicalDevices() noexcept = 0;
 
-        [[nodiscard]] virtual std::expected<core::UniquePtr<ILogicalDevice>, std::error_code> createLogicalDevice(const LogicalDeviceCreateInfo& create_info) noexcept = 0;
+        [[nodiscard]] virtual std::expected<core::UniquePtr<ILogicalDevice>, std::error_code> createLogicalDevice(
+            const LogicalDeviceCreateInfo& create_info, const allocator_type& alloc) noexcept = 0;
 
         void printDebugMessage(core::LogLevel level, std::string_view msg) const noexcept
         {

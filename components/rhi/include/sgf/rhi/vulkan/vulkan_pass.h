@@ -47,8 +47,6 @@ namespace sgf::rhi
         core::Vector<VkAttachmentDescription> color_attachments_;
         core::Vector<VkAttachmentReference> attachments_refs_;
 
-        std::pmr::memory_resource* memory_resource_ {};
-
         void destroy() noexcept override;
         [[nodiscard]] std::error_code create(const PassCreateInfo& create_info) noexcept override;
     };

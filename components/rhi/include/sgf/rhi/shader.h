@@ -29,26 +29,21 @@ namespace sgf::rhi
         const ILogicalDevice* logical_device {};
         core::Vector<ShaderStageCreateInfo> stages_create_info;
 
-        std::pmr::memory_resource* memory_resource = std::pmr::get_default_resource();
-
         ShaderCreateInfo() = default;
         explicit ShaderCreateInfo(const allocator_type& allocator) :
-            stages_create_info(allocator),
-            memory_resource(allocator.resource())
+            stages_create_info(allocator)
         { }
         ShaderCreateInfo(const ShaderCreateInfo&) = default;
         ShaderCreateInfo(const ShaderCreateInfo& other, const allocator_type& allocator) :
             context(other.context),
             logical_device(other.logical_device),
-            stages_create_info(other.stages_create_info, allocator),
-            memory_resource(other.memory_resource)
+            stages_create_info(other.stages_create_info, allocator)
         { }
         ShaderCreateInfo(ShaderCreateInfo&&) noexcept = default;
         ShaderCreateInfo(ShaderCreateInfo&& other, const allocator_type& allocator) :
             context(other.context),
             logical_device(other.logical_device),
-            stages_create_info(std::move(other.stages_create_info), allocator),
-            memory_resource(other.memory_resource)
+            stages_create_info(std::move(other.stages_create_info), allocator)
         { }
 
         [[nodiscard]] allocator_type get_allocator() const noexcept

@@ -72,6 +72,9 @@ namespace sgf::core
     template<typename T>
     using Vector = std::pmr::vector<T>;
 
+    template<typename T>
+    using List = std::pmr::list<T>;
+
     template<typename T, typename Hasher = std::hash<T>, class Eq = std::equal_to<T>>
     using UnorderedSet = std::pmr::unordered_set<T, Hasher, Eq>;
 

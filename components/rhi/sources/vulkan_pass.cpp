@@ -21,8 +21,7 @@ sgf::rhi::VulkanPass::VulkanPass(VulkanPass&& other) noexcept :
     logical_device_(std::exchange(other.logical_device_, nullptr)),
     handle_(std::exchange(other.handle_, VK_NULL_HANDLE)),
     color_attachments_(std::exchange(other.color_attachments_, {})),
-    attachments_refs_(std::exchange(other.attachments_refs_, {})),
-    memory_resource_(std::exchange(other.memory_resource_, {}))
+    attachments_refs_(std::exchange(other.attachments_refs_, {}))
 {
 }
 
@@ -31,8 +30,7 @@ sgf::rhi::VulkanPass::VulkanPass(VulkanPass&& other, const allocator_type& alloc
     logical_device_(std::exchange(other.logical_device_, nullptr)),
     handle_(std::exchange(other.handle_, VK_NULL_HANDLE)),
     color_attachments_(std::move(other.color_attachments_), allocator),
-    attachments_refs_(std::move(other.attachments_refs_), allocator),
-    memory_resource_(allocator.resource())
+    attachments_refs_(std::move(other.attachments_refs_), allocator)
 {
 }
 
@@ -57,7 +55,6 @@ sgf::rhi::VulkanPass& sgf::rhi::VulkanPass::operator=(VulkanPass&& other) noexce
     handle_ = std::exchange(other.handle_, VK_NULL_HANDLE);
     color_attachments_ = std::exchange(other.color_attachments_, {});
     attachments_refs_ = std::exchange(other.attachments_refs_, {});
-    memory_resource_ = std::exchange(other.memory_resource_, {});
 
     return *this;
 }
@@ -76,17 +73,14 @@ void sgf::rhi::VulkanPass::destroy() noexcept
 
 std::error_code sgf::rhi::VulkanPass::create(const PassCreateInfo& create_info) noexcept
 {
-    if(!create_info.memory_resource) return core::Error::kInvalidArgument;
-
     const auto* vulkan_context = static_cast<const VulkanContext*>(create_info.context);
     const auto* vulkan_logical_device = static_cast<const VulkanLogicalDevice*>(create_info.logical_device);
 
     context_ = vulkan_context;
     logical_device_ = vulkan_logical_device;
-    memory_resource_ = create_info.memory_resource;
 
-    color_attachments_ = core::Vector<VkAttachmentDescription>(create_info.color_attachments.size(), memory_resource_);
-    attachments_refs_ = core::Vector<VkAttachmentReference>(create_info.color_attachments.size(), memory_resource_);
+    color_attachments_.resize(create_info.color_attachments.size());
+    attachments_refs_.resize(create_info.color_attachments.size());
 
     for(size_t i = 0; i < create_info.color_attachments.size(); ++i)
     {

@@ -125,8 +125,6 @@ void sgf::rhi::VulkanDescriptorSet::destroy()
 
 std::error_code sgf::rhi::VulkanDescriptorSet::create(const DescriptorSetCreateInfo& create_info)
 {
-    if(!create_info.memory_resource) return core::Error::kInvalidArgument;
-
     const auto* vulkan_context = static_cast<const VulkanContext*>(create_info.context);
     auto* vulkan_logical_device = static_cast<VulkanLogicalDevice*>(create_info.logical_device);
 

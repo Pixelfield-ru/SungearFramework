@@ -83,8 +83,6 @@ namespace sgf::rhi
         friend struct VulkanBuffer;
         friend struct VulkanDescriptorSet;
 
-        using allocator_type = std::pmr::polymorphic_allocator<>;
-
         VulkanContext() noexcept = default;
         explicit VulkanContext(const allocator_type& allocator) noexcept;
         VulkanContext(const VulkanContext&) = delete;
@@ -96,7 +94,8 @@ namespace sgf::rhi
 
         [[nodiscard]] core::Vector<core::SharedPtr<IPhysicalDevice>> physicalDevices() noexcept override;
 
-        [[nodiscard]] std::expected<core::UniquePtr<ILogicalDevice>, std::error_code> createLogicalDevice(const LogicalDeviceCreateInfo& create_info) noexcept override;
+        [[nodiscard]] std::expected<core::UniquePtr<ILogicalDevice>, std::error_code> createLogicalDevice(
+            const LogicalDeviceCreateInfo& create_info, const allocator_type& alloc) noexcept override;
 
         [[nodiscard]] allocator_type get_allocator() const noexcept
         {
@@ -117,8 +116,6 @@ namespace sgf::rhi
         VkInstance instance_ {};
         VkSurfaceKHR surface_ {};
         VkDebugUtilsMessengerEXT messenger_ {};
-
-        std::pmr::memory_resource* memory_resource_ {};
 
         core::Vector<core::String> enabled_validation_layers_;
         core::Vector<core::String> enabled_extensions_;

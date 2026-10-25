@@ -57,7 +57,6 @@ VkBool32 sgf::rhi::debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT message_
 }
 
 sgf::rhi::VulkanContext::VulkanContext(const allocator_type& allocator) noexcept :
-    memory_resource_(allocator.resource()),
     enabled_validation_layers_(allocator),
     enabled_extensions_(allocator)
 {
@@ -70,7 +69,6 @@ sgf::rhi::VulkanContext::VulkanContext(VulkanContext&& other) noexcept :
     instance_(std::exchange(other.instance_, VK_NULL_HANDLE)),
     surface_(std::exchange(other.surface_, VK_NULL_HANDLE)),
     messenger_(std::exchange(other.messenger_, VK_NULL_HANDLE)),
-    memory_resource_(std::exchange(other.memory_resource_, {})),
     enabled_validation_layers_(std::move(other.enabled_validation_layers_)),
     enabled_extensions_(std::move(other.enabled_extensions_))
 {
@@ -84,7 +82,6 @@ sgf::rhi::VulkanContext::VulkanContext(VulkanContext&& other, const allocator_ty
     instance_(std::exchange(other.instance_, VK_NULL_HANDLE)),
     surface_(std::exchange(other.surface_, VK_NULL_HANDLE)),
     messenger_(std::exchange(other.messenger_, VK_NULL_HANDLE)),
-    memory_resource_(allocator.resource()),
     enabled_validation_layers_(std::move(other.enabled_validation_layers_), allocator),
     enabled_extensions_(std::move(other.enabled_extensions_), allocator)
 {
@@ -99,11 +96,6 @@ sgf::rhi::VulkanContext::~VulkanContext() noexcept
 std::error_code sgf::rhi::VulkanContext::create(VulkanContextCreateInfo create_info,
                                                 VulkanContext& output) noexcept
 {
-    if(!create_info.memory_resource)
-    {
-        return core::Error::kInvalidArgument;
-    }
-
     std::byte stack[core::stack_optimal_size];
     std::pmr::monotonic_buffer_resource stack_resource(stack, sizeof(stack));
 
@@ -111,7 +103,6 @@ std::error_code sgf::rhi::VulkanContext::create(VulkanContextCreateInfo create_i
     output.enabled_extensions_ = std::move(create_info.extensions);
     output.enabled_validation_layers_ = std::move(create_info.validation_layers);
     output.rhi_debug_output_ = std::exchange(create_info.rhi_debug_output, {});
-    output.memory_resource_ = std::exchange(create_info.memory_resource, {});
 
     // getting count of extensions that are supported by instance
     uint32_t extension_count = 0;
@@ -234,7 +225,7 @@ sgf::core::Vector<sgf::core::SharedPtr<sgf::rhi::IPhysicalDevice>> sgf::rhi::Vul
     core::Vector<VkPhysicalDevice> vulkan_devices(device_count, &stack_resource);
     vkEnumeratePhysicalDevices(instance_, &device_count, vulkan_devices.data());
 
-    core::Vector<core::SharedPtr<IPhysicalDevice>> physical_devices(vulkan_devices.size(), memory_resource_);
+    core::Vector<core::SharedPtr<IPhysicalDevice>> physical_devices(vulkan_devices.size(), get_allocator());
 
     for(size_t i = 0; i < vulkan_devices.size(); ++i)
     {
@@ -251,9 +242,9 @@ sgf::core::Vector<sgf::core::SharedPtr<sgf::rhi::IPhysicalDevice>> sgf::rhi::Vul
         core::Vector<VkExtensionProperties> available_extensions(extension_count, &stack_resource);
         vkEnumerateDeviceExtensionProperties(vulkan_device, nullptr, &extension_count, available_extensions.data());
 
-        auto physical_device = core::makeShared<VulkanPhysicalDevice>(memory_resource_);
+        auto physical_device = core::makeShared<VulkanPhysicalDevice>(get_allocator());
         // auto physical_device = core::SharedPtr<VulkanPhysicalDevice>(devices_allocator.new_object<VulkanPhysicalDevice>());
-        physical_device->name_ = core::String(device_properties.deviceName, memory_resource_);
+        physical_device->name_ = core::String(device_properties.deviceName, get_allocator());
         switch(device_properties.deviceType)
         {
             case VK_PHYSICAL_DEVICE_TYPE_OTHER:
@@ -279,8 +270,8 @@ sgf::core::Vector<sgf::core::SharedPtr<sgf::rhi::IPhysicalDevice>> sgf::rhi::Vul
         physical_device->features_ = device_features;
         physical_device->handle_ = vulkan_device;
         auto& surface_support = physical_device->surface_support_;
-        surface_support.formats_ = core::Vector<VkSurfaceFormatKHR>(memory_resource_);
-        surface_support.present_modes_ = core::Vector<VkPresentModeKHR>(memory_resource_);
+        surface_support.formats_ = core::Vector<VkSurfaceFormatKHR>(get_allocator());
+        surface_support.present_modes_ = core::Vector<VkPresentModeKHR>(get_allocator());
 
         // =========================================
 
@@ -367,9 +358,10 @@ sgf::core::Vector<sgf::core::SharedPtr<sgf::rhi::IPhysicalDevice>> sgf::rhi::Vul
 }
 
 std::expected<sgf::core::UniquePtr<sgf::rhi::ILogicalDevice>, std::error_code> sgf::rhi::VulkanContext::createLogicalDevice(
-    const LogicalDeviceCreateInfo& create_info) noexcept
+    const LogicalDeviceCreateInfo& create_info,
+    const allocator_type& alloc) noexcept
 {
-    auto output = core::makeUnique<VulkanLogicalDevice>(memory_resource_);
+    auto output = core::makeUnique<VulkanLogicalDevice>(alloc);
 
     if(const auto err = output->create(create_info))
     {
@@ -391,7 +383,6 @@ sgf::rhi::VulkanContext& sgf::rhi::VulkanContext::operator=(VulkanContext&& othe
     instance_ = std::exchange(other.instance_, VK_NULL_HANDLE);
     surface_ = std::exchange(other.surface_, VK_NULL_HANDLE);
     messenger_ = std::exchange(other.messenger_, VK_NULL_HANDLE);
-    memory_resource_ = std::exchange(other.memory_resource_, {});
     enabled_validation_layers_ = std::move(other.enabled_validation_layers_);
     enabled_extensions_ = std::move(other.enabled_extensions_);
     rhi_debug_output_ = std::exchange(other.rhi_debug_output_, {});

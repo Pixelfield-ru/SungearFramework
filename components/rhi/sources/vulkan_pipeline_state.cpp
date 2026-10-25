@@ -60,8 +60,6 @@ void sgf::rhi::VulkanPipelineState::destroy() noexcept
 
 std::error_code sgf::rhi::VulkanPipelineState::create(const PipelineStateCreateInfo& create_info) noexcept
 {
-    if(!create_info.memory_resource) return core::Error::kInvalidArgument;
-
     const auto* vulkan_context = static_cast<const VulkanContext*>(create_info.context);
     const auto* vulkan_logical_device = static_cast<const VulkanLogicalDevice*>(create_info.logical_device);
     const auto* vulkan_pass = static_cast<const VulkanPass*>(create_info.pass);

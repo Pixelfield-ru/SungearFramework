@@ -43,17 +43,38 @@ namespace sgf::rhi
         [[nodiscard]] std::error_code submit(const SubmitInfo& submit_info) noexcept override;
         [[nodiscard]] std::error_code waitIdle() noexcept override;
 
-        [[nodiscard]] std::expected<core::UniquePtr<ISwapchain>, std::error_code> createSwapchain(const SwapchainCreateInfo& create_info) noexcept override;
-        [[nodiscard]] std::expected<core::UniquePtr<IImage>, std::error_code> createImage(const ImageCreateInfo& create_info) noexcept override;
-        [[nodiscard]] std::expected<core::UniquePtr<IImageView>, std::error_code> createImageView(const ImageViewCreateInfo& create_info) noexcept override;
-        [[nodiscard]] std::expected<core::UniquePtr<ISampler>, std::error_code> createSampler(const SamplerCreateInfo& create_info) noexcept override;
-        [[nodiscard]] std::expected<core::UniquePtr<IShader>, std::error_code> createShader(const ShaderCreateInfo& create_info) noexcept override;
-        [[nodiscard]] std::expected<core::UniquePtr<IPass>, std::error_code> createPass(const PassCreateInfo& create_info) noexcept override;
-        [[nodiscard]] std::expected<core::UniquePtr<IPipelineState>, std::error_code> createPipelineState(const PipelineStateCreateInfo& create_info) noexcept override;
-        [[nodiscard]] std::expected<core::UniquePtr<IFramebuffer>, std::error_code> createFramebuffer(const FramebufferCreateInfo& create_info) noexcept override;
-        [[nodiscard]] std::expected<core::UniquePtr<ICommandBuffer>, std::error_code> createCommandBuffer(const CommandBufferCreateInfo& create_info) noexcept override;
-        [[nodiscard]] std::expected<core::UniquePtr<IBuffer>, std::error_code> createBuffer(const BufferCreateInfo& create_info) noexcept override;
-        [[nodiscard]] std::expected<core::UniquePtr<IDescriptorSet>, std::error_code> createDescriptorSet(const DescriptorSetCreateInfo& create_info) noexcept override;
+        [[nodiscard]] std::expected<core::UniquePtr<ISwapchain>, std::error_code> createSwapchain(
+            const SwapchainCreateInfo& create_info, const std::pmr::polymorphic_allocator<>& alloc) noexcept override;
+
+        [[nodiscard]] std::expected<core::UniquePtr<IImage>, std::error_code> createImage(
+            const ImageCreateInfo& create_info, const std::pmr::polymorphic_allocator<>& alloc) noexcept override;
+
+        [[nodiscard]] std::expected<core::UniquePtr<IImageView>, std::error_code> createImageView(
+            const ImageViewCreateInfo& create_info, const std::pmr::polymorphic_allocator<>& alloc) noexcept override;
+
+        [[nodiscard]] std::expected<core::UniquePtr<ISampler>, std::error_code> createSampler(
+            const SamplerCreateInfo& create_info, const std::pmr::polymorphic_allocator<>& alloc) noexcept override;
+
+        [[nodiscard]] std::expected<core::UniquePtr<IShader>, std::error_code> createShader(
+            const ShaderCreateInfo& create_info, const std::pmr::polymorphic_allocator<>& alloc) noexcept override;
+
+        [[nodiscard]] std::expected<core::UniquePtr<IPass>, std::error_code> createPass(
+            const PassCreateInfo& create_info, const std::pmr::polymorphic_allocator<>& alloc) noexcept override;
+
+        [[nodiscard]] std::expected<core::UniquePtr<IPipelineState>, std::error_code> createPipelineState(
+            const PipelineStateCreateInfo& create_info, const std::pmr::polymorphic_allocator<>& alloc) noexcept override;
+
+        [[nodiscard]] std::expected<core::UniquePtr<IFramebuffer>, std::error_code> createFramebuffer(
+            const FramebufferCreateInfo& create_info, const std::pmr::polymorphic_allocator<>& alloc) noexcept override;
+
+        [[nodiscard]] std::expected<core::UniquePtr<ICommandBuffer>, std::error_code> createCommandBuffer(
+            const CommandBufferCreateInfo& create_info, const std::pmr::polymorphic_allocator<>& alloc) noexcept override;
+
+        [[nodiscard]] std::expected<core::UniquePtr<IBuffer>, std::error_code> createBuffer(
+            const BufferCreateInfo& create_info, const std::pmr::polymorphic_allocator<>& alloc) noexcept override;
+
+        [[nodiscard]] std::expected<core::UniquePtr<IDescriptorSet>, std::error_code> createDescriptorSet(
+            const DescriptorSetCreateInfo& create_info, const std::pmr::polymorphic_allocator<>& alloc) noexcept override;
 
         VulkanLogicalDevice& operator=(const VulkanLogicalDevice&) = delete;
         VulkanLogicalDevice& operator=(VulkanLogicalDevice&& other) noexcept;
@@ -71,8 +92,6 @@ namespace sgf::rhi
         VulkanBuffer staging_buffer_;
         VulkanCommandBuffer staging_command_buffer_;
         size_t staging_buffer_min_size_ = 1024;
-
-        std::pmr::memory_resource* memory_resource_ {};
 
         /**
          * Get or create command commandPool.

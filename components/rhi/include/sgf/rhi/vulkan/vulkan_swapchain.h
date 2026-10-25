@@ -62,8 +62,6 @@ namespace sgf::rhi
         core::Vector<VkSemaphore> render_finished_semaphores_;
         core::Vector<VkFence> busy_frames_fences_;
 
-        std::pmr::memory_resource* memory_resource_ {};
-
         std::uint32_t current_frame_idx_ {};
 
         void destroy() noexcept override;
