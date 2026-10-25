@@ -53,6 +53,13 @@ namespace sgf::assets
         }
 
         template<typename AssetT>
+        Handle<AssetT> copy(const Handle<AssetT>& source) noexcept
+        {
+            // todo: make copy
+            return nullptr;
+        }
+
+        template<typename AssetT>
         AssetStorage<AssetT>& storage() noexcept
         {
             using Storage = AssetStorage<AssetT>;
