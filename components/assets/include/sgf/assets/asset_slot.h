@@ -13,23 +13,10 @@ namespace sgf::assets
 {
     using AssetId = std::uint32_t;
 
-    /// Has stable address in memory. Always valid if created.
-    template<typename AssetT>
-    struct AssetSlot final
+    struct AssetSlotControl
     {
-        std::optional<AssetT> value {};
+        virtual ~AssetSlotControl() noexcept = default;
 
-        AssetState state() const noexcept
-        {
-            return state_;
-        }
-
-        bool ready() const noexcept
-        {
-            return state_ == AssetState::kLoaded;
-        }
-
-    private:
         std::atomic<std::uint32_t> strong_refs_ {};
         /// Generation of asset (number of assets held by this slot earlier).
         std::atomic<std::uint32_t> generation_ = 1;
@@ -46,6 +33,32 @@ namespace sgf::assets
         void decrementRefCounter() noexcept
         {
             --strong_refs_;
+        }
+    };
+
+    /// Has stable address in memory. Always valid if created.
+    template<typename AssetT>
+    struct AssetSlot final : AssetSlotControl
+    {
+        template<typename>
+        friend struct Handle;
+
+        template<typename>
+        friend struct WeakHandle;
+
+        friend struct AnyHandle;
+        friend struct AnyWeakHandle;
+
+        std::optional<AssetT> value {};
+
+        AssetState state() const noexcept
+        {
+            return state_;
+        }
+
+        bool loaded() const noexcept
+        {
+            return state_ == AssetState::kLoaded;
         }
     };
 }
