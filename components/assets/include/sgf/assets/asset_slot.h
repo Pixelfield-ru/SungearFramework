@@ -17,22 +17,69 @@ namespace sgf::assets
     {
         virtual ~AssetSlotControl() noexcept = default;
 
-        std::atomic<std::uint32_t> strong_refs_ {};
+        AssetSlotControl() = default;
+        AssetSlotControl(const AssetSlotControl& other) noexcept :
+            strong_refs(other.strong_refs.load()),
+            generation(other.generation.load()),
+            version(other.version.load()),
+            state(other.state.load()),
+            id(other.id.load())
+        { }
+        AssetSlotControl(AssetSlotControl&& other) noexcept :
+            strong_refs(other.strong_refs.load()),
+            generation(other.generation.load()),
+            version(other.version.load()),
+            state(other.state.load()),
+            id(other.id.load())
+        { }
+
+        std::atomic<std::uint32_t> strong_refs {};
         /// Generation of asset (number of assets held by this slot earlier).
-        std::atomic<std::uint32_t> generation_ = 1;
+        std::atomic<std::uint32_t> generation = 1;
         /// Version of asset (number of reloads of the same asset).
-        std::atomic<std::uint32_t> version_ = 1;
-        std::atomic<AssetState> state_ = AssetState::kUnloaded;
-        AssetId id_ {};
+        std::atomic<std::uint32_t> version = 1;
+        std::atomic<AssetState> state = AssetState::kUnloaded;
+        std::atomic<AssetId> id {};
 
         void incrementRefCounter() noexcept
         {
-            ++strong_refs_;
+            ++strong_refs;
         }
 
         void decrementRefCounter() noexcept
         {
-            --strong_refs_;
+            --strong_refs;
+        }
+
+        bool loaded() const noexcept
+        {
+            return state == AssetState::kLoaded;
+        }
+
+        AssetSlotControl& operator=(const AssetSlotControl& other) noexcept
+        {
+            if(std::addressof(other) == this) return *this;
+
+            strong_refs = other.strong_refs.load();
+            generation = other.generation.load();
+            version = other.version.load();
+            state = other.state.load();
+            id = other.id.load();
+
+            return *this;
+        }
+
+        AssetSlotControl& operator=(AssetSlotControl&& other) noexcept
+        {
+            if(std::addressof(other) == this) return *this;
+
+            strong_refs = other.strong_refs.load();
+            generation = other.generation.load();
+            version = other.version.load();
+            state = other.state.load();
+            id = other.id.load();
+
+            return *this;
         }
     };
 
@@ -51,14 +98,11 @@ namespace sgf::assets
 
         std::optional<AssetT> value {};
 
-        AssetState state() const noexcept
+        void insert(AssetT asset)
         {
-            return state_;
-        }
-
-        bool loaded() const noexcept
-        {
-            return state_ == AssetState::kLoaded;
+            value = std::move(asset);
+            state = AssetState::kLoaded;
+            ++generation;
         }
     };
 }

@@ -14,23 +14,26 @@
 namespace sgf::assets
 {
     // todo: use log callback
-    struct AssetsServer final
+    // todo: use stable type index
+    struct AssetServer final
     {
         using allocator_type = std::pmr::polymorphic_allocator<>;
 
-        AssetsServer(size_t page_size) :
+        AssetServer(size_t page_size) :
             page_size_(page_size)
         { }
-        AssetsServer(size_t page_size, const allocator_type& alloc) :
+        AssetServer(size_t page_size, const allocator_type& alloc) :
             storages_map_(alloc),
             page_size_(page_size)
         { }
-        AssetsServer(const AssetsServer&) = delete;
-        AssetsServer(AssetsServer&&) = default;
-        AssetsServer(AssetsServer&& other, const allocator_type& alloc) noexcept :
+        AssetServer(const AssetServer&) = delete;
+        AssetServer(AssetServer&&) = default;
+        AssetServer(AssetServer&& other, const allocator_type& alloc) noexcept :
             storages_map_(std::move(other.storages_map_), alloc),
             page_size_(other.page_size_)
         { }
+
+        void setRoot(const std::filesystem::path& path) noexcept;
 
         template<typename AssetT>
         std::expected<Handle<AssetT>, std::error_code> load(const std::filesystem::path& path) noexcept
@@ -50,6 +53,30 @@ namespace sgf::assets
             {
                 return std::unexpected(asset.error());
             }*/
+        }
+
+        template<typename AssetT>
+        Handle<AssetT> find(AssetId asset_id) noexcept
+        {
+            auto& st = storage<AssetT>();
+            auto* slot = st.findSlot(asset_id);
+
+            Handle<AssetT> handle(slot);
+
+            return handle;
+        }
+
+        AnyHandle find(AssetId asset_id, std::uint32_t type_index) noexcept
+        {
+            auto* st = storage(type_index);
+            if(!st) return {};
+
+            auto* control = st->slotControl(asset_id);
+            if(!control) return {};
+
+            AnyHandle handle(control, type_index);
+
+            return handle;
         }
 
         template<typename AssetT>
@@ -73,6 +100,16 @@ namespace sgf::assets
             return storage;
         }
 
+        IAssetStorage* storage(std::uint32_t type_index) noexcept
+        {
+            if(!storages_map_.hasType(type_index))
+            {
+                return {};
+            }
+
+            return static_cast<IAssetStorage*>(storages_map_.erased(type_index));
+        }
+
         template<typename AssetT>
         const AssetStorage<AssetT>& storage() const noexcept
         {
@@ -84,8 +121,8 @@ namespace sgf::assets
             return storages_map_.get_allocator();
         }
 
-        AssetsServer& operator=(const AssetsServer&) = delete;
-        AssetsServer& operator=(AssetsServer&&) noexcept = default;
+        AssetServer& operator=(const AssetServer&) = delete;
+        AssetServer& operator=(AssetServer&&) noexcept = default;
 
     private:
         mutable core::TypeMap storages_map_;

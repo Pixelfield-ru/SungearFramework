@@ -13,6 +13,7 @@
 
 namespace sgf::core
 {
+    // todo: make template with id generator
     struct TypeMap final
     {
         using allocator_type = std::pmr::polymorphic_allocator<TypeMap>;
@@ -62,6 +63,22 @@ namespace sgf::core
             return static_cast<Storage<T>*>(storage_[index].get())->value;
         }
 
+        void* erased(std::uint32_t type_index) noexcept
+        {
+            sgf_assert(type_index < storage_.size(), "Index out of bounds");
+
+            auto& erased = *storage_[type_index];
+            return erased.erased_value;
+        }
+
+        const void* erased(std::uint32_t type_index) const noexcept
+        {
+            sgf_assert(type_index < storage_.size(), "Index out of bounds");
+
+            const auto& erased = *storage_[type_index];
+            return erased.erased_value;
+        }
+
         template<typename T>
         [[nodiscard]] bool hasType() const noexcept
         {
@@ -95,13 +112,19 @@ namespace sgf::core
         struct Erased
         {
             virtual ~Erased() noexcept = default;
+
+            void* erased_value {};
         };
 
         template<typename T>
         struct Storage final : Erased
         {
             template<typename... Args>
-            explicit Storage(Args&&... args) : value(std::forward<Args>(args)...) { }
+            explicit Storage(Args&&... args) :
+                value(std::forward<Args>(args)...)
+            {
+                erased_value = &value;
+            }
 
             T value;
         };

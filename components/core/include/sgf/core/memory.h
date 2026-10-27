@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include <deque>
+#include <queue>
 #include <memory>
 #include <memory_resource>
 #include <unordered_set>
@@ -74,6 +76,12 @@ namespace sgf::core
 
     template<typename T>
     using List = std::pmr::list<T>;
+
+    template<typename T>
+    using Deque = std::pmr::deque<T>;
+
+    template<typename T, typename ContainerT = Deque<T>>
+    using Queue = std::queue<T, ContainerT>;
 
     template<typename T, typename Hasher = std::hash<T>, class Eq = std::equal_to<T>>
     using UnorderedSet = std::pmr::unordered_set<T, Hasher, Eq>;
