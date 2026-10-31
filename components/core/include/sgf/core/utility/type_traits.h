@@ -5,6 +5,7 @@
 #pragma once
 
 #include <cstdint>
+#include <type_traits>
 
 namespace sgf::core
 {
@@ -23,4 +24,10 @@ namespace sgf::core
 
         return index;
     }
+
+    template<typename>
+    struct AlwaysFalse : std::false_type { };
+
+    template<typename T>
+    static constexpr bool always_false_v = AlwaysFalse<T>::value;
 }

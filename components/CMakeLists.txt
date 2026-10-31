@@ -1,4 +1,5 @@
 add_subdirectory(core)
+add_subdirectory(serialization)
 add_subdirectory(runtime)
 add_subdirectory(platform)
 add_subdirectory(rhi)
