@@ -21,7 +21,8 @@ namespace sgf::serialization
         kTypeMismatch,
         kMissingField,
         kOutOfRange,
-        kDepthLimit
+        kDepthLimit,
+        kUnknownType
     };
 
     struct ErrorCategory final : public std::error_category
@@ -44,6 +45,7 @@ namespace sgf::serialization
                 case Error::kMissingField: return "Field was not found.";
                 case Error::kOutOfRange: return "Array index is out of range.";
                 case Error::kDepthLimit: return "Reader nesting is too deep.";
+                case Error::kUnknownType: return "Unknown type of object.";
                 default: return "Unknown error";
             }
         }

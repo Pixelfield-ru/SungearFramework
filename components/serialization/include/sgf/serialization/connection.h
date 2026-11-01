@@ -9,7 +9,8 @@
 #include <system_error>
 
 #include "sgf/core/memory.h"
-#include "sgf/core/utility/type_traits.h"
+#include "sgf/core/utility/macroses.h"
+#include "owned_object.h"
 
 namespace sgf::serialization
 {
@@ -21,12 +22,14 @@ namespace sgf::serialization
     {
         virtual ~IConnection() = default;
 
-        virtual std::expected<bool, std::error_code> serialize(Serializer& serializer, const void* object, ArgsT&&... args) const noexcept = 0;
-        virtual std::expected<bool, std::error_code> deserialize(Serializer& serializer, void* object, ArgsT&&... args) const noexcept = 0;
+        virtual std::expected<bool, std::error_code> serialize(Serializer& serializer, const std::byte* object, ArgsT&&... args) const noexcept = 0;
+        virtual std::expected<OwnedObject, std::error_code> deserialize(Serializer& serializer, ArgsT&&... args) const noexcept = 0;
     };
 
     namespace impl
     {
+        static constexpr std::string_view key_type_name = "$sgf_type";
+
         /// Be careful with reference that this function returns. It can be invalidated if new serializer will be added.\n
         /// DO NOT STORE REFERENCE.
         core::Vector<std::byte*>& connections(size_t type_hash) noexcept;
@@ -34,7 +37,7 @@ namespace sgf::serialization
         template<typename T, typename... ArgsT>
         size_t storageTypeHash() noexcept
         {
-            static size_t hash = std::hash<const char*>{}(GENERATOR_PRETTY_FUNCTION);
+            static size_t hash = std::hash<const char*>{}(SGF_GENERATOR_PRETTY_FUNCTION);
             return hash;
         }
 

@@ -23,7 +23,7 @@ namespace sgf::serialization
         JsonWriter& operator=(const JsonWriter&) = delete;
 
         [[nodiscard]] allocator_type get_allocator() const noexcept;
-        [[nodiscard]] std::string_view data() const;
+        [[nodiscard]] std::string_view data() const override;
 
         void reset() override;
 

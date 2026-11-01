@@ -21,7 +21,7 @@ namespace sgf::serialization
 
         [[nodiscard]] allocator_type get_allocator() const noexcept;
 
-        [[nodiscard]] std::error_code parse(std::string_view text);
+        [[nodiscard]] std::error_code parse(std::string_view text) override;
 
         void reset() override;
 

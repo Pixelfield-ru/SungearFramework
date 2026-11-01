@@ -30,6 +30,8 @@ namespace sgf::serialization
 
         virtual void reset() = 0;
 
+        [[nodiscard]] virtual std::error_code parse(std::string_view text) = 0;
+
         [[nodiscard]] virtual FormatNode kind() const = 0;
         [[nodiscard]] virtual std::size_t size() const = 0;
 

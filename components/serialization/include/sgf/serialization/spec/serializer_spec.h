@@ -11,6 +11,8 @@
 
 #include <system_error>
 
+#include "sgf/serialization/value_type.h"
+
 namespace sgf::serialization
 {
     struct Serializer;
@@ -23,6 +25,9 @@ namespace sgf::serialization
     struct SerializerSpec final
     {
         static_assert(core::always_false_v<T>, "Implement SerializerSpec for your type!");
+
+        static constexpr ValueType value_type = ValueType::kObject;
+        static constexpr std::string_view type_name = "unknown";
 
         template<typename... ArgsT>
         static std::error_code serialize(Serializer& serializer, const T& value, ArgsT&&... args)
@@ -61,5 +66,8 @@ namespace sgf::serialization
             }
             else return core::types_container<>{};
         }
+
+        template<typename T>
+        using collect_all_types = decltype(collectBaseTypes<T>() + core::type_wrapper<T>{});
     }
 }

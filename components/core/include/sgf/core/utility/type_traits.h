@@ -8,12 +8,6 @@
 #include <tuple>
 #include <type_traits>
 
-#if defined _MSC_VER
-#   define GENERATOR_PRETTY_FUNCTION __FUNCSIG__
-#elif defined __clang__ || (defined __GNUC__)
-#   define GENERATOR_PRETTY_FUNCTION __PRETTY_FUNCTION__
-#endif
-
 namespace sgf::core
 {
     namespace impl

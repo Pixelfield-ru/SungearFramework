@@ -22,6 +22,8 @@ namespace sgf::serialization
 
         virtual void reset() = 0;
 
+        [[nodiscard]] virtual std::string_view data() const = 0;
+
         virtual std::error_code setSettings(const WriterSettings& settings) = 0;
 
         virtual std::error_code beginObject() = 0;

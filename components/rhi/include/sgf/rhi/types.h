@@ -760,25 +760,4 @@ namespace sgf::rhi
         float min_depth = 0.0f;
         float max_depth = 1.0f;
     };
-
-    struct Defer final
-    {
-        Defer(std::function<void()> func) noexcept : func_(std::move(func)) {}
-        Defer(const Defer&) = delete;
-        Defer(Defer&&) noexcept = default;
-        ~Defer() noexcept
-        {
-            func_();
-        }
-
-        Defer& operator=(const Defer&) = delete;
-        Defer& operator=(Defer&&) = default;
-
-    private:
-        std::function<void()> func_;
-    };
 }
-
-#define rhi_concat_impl(a, b) a##b
-#define rhi_concat(a, b) rhi_concat_impl(a, b)
-#define rhi_defer(func) pf::rhi::Defer rhi_concat(defer_, __LINE__)(func)
