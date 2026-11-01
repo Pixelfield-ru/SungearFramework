@@ -20,6 +20,8 @@ namespace sgf::serialization
     {
         virtual ~IWriter() = default;
 
+        virtual void reset() = 0;
+
         virtual std::error_code setSettings(const WriterSettings& settings) = 0;
 
         virtual std::error_code beginObject() = 0;

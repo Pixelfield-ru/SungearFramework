@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include "sgf/serialization/errors.h"
 #include "sgf/serialization/spec/serializer_spec.h"
 #include "sgf/serialization/serializer.h"
 
@@ -122,9 +123,24 @@ namespace sgf::serialization
         static std::error_code deserialize(Serializer& serializer, Value& value, ArgsT&&... args)
         {
             auto* reader = serializer.reader();
+            if(reader->kind() != FormatNode::kArray) return Error::kTypeMismatch;
 
-            // todo: continue
-            // if(const auto err = reader->) return err;
+            const auto count = reader->size();
+            value.clear();
+            value.reserve(count);
+
+            for(std::size_t index = 0; index < count; ++index)
+            {
+                if(const auto error = reader->at(index)) return error;
+
+                value.emplace_back();
+                if(const auto error = serializer.deserialize(value.back(), std::forward<ArgsT>(args)...))
+                    return error;
+
+                if(const auto error = reader->leave()) return error;
+            }
+
+            return {};
         }
     };
 }

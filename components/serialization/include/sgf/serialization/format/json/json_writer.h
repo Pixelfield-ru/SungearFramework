@@ -25,6 +25,8 @@ namespace sgf::serialization
         [[nodiscard]] allocator_type get_allocator() const noexcept;
         [[nodiscard]] std::string_view data() const;
 
+        void reset() override;
+
         std::error_code setSettings(const WriterSettings& settings) override;
 
         std::error_code beginObject() override;

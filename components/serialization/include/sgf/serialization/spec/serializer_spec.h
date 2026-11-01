@@ -15,6 +15,10 @@ namespace sgf::serialization
 {
     struct Serializer;
 
+    /**
+     * Serialization specialization for type. Inherit core::base_types to specify the base types.
+     * @tparam T Type.
+     */
     template<typename T>
     struct SerializerSpec final
     {
@@ -32,4 +36,30 @@ namespace sgf::serialization
             return {};
         }
     };
+
+    namespace impl
+    {
+        template<typename T>
+        auto collectBaseTypes() noexcept
+        {
+            if constexpr (requires { typename SerializerSpec<T>::base; })
+            {
+                using bases = typename SerializerSpec<T>::base;
+
+                return []<std::size_t... Indices>(std::index_sequence<Indices...>)
+                {
+                    if constexpr (sizeof...(Indices) == 0)
+                    {
+                        return core::types_container<>{};
+                    }
+                    else
+                    {
+                        return ((collectBaseTypes<typename bases::template get<Indices>>()
+                                 + core::type_wrapper<typename bases::template get<Indices>>{}) + ...);
+                    }
+                }(std::make_index_sequence<bases::count>{}).unify();
+            }
+            else return core::types_container<>{};
+        }
+    }
 }

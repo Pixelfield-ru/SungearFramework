@@ -19,24 +19,27 @@ namespace sgf::serialization
         explicit JsonReader(const allocator_type& allocator);
         ~JsonReader() override;
 
-        JsonReader(const JsonReader&) = delete;
-        JsonReader& operator=(const JsonReader&) = delete;
-
         [[nodiscard]] allocator_type get_allocator() const noexcept;
 
         [[nodiscard]] std::error_code parse(std::string_view text);
 
+        void reset() override;
+
         [[nodiscard]] FormatNode kind() const override;
         [[nodiscard]] std::size_t size() const override;
 
-        [[nodiscard]] IReader* field(std::string_view key) override;
-        [[nodiscard]] IReader* at(std::size_t index) override;
+        [[nodiscard]] std::error_code field(std::string_view key) override;
+        [[nodiscard]] std::error_code at(std::size_t index) override;
+        [[nodiscard]] std::error_code leave() override;
 
         std::error_code readBool(bool& value) const override;
         std::error_code readInt(std::int64_t& value) const override;
         std::error_code readUint(std::uint64_t& value) const override;
         std::error_code readFloat(double& value) const override;
         std::error_code readString(std::string_view& value) const override;
+
+        JsonReader(const JsonReader&) = delete;
+        JsonReader& operator=(const JsonReader&) = delete;
 
     private:
         struct Impl;

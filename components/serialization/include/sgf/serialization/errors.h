@@ -18,7 +18,10 @@ namespace sgf::serialization
         kWriteFailed,
         kSettingsLocked,
         kParseError,
-        kTypeMismatch
+        kTypeMismatch,
+        kMissingField,
+        kOutOfRange,
+        kDepthLimit
     };
 
     struct ErrorCategory final : public std::error_category
@@ -38,6 +41,9 @@ namespace sgf::serialization
                 case Error::kSettingsLocked: return "Writer settings cannot be changed after output has started.";
                 case Error::kParseError: return "JSON text could not be parsed.";
                 case Error::kTypeMismatch: return "JSON value has a different type.";
+                case Error::kMissingField: return "Field was not found.";
+                case Error::kOutOfRange: return "Array index is out of range.";
+                case Error::kDepthLimit: return "Reader nesting is too deep.";
                 default: return "Unknown error";
             }
         }

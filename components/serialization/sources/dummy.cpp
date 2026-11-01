@@ -5,3 +5,4 @@
 #include "sgf/serialization/serializer.h"
 #include "sgf/serialization/spec/serializer_spec.h"
 #include "sgf/serialization/spec/specs.h"
+#include "sgf/serialization/types_connection.h"

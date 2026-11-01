@@ -28,11 +28,14 @@ namespace sgf::serialization
     {
         virtual ~IReader() = default;
 
+        virtual void reset() = 0;
+
         [[nodiscard]] virtual FormatNode kind() const = 0;
         [[nodiscard]] virtual std::size_t size() const = 0;
 
-        [[nodiscard]] virtual IReader* field(std::string_view key) = 0;
-        [[nodiscard]] virtual IReader* at(std::size_t index) = 0;
+        [[nodiscard]] virtual std::error_code field(std::string_view key) = 0;
+        [[nodiscard]] virtual std::error_code at(std::size_t index) = 0;
+        [[nodiscard]] virtual std::error_code leave() = 0;
 
         virtual std::error_code readBool(bool& value) const = 0;
         virtual std::error_code readInt(std::int64_t& value) const = 0;

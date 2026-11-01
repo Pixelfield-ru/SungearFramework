@@ -88,6 +88,15 @@ struct sgf::serialization::JsonWriter::Impl
         return {};
     }
 
+    void reset()
+    {
+        stack_.clear();
+        expect_key = false;
+        finished = false;
+        buffer_.Clear();
+        std::visit([&](auto& writer) { writer.Reset(buffer_); }, writer_);
+    }
+
     template<typename Function>
     bool emit(Function&& function)
     {
@@ -150,6 +159,11 @@ sgf::serialization::JsonWriter::allocator_type sgf::serialization::JsonWriter::g
 std::string_view sgf::serialization::JsonWriter::data() const
 {
     return { impl_->buffer_.GetString(), impl_->buffer_.GetLength() };
+}
+
+void sgf::serialization::JsonWriter::reset()
+{
+    impl_->reset();
 }
 
 std::error_code sgf::serialization::JsonWriter::setSettings(const WriterSettings& settings)

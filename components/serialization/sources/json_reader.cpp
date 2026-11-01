@@ -29,48 +29,20 @@ struct sgf::serialization::JsonReader::Impl
     using Value = rapidjson::GenericValue<rapidjson::UTF8<>, rapidjson::MemoryPoolAllocator<RapidJsonPmrAllocator>>;
     using Document = rapidjson::GenericDocument<rapidjson::UTF8<>, rapidjson::MemoryPoolAllocator<RapidJsonPmrAllocator>, RapidJsonPmrAllocator>;
 
-    struct Node final : IReader
-    {
-        const Value* value {};
-        Impl* impl {};
-
-        Node(const Value* value, Impl* impl) noexcept : value { value }, impl { impl }
-        {
-        }
-
-        Node(const Node&) = delete;
-        Node(Node&& other) noexcept : value { other.value }, impl { other.impl }
-        {
-        }
-
-        Node& operator=(const Node&) = delete;
-        Node& operator=(Node&&) = delete;
-
-        [[nodiscard]] FormatNode kind() const override;
-        [[nodiscard]] std::size_t size() const override;
-        [[nodiscard]] IReader* field(std::string_view key) override;
-        [[nodiscard]] IReader* at(std::size_t index) override;
-        std::error_code readBool(bool& value) const override;
-        std::error_code readInt(std::int64_t& value) const override;
-        std::error_code readUint(std::uint64_t& value) const override;
-        std::error_code readFloat(double& value) const override;
-        std::error_code readString(std::string_view& value) const override;
-    };
+    static constexpr std::size_t max_depth = 256;
 
     explicit Impl(std::pmr::memory_resource* resource) :
         base_ { resource },
         pool_ { core::stack_optimal_size, &base_ },
-        document_(&pool_, 1024, &base_),
-        storage_(resource),
-        nodes_(resource)
+        document_(&pool_, 1024, &base_)
     {
     }
 
     [[nodiscard]] std::error_code parse(const std::string_view text)
     {
-        storage_.clear();
-        nodes_.clear();
-        root_ = nullptr;
+        depth_ = 0;
+        current_ = nullptr;
+        parsed_ = false;
 
         document_.Parse(charsOf(text), text.size());
         if(document_.HasParseError())
@@ -80,121 +52,142 @@ struct sgf::serialization::JsonReader::Impl
         }
 
         parse_error_ = {};
-        root_ = nodeFor(&document_);
+        parsed_ = true;
+        current_ = &document_;
         return {};
     }
 
-    [[nodiscard]] IReader* nodeFor(const Value* value)
+    void reset()
     {
-        const auto it = nodes_.find(value);
-        if(it != nodes_.end()) return it->second;
+        depth_ = 0;
+        current_ = parsed_ ? &document_ : nullptr;
+    }
 
-        storage_.emplace_back(value, this);
-        IReader* const node = &storage_.back();
-        nodes_.emplace(value, node);
-        return node;
+    [[nodiscard]] FormatNode kind() const
+    {
+        if(current_ == nullptr) return FormatNode::kInvalid;
+        if(current_->IsNull()) return FormatNode::kNull;
+        if(current_->IsBool()) return FormatNode::kBool;
+        if(current_->IsString()) return FormatNode::kString;
+        if(current_->IsObject()) return FormatNode::kObject;
+        if(current_->IsArray()) return FormatNode::kArray;
+        if(current_->IsDouble()) return FormatNode::kFloat;
+        if(current_->IsUint64() && !current_->IsInt64()) return FormatNode::kUint;
+        if(current_->IsNumber()) return FormatNode::kInt;
+        return FormatNode::kInvalid;
+    }
+
+    [[nodiscard]] std::size_t size() const
+    {
+        if(current_ == nullptr) return 0;
+        if(current_->IsArray()) return current_->Size();
+        if(current_->IsObject()) return current_->MemberCount();
+        return 0;
+    }
+
+    [[nodiscard]] std::error_code field(const std::string_view key)
+    {
+        if(current_ == nullptr) return Error::kParseError;
+        if(!current_->IsObject()) return Error::kTypeMismatch;
+        if(depth_ == max_depth) return Error::kDepthLimit;
+
+        const rapidjson::Value name(rapidjson::StringRef(charsOf(key), sizeOf(key)));
+        const auto it = current_->FindMember(name);
+        if(it == current_->MemberEnd()) return Error::kMissingField;
+
+        path_[depth_++] = current_;
+        current_ = &it->value;
+        return {};
+    }
+
+    [[nodiscard]] std::error_code at(const std::size_t index)
+    {
+        if(current_ == nullptr) return Error::kParseError;
+        if(!current_->IsArray()) return Error::kTypeMismatch;
+        if(index >= current_->Size()) return Error::kOutOfRange;
+        if(depth_ == max_depth) return Error::kDepthLimit;
+
+        path_[depth_++] = current_;
+        current_ = &(*current_)[static_cast<rapidjson::SizeType>(index)];
+        return {};
+    }
+
+    [[nodiscard]] std::error_code leave()
+    {
+        if(depth_ == 0) return Error::kUnbalancedScope;
+
+        current_ = path_[--depth_];
+        return {};
+    }
+
+    [[nodiscard]] std::error_code readBool(bool& output) const
+    {
+        if(current_ == nullptr) return Error::kParseError;
+        if(!current_->IsBool()) return Error::kTypeMismatch;
+
+        output = current_->GetBool();
+        return {};
+    }
+
+    [[nodiscard]] std::error_code readInt(std::int64_t& output) const
+    {
+        if(current_ == nullptr) return Error::kParseError;
+        if(!current_->IsNumber() || current_->IsDouble()) return Error::kTypeMismatch;
+        if(current_->IsInt64())
+        {
+            output = current_->GetInt64();
+            return {};
+        }
+
+        if(current_->IsUint64())
+        {
+            const auto number = current_->GetUint64();
+            if(number > static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::max())) return Error::kTypeMismatch;
+
+            output = static_cast<std::int64_t>(number);
+            return {};
+        }
+
+        return Error::kTypeMismatch;
+    }
+
+    [[nodiscard]] std::error_code readUint(std::uint64_t& output) const
+    {
+        if(current_ == nullptr) return Error::kParseError;
+        if(!current_->IsNumber() || current_->IsDouble() || !current_->IsUint64()) return Error::kTypeMismatch;
+
+        output = current_->GetUint64();
+        return {};
+    }
+
+    [[nodiscard]] std::error_code readFloat(double& output) const
+    {
+        if(current_ == nullptr) return Error::kParseError;
+        if(!current_->IsNumber()) return Error::kTypeMismatch;
+
+        output = current_->GetDouble();
+        return {};
+    }
+
+    [[nodiscard]] std::error_code readString(std::string_view& output) const
+    {
+        if(current_ == nullptr) return Error::kParseError;
+        if(!current_->IsString()) return Error::kTypeMismatch;
+
+        const char* const chars = current_->GetString();
+        output = chars == nullptr ? std::string_view {} : std::string_view { chars, current_->GetStringLength() };
+        return {};
     }
 
     RapidJsonPmrAllocator base_;
     rapidjson::MemoryPoolAllocator<RapidJsonPmrAllocator> pool_;
     Document document_;
-    core::Deque<Node> storage_;
-    core::UnorderedMap<const Value*, IReader*> nodes_;
-    IReader* root_ {};
+    const Value* path_[max_depth] {};
+    std::size_t depth_ {};
+    const Value* current_ {};
+    bool parsed_ { false };
     std::error_code parse_error_ {};
 };
-
-sgf::serialization::FormatNode sgf::serialization::JsonReader::Impl::Node::kind() const
-{
-    if(value->IsNull()) return FormatNode::kNull;
-    if(value->IsBool()) return FormatNode::kBool;
-    if(value->IsString()) return FormatNode::kString;
-    if(value->IsObject()) return FormatNode::kObject;
-    if(value->IsArray()) return FormatNode::kArray;
-    if(value->IsDouble()) return FormatNode::kFloat;
-    if(value->IsUint64() && !value->IsInt64()) return FormatNode::kUint;
-    if(value->IsNumber()) return FormatNode::kInt;
-    return FormatNode::kInvalid;
-}
-
-std::size_t sgf::serialization::JsonReader::Impl::Node::size() const
-{
-    if(value->IsArray()) return value->Size();
-    if(value->IsObject()) return value->MemberCount();
-    return 0;
-}
-
-sgf::serialization::IReader* sgf::serialization::JsonReader::Impl::Node::field(const std::string_view key)
-{
-    if(!value->IsObject()) return nullptr;
-
-    const rapidjson::Value name(rapidjson::StringRef(charsOf(key), sizeOf(key)));
-    const auto it = value->FindMember(name);
-    if(it == value->MemberEnd()) return nullptr;
-
-    return impl->nodeFor(&it->value);
-}
-
-sgf::serialization::IReader* sgf::serialization::JsonReader::Impl::Node::at(const std::size_t index)
-{
-    if(!value->IsArray() || index >= value->Size()) return nullptr;
-
-    return impl->nodeFor(&(*value)[static_cast<rapidjson::SizeType>(index)]);
-}
-
-std::error_code sgf::serialization::JsonReader::Impl::Node::readBool(bool& output) const
-{
-    if(!value->IsBool()) return Error::kTypeMismatch;
-
-    output = value->GetBool();
-    return {};
-}
-
-std::error_code sgf::serialization::JsonReader::Impl::Node::readInt(std::int64_t& output) const
-{
-    if(!value->IsNumber() || value->IsDouble()) return Error::kTypeMismatch;
-    if(value->IsInt64())
-    {
-        output = value->GetInt64();
-        return {};
-    }
-
-    if(value->IsUint64())
-    {
-        const auto number = value->GetUint64();
-        if(number > static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::max())) return Error::kTypeMismatch;
-
-        output = static_cast<std::int64_t>(number);
-        return {};
-    }
-
-    return Error::kTypeMismatch;
-}
-
-std::error_code sgf::serialization::JsonReader::Impl::Node::readUint(std::uint64_t& output) const
-{
-    if(!value->IsNumber() || value->IsDouble() || !value->IsUint64()) return Error::kTypeMismatch;
-
-    output = value->GetUint64();
-    return {};
-}
-
-std::error_code sgf::serialization::JsonReader::Impl::Node::readFloat(double& output) const
-{
-    if(!value->IsNumber()) return Error::kTypeMismatch;
-
-    output = value->GetDouble();
-    return {};
-}
-
-std::error_code sgf::serialization::JsonReader::Impl::Node::readString(std::string_view& output) const
-{
-    if(!value->IsString()) return Error::kTypeMismatch;
-
-    const char* const chars = value->GetString();
-    output = chars == nullptr ? std::string_view {} : std::string_view { chars, value->GetStringLength() };
-    return {};
-}
 
 sgf::serialization::JsonReader::JsonReader() : JsonReader(allocator_type {})
 {
@@ -209,7 +202,7 @@ sgf::serialization::JsonReader::~JsonReader() = default;
 
 sgf::serialization::JsonReader::allocator_type sgf::serialization::JsonReader::get_allocator() const noexcept
 {
-    return impl_->storage_.get_allocator();
+    return { impl_->base_.resource };
 }
 
 std::error_code sgf::serialization::JsonReader::parse(const std::string_view text)
@@ -217,56 +210,57 @@ std::error_code sgf::serialization::JsonReader::parse(const std::string_view tex
     return impl_->parse(text);
 }
 
+void sgf::serialization::JsonReader::reset()
+{
+    impl_->reset();
+}
+
 sgf::serialization::FormatNode sgf::serialization::JsonReader::kind() const
 {
-    if(!impl_->root_) return FormatNode::kInvalid;
-    return impl_->root_->kind();
+    return impl_->kind();
 }
 
 std::size_t sgf::serialization::JsonReader::size() const
 {
-    if(!impl_->root_) return 0;
-    return impl_->root_->size();
+    return impl_->size();
 }
 
-sgf::serialization::IReader* sgf::serialization::JsonReader::field(const std::string_view key)
+std::error_code sgf::serialization::JsonReader::field(const std::string_view key)
 {
-    if(!impl_->root_) return nullptr;
-    return impl_->root_->field(key);
+    return impl_->field(key);
 }
 
-sgf::serialization::IReader* sgf::serialization::JsonReader::at(const std::size_t index)
+std::error_code sgf::serialization::JsonReader::at(const std::size_t index)
 {
-    if(!impl_->root_) return nullptr;
-    return impl_->root_->at(index);
+    return impl_->at(index);
+}
+
+std::error_code sgf::serialization::JsonReader::leave()
+{
+    return impl_->leave();
 }
 
 std::error_code sgf::serialization::JsonReader::readBool(bool& value) const
 {
-    if(!impl_->root_) return Error::kParseError;
-    return impl_->root_->readBool(value);
+    return impl_->readBool(value);
 }
 
 std::error_code sgf::serialization::JsonReader::readInt(std::int64_t& value) const
 {
-    if(!impl_->root_) return Error::kParseError;
-    return impl_->root_->readInt(value);
+    return impl_->readInt(value);
 }
 
 std::error_code sgf::serialization::JsonReader::readUint(std::uint64_t& value) const
 {
-    if(!impl_->root_) return Error::kParseError;
-    return impl_->root_->readUint(value);
+    return impl_->readUint(value);
 }
 
 std::error_code sgf::serialization::JsonReader::readFloat(double& value) const
 {
-    if(!impl_->root_) return Error::kParseError;
-    return impl_->root_->readFloat(value);
+    return impl_->readFloat(value);
 }
 
 std::error_code sgf::serialization::JsonReader::readString(std::string_view& value) const
 {
-    if(!impl_->root_) return Error::kParseError;
-    return impl_->root_->readString(value);
+    return impl_->readString(value);
 }
