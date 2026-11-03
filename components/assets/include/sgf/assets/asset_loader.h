@@ -7,7 +7,6 @@
 #include <expected>
 #include <filesystem>
 #include <span>
-#include <string_view>
 #include <system_error>
 
 namespace sgf::assets
@@ -16,8 +15,8 @@ namespace sgf::assets
     struct IAssetLoader
     {
         virtual ~IAssetLoader() = default;
-        [[nodiscard]] virtual std::span<const std::string_view> extensions() const noexcept = 0;
-        [[nodiscard]] virtual std::expected<AssetT, std::error_code> loadSource(const std::filesystem::path& source) = 0;
-        [[nodiscard]] virtual std::expected<AssetT, std::error_code> loadBaked(std::span<const std::byte> bytes) = 0;
+        [[nodiscard]] virtual std::error_code loadSource(const std::filesystem::path& source, AssetT& asset) = 0;
+        [[nodiscard]] virtual std::error_code loadBaked(std::span<const std::byte> bytes, AssetT& asset) = 0;
+        [[nodiscard]] virtual std::error_code writeMeta(const std::filesystem::path& source, AssetId id) = 0;
     };
 }

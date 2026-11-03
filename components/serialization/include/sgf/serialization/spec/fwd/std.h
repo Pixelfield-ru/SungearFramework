@@ -13,6 +13,7 @@
 #include <filesystem>
 #include <map>
 #include <memory>
+#include <optional>
 #include <set>
 #include <string>
 #include <type_traits>
@@ -190,6 +191,32 @@ namespace sgf::serialization
             value = static_cast<T*>(object->release());
 
             return {};
+        }
+    };
+
+    template<typename T>
+    struct SerializerSpec<std::optional<T>> final
+    {
+        static constexpr ValueType value_type = ValueType::kDirect;
+
+        template<typename... ArgsT>
+        static std::error_code serialize(Serializer& serializer, const std::optional<T>& value, ArgsT&&... args)
+        {
+            if(!value) return serializer.writer()->writeNull();
+            return serializer.serialize(*value, std::forward<ArgsT>(args)...);
+        }
+
+        template<typename... ArgsT>
+        static std::error_code deserialize(Serializer& serializer, std::optional<T>& value, ArgsT&&... args)
+        {
+            if(serializer.reader()->kind() == FormatNode::kNull)
+            {
+                value.reset();
+                return {};
+            }
+
+            if(!value) value.emplace();
+            return serializer.deserialize(*value, std::forward<ArgsT>(args)...);
         }
     };
 

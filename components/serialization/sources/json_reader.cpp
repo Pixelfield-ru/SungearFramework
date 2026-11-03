@@ -85,6 +85,14 @@ struct sgf::serialization::JsonReader::Impl
         return 0;
     }
 
+    [[nodiscard]] bool hasField(const std::string_view key) const
+    {
+        if(current_ == nullptr || !current_->IsObject()) return false;
+
+        const rapidjson::Value name(rapidjson::StringRef(charsOf(key), sizeOf(key)));
+        return current_->FindMember(name) != current_->MemberEnd();
+    }
+
     [[nodiscard]] std::error_code field(const std::string_view key)
     {
         if(current_ == nullptr) return Error::kParseError;
@@ -223,6 +231,11 @@ sgf::serialization::FormatNode sgf::serialization::JsonReader::kind() const
 std::size_t sgf::serialization::JsonReader::size() const
 {
     return impl_->size();
+}
+
+bool sgf::serialization::JsonReader::hasField(const std::string_view key) const
+{
+    return impl_->hasField(key);
 }
 
 std::error_code sgf::serialization::JsonReader::field(const std::string_view key)

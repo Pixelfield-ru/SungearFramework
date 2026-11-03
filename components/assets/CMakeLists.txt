@@ -49,6 +49,7 @@ target_link_libraries(
     ${PROJECT_NAME}
     PUBLIC
         sgf::core
+        sgf::serialization
 )
 
 target_include_directories(

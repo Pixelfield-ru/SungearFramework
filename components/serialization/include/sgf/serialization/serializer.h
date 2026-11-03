@@ -27,17 +27,30 @@ namespace sgf::serialization
         template<typename>
         friend struct SerializerSpec;
 
-        Serializer(IWriter* writer, IReader* reader, const allocator_type& allocator) noexcept :
+        Serializer() noexcept = default;
+        Serializer(IWriter* writer, IReader* reader, const allocator_type& alloc) noexcept :
             writer_(writer),
             reader_(reader),
-            resource_(allocator.resource())
+            resource_(alloc.resource())
         { }
         Serializer(const Serializer&) = default;
+        Serializer(const Serializer& other, const allocator_type& alloc) :
+            writer_(other.writer_),
+            reader_(other.reader_),
+            resource_(alloc.resource())
+        { }
         Serializer(Serializer&&) = default;
+        Serializer(Serializer&& other, const allocator_type& alloc) :
+            writer_(other.writer_),
+            reader_(other.reader_),
+            resource_(alloc.resource())
+        { }
 
         template<typename T, typename... ArgsT>
         [[nodiscard]] std::error_code serialize(const T& value, ArgsT&&... args)
         {
+            if(!writer_) return Error::kNoWriter;
+
             constexpr ValueType kind = valueTypeOf<T>();
 
             if constexpr(kind == ValueType::kDirect)
@@ -65,19 +78,30 @@ namespace sgf::serialization
         template<typename T, typename... ArgsT>
         [[nodiscard]] std::error_code deserialize(T& value, ArgsT&&... args)
         {
+            if(!reader_) return Error::kNoReader;
+
             return deserializeWithBaseTypes(value, std::forward<ArgsT>(args)...);
         }
 
         template<typename T, typename... ArgsT>
         [[nodiscard]] std::error_code serializeField(std::string_view name, const T& value, ArgsT&&... args) noexcept
         {
+            if(!writer_) return Error::kNoReader;
+
             if(const auto err = writer_->key(name)) return err;
             return serialize(value, std::forward<ArgsT>(args)...);
+        }
+
+        [[nodiscard]] bool hasField(std::string_view name) const noexcept
+        {
+            return reader_->hasField(name);
         }
 
         template<typename T, typename... ArgsT>
         [[nodiscard]] std::error_code deserializeField(std::string_view name, T& value, ArgsT&&... args) noexcept
         {
+            if(!reader_) return Error::kNoReader;
+
             if(const auto err = reader_->field(name)) return err;
             if(const auto err = deserialize(value, std::forward<ArgsT>(args)...)) return err;
             if(const auto err = reader_->leave()) return err;

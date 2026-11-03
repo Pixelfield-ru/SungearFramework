@@ -28,6 +28,7 @@ namespace sgf::serialization
         [[nodiscard]] FormatNode kind() const override;
         [[nodiscard]] std::size_t size() const override;
 
+        [[nodiscard]] bool hasField(std::string_view key) const override;
         [[nodiscard]] std::error_code field(std::string_view key) override;
         [[nodiscard]] std::error_code at(std::size_t index) override;
         [[nodiscard]] std::error_code leave() override;

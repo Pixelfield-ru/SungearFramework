@@ -9,50 +9,93 @@
 #include "sgf/core/structures/type_map.h"
 
 #include "asset_storage.h"
+#include "asset_catalog.h"
 #include "errors.h"
 
 namespace sgf::assets
 {
     // todo: use log callback
     // todo: use stable type index
+    // todo: accept threadpool
+    // todo: use AssetServerCreateInfo
     struct AssetServer final
     {
         using allocator_type = std::pmr::polymorphic_allocator<>;
 
-        AssetServer(size_t page_size) :
+        AssetServer(serialization::Serializer serializer, size_t page_size) :
+            catalog_(std::move(serializer)),
             page_size_(page_size)
         { }
-        AssetServer(size_t page_size, const allocator_type& alloc) :
+        AssetServer(serialization::Serializer serializer, size_t page_size, const allocator_type& alloc) :
             storages_map_(alloc),
+            catalog_(std::move(serializer)),
             page_size_(page_size)
         { }
         AssetServer(const AssetServer&) = delete;
         AssetServer(AssetServer&&) = default;
         AssetServer(AssetServer&& other, const allocator_type& alloc) noexcept :
             storages_map_(std::move(other.storages_map_), alloc),
+            catalog_(std::move(other.catalog_), alloc),
             page_size_(other.page_size_)
         { }
 
-        void setRoot(const std::filesystem::path& path) noexcept;
+        /**
+         * Mount catalog in directory.
+         * @param path Path to mount catalog.
+         */
+        void mount(std::filesystem::path path) noexcept;
 
-        template<typename AssetT>
-        std::expected<Handle<AssetT>, std::error_code> load(const std::filesystem::path& path) noexcept
+        template<typename AssetT, typename... ArgsT>
+        std::expected<Handle<AssetT>, std::error_code> load(const std::filesystem::path& path, ArgsT&&... args) noexcept
         {
-            auto& st = storage<AssetT>();
-            auto* loader = st.loader();
+            // todo: normalize path
 
-            if(!loader)
+            const auto type = core::typeIndex<AssetT>();
+            auto& storage = this->storage<AssetT>();
+            // trying to find existing asset
+            auto* file = catalog_.find(path);
+
+            // if file was not found then creating new file in catalog
+            if(!file)
             {
-                return std::unexpected(Error::kLoaderNotSpecified);
+                // acquire new id for new asset
+                file = &catalog_.acquireFile(path);
+                file->type_id = type;
+
+                // saving catalog to file
+                if(const auto err = catalog_.save()) return std::unexpected(err);
+
+                // writing meta of the file near the file
+                if(const auto err = storage.loader()->writeMeta(path, file->id)) return std::unexpected(err);
             }
 
-            // todo: check if slot exists and return it or load asset.
-            return nullptr;
-            /*auto asset = loader->loadSource(path);
-            if(!asset)
+            // if slot is already exists then leave
+            if(auto* existing = storage.findSlot(file->id)) return Handle<AssetT>(existing);
+
+            // get new slot for asset
+            auto* slot = storage.acquireSlot(file->id);
+
+            auto asset = std::make_obj_using_allocator<AssetT>(get_allocator(), std::forward<ArgsT>(args)...);
+            // todo: load async
+            if(const auto err = storage.loader()->loadSource(path, asset))
             {
+                slot->state = AssetState::kFailed;
                 return std::unexpected(asset.error());
-            }*/
+            }
+
+            slot->insert(std::move(asset));
+            return Handle<AssetT>(slot);
+        }
+
+        template<typename AssetT>
+        std::error_code bake(const Handle<AssetT>& handle/*, Archive& archive*/)
+        {
+            return {};
+        }
+
+        std::error_code bake(const AnyHandle& handle/*, Archive& archive*/)
+        {
+            return {};
         }
 
         template<typename AssetT>
@@ -126,6 +169,7 @@ namespace sgf::assets
 
     private:
         mutable core::TypeMap storages_map_;
+        AssetCatalog catalog_;
         size_t page_size_ {};
     };
 }

@@ -35,6 +35,7 @@ namespace sgf::serialization
         [[nodiscard]] virtual FormatNode kind() const = 0;
         [[nodiscard]] virtual std::size_t size() const = 0;
 
+        [[nodiscard]] virtual bool hasField(std::string_view key) const = 0;
         [[nodiscard]] virtual std::error_code field(std::string_view key) = 0;
         [[nodiscard]] virtual std::error_code at(std::size_t index) = 0;
         [[nodiscard]] virtual std::error_code leave() = 0;

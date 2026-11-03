@@ -4,7 +4,8 @@
 
 #include "sgf/assets/asset_server.h"
 
-void sgf::assets::AssetServer::setRoot(const std::filesystem::path& path) noexcept
+void sgf::assets::AssetServer::mount(std::filesystem::path path) noexcept
 {
+    catalog_.path = std::move(path);
 
 }
