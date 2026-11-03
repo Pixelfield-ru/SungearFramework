@@ -94,12 +94,14 @@ namespace sgf::assets
         File* find(const std::filesystem::path& file_path) noexcept;
 
         File& acquireFile(std::filesystem::path file_path);
+        AssetId acquireId();
 
         /**
          * Writes catalog information in file by AssetCatalog::path.
          * @return Catalog save result.
          */
         std::error_code save();
+        std::error_code load();
 
         [[nodiscard]] allocator_type get_allocator() const noexcept
         {

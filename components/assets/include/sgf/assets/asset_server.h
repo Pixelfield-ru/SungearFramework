@@ -7,6 +7,7 @@
 #include "asset_handle.h"
 #include "sgf/core/memory.h"
 #include "sgf/core/structures/type_map.h"
+#include "sgf/core/utility/file.h"
 
 #include "asset_storage.h"
 #include "asset_catalog.h"
@@ -39,34 +40,37 @@ namespace sgf::assets
             page_size_(other.page_size_)
         { }
 
-        /**
+        /***
          * Mount catalog in directory.
          * @param path Path to mount catalog.
          */
-        void mount(std::filesystem::path path) noexcept;
+        std::error_code mount(std::filesystem::path path) noexcept;
 
         template<typename AssetT, typename... ArgsT>
         std::expected<Handle<AssetT>, std::error_code> load(const std::filesystem::path& path, ArgsT&&... args) noexcept
         {
-            // todo: normalize path
+            const auto key = core::normalizedRelativePath(catalog_.path / path, catalog_.path);
+            if(!key) return std::unexpected(key.error());
+
+            const auto actual_path = catalog_.path / *key;
 
             const auto type = core::typeIndex<AssetT>();
             auto& storage = this->storage<AssetT>();
             // trying to find existing asset
-            auto* file = catalog_.find(path);
+            auto* file = catalog_.find(*key);
 
             // if file was not found then creating new file in catalog
             if(!file)
             {
                 // acquire new id for new asset
-                file = &catalog_.acquireFile(path);
+                file = &catalog_.acquireFile(*key);
                 file->type_id = type;
 
                 // saving catalog to file
                 if(const auto err = catalog_.save()) return std::unexpected(err);
 
                 // writing meta of the file near the file
-                if(const auto err = storage.loader()->writeMeta(path, file->id)) return std::unexpected(err);
+                if(const auto err = storage.loader()->writeMeta(actual_path, file->id)) return std::unexpected(err);
             }
 
             // if slot is already exists then leave
@@ -77,7 +81,7 @@ namespace sgf::assets
 
             auto asset = std::make_obj_using_allocator<AssetT>(get_allocator(), std::forward<ArgsT>(args)...);
             // todo: load async
-            if(const auto err = storage.loader()->loadSource(path, asset))
+            if(const auto err = storage.loader()->loadSource(actual_path, asset))
             {
                 slot->state = AssetState::kFailed;
                 return std::unexpected(asset.error());
@@ -123,10 +127,20 @@ namespace sgf::assets
         }
 
         template<typename AssetT>
+        requires(std::is_copy_constructible_v<AssetT>)
         Handle<AssetT> copy(const Handle<AssetT>& source) noexcept
         {
-            // todo: make copy
-            return nullptr;
+            auto& storage = this->storage<AssetT>();
+
+            const auto new_id = catalog_.acquireId();
+            // get new slot for asset
+            auto* slot = storage.acquireSlot(new_id);
+            // creating new asset using copy constructor with allocator
+            // or without allocator if T does not have such constructor
+            auto new_asset = std::make_obj_using_allocator<AssetT>(get_allocator(), *source);
+            slot->insert(std::move(new_asset));
+
+            return Handle<AssetT>(slot);
         }
 
         template<typename AssetT>

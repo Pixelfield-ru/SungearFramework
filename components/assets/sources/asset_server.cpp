@@ -4,8 +4,8 @@
 
 #include "sgf/assets/asset_server.h"
 
-void sgf::assets::AssetServer::mount(std::filesystem::path path) noexcept
+std::error_code sgf::assets::AssetServer::mount(std::filesystem::path path) noexcept
 {
     catalog_.path = std::move(path);
-
+    return catalog_.load();
 }
