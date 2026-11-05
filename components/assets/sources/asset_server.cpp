@@ -47,6 +47,9 @@ std::expected<sgf::assets::AnyHandle, std::error_code> sgf::assets::AssetServer:
         return std::unexpected(Error::kUnknownAsset);
     }
 
+    // else if slot does not exist then acquire new slot
+    if(!slot) slot = storage->acquireErasedSlot(asset_id);
+
     // if files is stored by path
     if(file->path)
     {
@@ -55,11 +58,18 @@ std::expected<sgf::assets::AnyHandle, std::error_code> sgf::assets::AssetServer:
         // loading meta of the file near the file
         if(const auto err = loader->loadMeta(actual_path, file->id)) return std::unexpected(err);
 
+        slot->state = AssetState::kLoading;
         // loading asset by path
         // todo: async
-        if(const auto err = loader->loadSourceErased(actual_path, slot->erased())) return std::unexpected(err);
+        if(const auto err = loader->loadSourceErased(actual_path, slot->erased()))
+        {
+            slot->state = AssetState::kFailed;
+            return std::unexpected(err);
+        }
 
-        return {};
+        slot->state = AssetState::kLoaded;
+
+        return AnyHandle(slot, type_id);
     }
 
     if(file->baked)
@@ -71,13 +81,33 @@ std::expected<sgf::assets::AnyHandle, std::error_code> sgf::assets::AssetServer:
             archive = &catalog_.acquireArchive(file->baked->archive);
         }
 
-        if(const auto err = archive->open()) return std::unexpected(err);
+        if(const auto err = archive->open(std::ios::in)) return std::unexpected(err);
 
-        // todo: impl load
+        const auto archive_bytes = archive->bytes();
+
+        const auto baked_offset = file->baked->offset;
+        const auto baked_size = file->baked->size;
+
+        // baked_offset + baked_size may provide integer overflow
+        if(baked_offset > archive_bytes.size() ||
+           baked_size > archive_bytes.size() - baked_offset)
+        {
+            return std::unexpected(std::make_error_code(std::errc::result_out_of_range));
+        }
+
+        const auto asset_bytes = archive_bytes.subspan(baked_offset, baked_size);
+
+        slot->state = AssetState::kLoading;
         // todo: async
-        // if(const auto err = loader->loadBakedErased(actual_path, slot->erased())) return std::unexpected(err);
+        if(const auto err = loader->loadBakedErased(asset_bytes, slot->erased()))
+        {
+            slot->state = AssetState::kFailed;
+            return std::unexpected(err);
+        }
 
-        return {};
+        slot->state = AssetState::kLoaded;
+
+        return AnyHandle(slot, type_id);
     }
 
     return std::unexpected(Error::kUnknownStorageType);

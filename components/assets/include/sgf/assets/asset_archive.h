@@ -5,11 +5,15 @@
 #pragma once
 
 #include <filesystem>
+#include <ios>
+#include <span>
 #include <system_error>
+
+#include "sgf/core/utility/platform.h"
 
 namespace sgf::assets
 {
-    // todo: impl
+    // todo: linux & macos impl
     struct Archive final
     {
         ~Archive();
@@ -20,8 +24,12 @@ namespace sgf::assets
         Archive(const Archive&) = default;
         Archive(Archive&&) noexcept = default;
 
-        [[nodiscard]] std::error_code open();
+        [[nodiscard]] std::error_code open(std::ios_base::openmode mode);
         [[nodiscard]] std::error_code close();
+
+        [[nodiscard]] bool opened() const noexcept;
+
+        [[nodiscard]] std::span<const std::byte> bytes() const noexcept;
 
         [[nodiscard]] std::filesystem::path path() const noexcept;
 
@@ -30,5 +38,11 @@ namespace sgf::assets
 
     private:
         std::filesystem::path path_;
+
+#if SGF_PLATFORM_OS_WINDOWS
+        void* view_ {};
+        void* mapping_ {};
+        std::size_t size_ {};
+#endif
     };
 }

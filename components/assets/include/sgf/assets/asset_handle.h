@@ -9,6 +9,7 @@
 #include "sgf/core/utility/type_traits.h"
 
 #include "asset_slot.h"
+#include "sgf/serialization/macroses.h"
 
 namespace sgf::assets
 {
@@ -17,6 +18,8 @@ namespace sgf::assets
 
     struct HandleBase
     {
+        SGF_SERIALIZER_AS_FRIEND();
+
         HandleBase() = default;
         HandleBase(AssetSlotControl* slot, AssetId id, std::uint32_t type) :
             slot_(slot),
@@ -32,10 +35,14 @@ namespace sgf::assets
             type_id_(std::exchange(other.type_id_, {}))
         { }
 
-        template<typename AssetT>
-        AssetSlot<AssetT>* slotAs() noexcept
+        [[nodiscard]] AssetId assetId() const noexcept
         {
-            return static_cast<AssetSlot<AssetT>*>(slot_);
+            return asset_id_;
+        }
+
+        [[nodiscard]] std::uint32_t typeId() const noexcept
+        {
+            return type_id_;
         }
 
         HandleBase& operator=(const HandleBase&) = default;
@@ -54,6 +61,12 @@ namespace sgf::assets
         AssetSlotControl* slot_ {};
         AssetId asset_id_ {};
         std::uint32_t type_id_ {};
+
+        template<typename AssetT>
+        AssetSlot<AssetT>* slotAs() noexcept
+        {
+            return static_cast<AssetSlot<AssetT>*>(slot_);
+        }
     };
 
     template<typename AssetT>

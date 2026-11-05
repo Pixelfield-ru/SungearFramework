@@ -103,6 +103,8 @@ namespace sgf::assets
             // get new slot for asset
             if(!slot) slot = storage.acquireSlot(file->id);
 
+            slot->state = AssetState::kLoading;
+
             // todo: load async
             if(const auto err = loader->loadSource(actual_path, *slot->value))
             {

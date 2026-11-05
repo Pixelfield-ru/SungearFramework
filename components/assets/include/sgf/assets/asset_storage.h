@@ -78,7 +78,7 @@ namespace sgf::assets
             auto& free_page = freePage();
 
             const auto index = free_page.free_slots.back();
-            free_page.free_slots_.pop_back();
+            free_page.free_slots.pop_back();
 
             PageSlotId slot_id;
             slot_id.page_id = free_page.id;
@@ -86,7 +86,7 @@ namespace sgf::assets
             slots_mapping_[asset_id] = slot_id;
 
             auto& slot = free_page.slots[index];
-            slot.id_ = asset_id;
+            slot.id = asset_id;
             slot.insert(std::make_obj_using_allocator<AssetT>(get_allocator()));
 
             return &slot;
@@ -99,13 +99,13 @@ namespace sgf::assets
 
         void releaseSlot(const AssetSlot<AssetT>* slot) noexcept
         {
-            const auto it = slots_mapping_.find(slot->id_);
+            const auto it = slots_mapping_.find(slot->id.load());
             if(it == slots_mapping_.end()) return;
 
-            const auto& slot_id = it->second;
+            const auto slot_id = it->second;
 
-            slots_mapping_.erase(it->second);
-            pages_[slot_id.page_id].free_slots[slot_id.slot_id].push_back(it->second);
+            slots_mapping_.erase(it);
+            pages_[slot_id.page_id].free_slots.push_back(slot_id.slot_id);
         }
 
         [[nodiscard]] AssetSlotControl* slotControl(AssetId asset_id) noexcept override
@@ -187,7 +187,7 @@ namespace sgf::assets
         {
             for(auto& page : pages_)
             {
-                if(!page.free_slots_.empty()) return page;
+                if(!page.free_slots.empty()) return page;
             }
 
             Page page(page_size_, get_allocator());
