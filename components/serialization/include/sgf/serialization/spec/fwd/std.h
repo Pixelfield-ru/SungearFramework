@@ -9,6 +9,7 @@
 #include "sgf/serialization/spec/serializer_spec.h"
 #include "sgf/serialization/serializer.h"
 
+#include <atomic>
 #include <expected>
 #include <filesystem>
 #include <map>
@@ -217,6 +218,28 @@ namespace sgf::serialization
 
             if(!value) value.emplace();
             return serializer.deserialize(*value, std::forward<ArgsT>(args)...);
+        }
+    };
+
+    template<typename T>
+    struct SerializerSpec<std::atomic<T>> final
+    {
+        static constexpr ValueType value_type = ValueType::kDirect;
+
+        template<typename... ArgsT>
+        static std::error_code serialize(Serializer& serializer, const std::atomic<T>& value, ArgsT&&... args)
+        {
+            return serializer.serialize(value.load(), std::forward<ArgsT>(args)...);
+        }
+
+        template<typename... ArgsT>
+        static std::error_code deserialize(Serializer& serializer, std::atomic<T>& value, ArgsT&&... args)
+        {
+            T stored {};
+            if(const auto err = serializer.deserialize(stored, std::forward<ArgsT>(args)...)) return err;
+
+            value.store(std::move(stored));
+            return {};
         }
     };
 

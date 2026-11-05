@@ -35,7 +35,7 @@ namespace sgf::assets
 
         std::atomic<std::uint32_t> strong_refs {};
         /// Generation of asset (number of assets held by this slot earlier).
-        std::atomic<std::uint32_t> generation = 1;
+        std::atomic<std::uint32_t> generation = 0;
         /// Version of asset (number of reloads of the same asset).
         std::atomic<std::uint32_t> version = 1;
         std::atomic<AssetState> state = AssetState::kUnloaded;
@@ -55,6 +55,9 @@ namespace sgf::assets
         {
             return state == AssetState::kLoaded;
         }
+
+        virtual std::byte* erased() noexcept = 0;
+        virtual std::byte const* erased() const noexcept = 0;
 
         AssetSlotControl& operator=(const AssetSlotControl& other) noexcept
         {
@@ -101,8 +104,17 @@ namespace sgf::assets
         void insert(AssetT asset)
         {
             value = std::move(asset);
-            state = AssetState::kLoaded;
             ++generation;
+        }
+
+        std::byte* erased() noexcept override
+        {
+            return value ? reinterpret_cast<std::byte*>(&*value) : nullptr;
+        }
+
+        std::byte const* erased() const noexcept override
+        {
+            return value ? reinterpret_cast<std::byte const*>(&*value) : nullptr;
         }
     };
 }

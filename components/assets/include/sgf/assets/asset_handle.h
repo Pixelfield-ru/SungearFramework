@@ -15,8 +15,49 @@ namespace sgf::assets
     template<typename>
     struct WeakHandle;
 
+    struct HandleBase
+    {
+        HandleBase() = default;
+        HandleBase(AssetSlotControl* slot, AssetId id, std::uint32_t type) :
+            slot_(slot),
+            asset_id_(id),
+            type_id_(type)
+        { }
+        HandleBase(std::nullptr_t) noexcept
+        { }
+        HandleBase(const HandleBase& other) = default;
+        HandleBase(HandleBase&& other) noexcept :
+            slot_(std::exchange(other.slot_, {})),
+            asset_id_(std::exchange(other.asset_id_, {})),
+            type_id_(std::exchange(other.type_id_, {}))
+        { }
+
+        template<typename AssetT>
+        AssetSlot<AssetT>* slotAs() noexcept
+        {
+            return static_cast<AssetSlot<AssetT>*>(slot_);
+        }
+
+        HandleBase& operator=(const HandleBase&) = default;
+        HandleBase& operator=(HandleBase&& other) noexcept
+        {
+            if(this == std::addressof(other)) return *this;
+
+            slot_ = std::exchange(other.slot_, {});
+            asset_id_ = std::exchange(other.asset_id_, {});
+            type_id_ = std::exchange(other.type_id_, {});
+
+            return *this;
+        }
+
+    protected:
+        AssetSlotControl* slot_ {};
+        AssetId asset_id_ {};
+        std::uint32_t type_id_ {};
+    };
+
     template<typename AssetT>
-    struct Handle final
+    struct Handle final : HandleBase
     {
         friend struct AssetServer;
 
@@ -28,33 +69,37 @@ namespace sgf::assets
         Handle() noexcept = default;
         ~Handle() noexcept
         {
-            if(slot_) slot_->decrementRefCounter();
+            auto* slot = slotAs<AssetT>();
+            if(slot) slot->decrementRefCounter();
         }
-        Handle(std::nullptr_t) noexcept { }
+        Handle(std::nullptr_t) noexcept :
+            HandleBase(nullptr)
+        { }
 
         template<typename OtherAssetT>
         requires(std::is_base_of_v<AssetT, OtherAssetT> || std::is_same_v<AssetT, OtherAssetT>)
         Handle(const Handle<OtherAssetT>& other) noexcept :
-            slot_(other.slot_),
-            asset_id_(other.asset_id_)
+            HandleBase(other)
         {
-            if(slot_) slot_->incrementRefCounter();
+            auto* slot = slotAs<AssetT>();
+            if(slot) slot->incrementRefCounter();
         }
         template<typename OtherAssetT>
         requires(std::is_base_of_v<AssetT, OtherAssetT> || std::is_same_v<AssetT, OtherAssetT>)
         Handle(Handle<OtherAssetT>&& other) noexcept :
-            slot_(other.slot_),
-            asset_id_(other.asset_id_)
+            HandleBase(std::move(other))
         { }
 
         [[nodiscard]] const AssetT* get() const noexcept
         {
-            return valid() ? &(*slot_->value) : nullptr;
+            auto* slot = slotAs<AssetT>();
+            return valid() ? &(*slot->value) : nullptr;
         }
 
         [[nodiscard]] AssetT* get() noexcept
         {
-            return valid() ? &(*slot_->value) : nullptr;
+            auto* slot = slotAs<AssetT>();
+            return valid() ? &(*slot->value) : nullptr;
         }
 
         [[nodiscard]] WeakHandle<AssetT> weak() const noexcept;
@@ -66,12 +111,14 @@ namespace sgf::assets
 
         AssetT* operator->() const noexcept
         {
-            return valid() ? &(*slot_->value) : nullptr;
+            auto* slot = slotAs<AssetT>();
+            return valid() ? &(*slot->value) : nullptr;
         }
 
         AssetT* operator->() noexcept
         {
-            return valid() ? &(*slot_->value) : nullptr;
+            auto* slot = slotAs<AssetT>();
+            return valid() ? &(*slot->value) : nullptr;
         }
 
         template<typename OtherAssetT>
@@ -83,8 +130,7 @@ namespace sgf::assets
 
             if(slot_) slot_->decrementRefCounter();
 
-            slot_ = other.slot_;
-            asset_id_ = other.asset_id_;
+            HandleBase::operator=(other);
 
             if(slot_) slot_->incrementRefCounter();
 
@@ -100,8 +146,7 @@ namespace sgf::assets
 
             if(slot_) slot_->decrementRefCounter();
 
-            slot_ = std::exchange(other.slot_, {});
-            asset_id_ = std::exchange(other.asset_id_, {});
+            HandleBase::operator=(std::move(other));
 
             return *this;
         }
@@ -110,31 +155,26 @@ namespace sgf::assets
         {
             if(slot_) slot_->decrementRefCounter();
 
-            slot_ = {};
-            asset_id_ = {};
+            HandleBase::operator=(std::nullptr_t{});
 
             return *this;
         }
 
     private:
-        AssetSlot<AssetT>* slot_ {};
-        AssetId asset_id_ {};
-
-        Handle(AssetSlot<AssetT>* slot) noexcept :
-            slot_(slot),
-            asset_id_(slot_ ? slot->id.load() : 0)
+        Handle(AssetSlot<AssetT>* slot, std::uint32_t type_id) noexcept :
+            HandleBase(slot, slot ? slot->id.load() : 0, type_id)
         {
             if(slot_) slot_->incrementRefCounter();
         }
 
         [[nodiscard]] bool valid() const noexcept
         {
-            return slot_ && slot_->loaded();
+            return slot_ && slotAs<AssetT>()->value && slot_->loaded();
         }
     };
 
     template<typename AssetT>
-    struct WeakHandle final
+    struct WeakHandle final : HandleBase
     {
         template<typename>
         friend struct Handle;
@@ -142,24 +182,24 @@ namespace sgf::assets
         friend struct AnyWeakHandle;
 
         WeakHandle() = default;
-        WeakHandle(std::nullptr_t) noexcept { }
+        WeakHandle(std::nullptr_t) noexcept :
+            HandleBase(nullptr)
+        { }
 
         template<typename OtherAssetT>
         requires(std::is_base_of_v<AssetT, OtherAssetT> || std::is_same_v<AssetT, OtherAssetT>)
-        WeakHandle(const WeakHandle<OtherAssetT>& other) noexcept
+        WeakHandle(const WeakHandle<OtherAssetT>& other) noexcept :
+            HandleBase(other)
         {
-            slot_ = other.slot_;
             generation_ = other.generation_;
-            asset_id_ = other.asset_id_;
         }
 
         template<typename OtherAssetT>
         requires(std::is_base_of_v<AssetT, OtherAssetT> || std::is_same_v<AssetT, OtherAssetT>)
-        WeakHandle(const Handle<OtherAssetT>& other) noexcept
+        WeakHandle(const Handle<OtherAssetT>& other) noexcept :
+            HandleBase(other)
         {
-            slot_ = other.slot_;
             generation_ = other.slot_ ? other.slot_->generation.load() : 0;
-            asset_id_ = other.asset_id_;
         }
 
         WeakHandle(const WeakHandle&) = default;
@@ -172,6 +212,7 @@ namespace sgf::assets
             Handle<AssetT> handle;
             handle.slot_ = slot_;
             handle.asset_id_ = asset_id_;
+            handle.type_id_ = type_id_;
 
             return handle;
         }
@@ -180,7 +221,7 @@ namespace sgf::assets
         {
             if(!slot_) return true;
 
-            return slot_->strong_refs_ == 0;
+            return slot_->strong_refs == 0;
         }
 
         template<typename OtherAssetT>
@@ -189,18 +230,16 @@ namespace sgf::assets
         {
             if(std::addressof(other) == this) return *this;
 
-            slot_ = other.slot_;
+            HandleBase::operator=(other);
             generation_ = other.generation_;
-            asset_id_ = other.asset_id_;
 
             return *this;
         }
 
         WeakHandle& operator=(std::nullptr_t) noexcept
         {
-            slot_ = {};
+            HandleBase::operator=(nullptr);
             generation_ = {};
-            asset_id_ = {};
 
             return *this;
         }
@@ -209,9 +248,7 @@ namespace sgf::assets
         WeakHandle& operator=(WeakHandle&&) noexcept = default;
 
     private:
-        AssetSlot<AssetT>* slot_ {};
         std::uint32_t generation_ {};
-        AssetId asset_id_ {};
     };
 
     template<typename AssetT>
@@ -221,11 +258,12 @@ namespace sgf::assets
         handle.slot_ = slot_;
         handle.generation_ = slot_ ? slot_->generation.load() : 0;
         handle.asset_id_ = asset_id_;
+        handle.type_id_ = type_id_;
 
         return handle;
     }
 
-    struct AnyHandle final
+    struct AnyHandle final : HandleBase
     {
         friend struct AssetServer;
         friend struct AnyWeakHandle;
@@ -235,25 +273,19 @@ namespace sgf::assets
 
         template<typename AssetT>
         AnyHandle(const Handle<AssetT>& handle) noexcept :
-            slot_(handle.slot_),
-            type_index_(core::typeIndex<AssetT>()),
-            asset_id_(handle.asset_id_)
+            HandleBase(handle)
         {
             if(slot_) slot_->incrementRefCounter();
         }
 
         AnyHandle(const AnyHandle& other) :
-            slot_(other.slot_),
-            type_index_(other.type_index_),
-            asset_id_(other.asset_id_)
+            HandleBase(other)
         {
             if(slot_) slot_->incrementRefCounter();
         }
 
         AnyHandle(AnyHandle&& other) noexcept :
-            slot_(other.slot_),
-            type_index_(other.type_index_),
-            asset_id_(other.asset_id_)
+            HandleBase(std::move(other))
         { }
 
         ~AnyHandle() noexcept
@@ -264,11 +296,12 @@ namespace sgf::assets
         template<typename AssetT>
         Handle<AssetT> as() const noexcept
         {
-            if(!slot_ || core::typeIndex<AssetT>() != type_index_) return {};
+            if(!slot_ || core::typeIndex<AssetT>() != type_id_) return {};
 
             Handle<AssetT> handle;
             handle.slot_ = static_cast<AssetSlot<AssetT>*>(slot_);
             handle.asset_id_ = asset_id_;
+            handle.type_id_ = type_id_;
             handle.slot_->incrementRefCounter();
 
             return handle;
@@ -286,9 +319,7 @@ namespace sgf::assets
 
             if(slot_) slot_->decrementRefCounter();
 
-            slot_ = other.slot_;
-            type_index_ = other.type_index_;
-            asset_id_ = other.asset_id_;
+            HandleBase::operator=(other);
 
             if(slot_) slot_->incrementRefCounter();
 
@@ -302,9 +333,7 @@ namespace sgf::assets
 
             if(slot_) slot_->decrementRefCounter();
 
-            slot_ = std::exchange(other.slot_, {});
-            type_index_ = std::exchange(other.type_index_, {});
-            asset_id_ = std::exchange(other.asset_id_, {});
+            HandleBase::operator=(std::move(other));
 
             return *this;
         }
@@ -316,9 +345,7 @@ namespace sgf::assets
 
             if(slot_) slot_->decrementRefCounter();
 
-            slot_ = other.slot;
-            type_index_ = core::typeIndex<AssetT>();
-            asset_id_ = other.asset_id_;
+            HandleBase::operator=(other);
 
             if(slot_) slot_->incrementRefCounter();
 
@@ -332,9 +359,7 @@ namespace sgf::assets
 
             if(slot_) slot_->decrementRefCounter();
 
-            slot_ = std::exchange(other.slot_, {});
-            type_index_ = core::typeIndex<AssetT>();
-            asset_id_ = std::exchange(other.asset_id_, {});
+            HandleBase::operator=(std::move(other));
 
             return *this;
         }
@@ -343,69 +368,55 @@ namespace sgf::assets
         {
             if(slot_) slot_->decrementRefCounter();
 
-            slot_ = nullptr;
-            type_index_ = {};
-            asset_id_ = {};
+            HandleBase::operator=(nullptr);
 
             return *this;
         }
 
     private:
-        AnyHandle(AssetSlotControl* slot, std::uint32_t type_index) :
-            slot_(slot),
-            type_index_(type_index),
-            asset_id_(slot ? slot->id.load() : 0)
+        AnyHandle(AssetSlotControl* slot, std::uint32_t type_id) :
+            HandleBase(slot, slot ? slot->id.load() : 0, type_id)
         {
             if(slot_) slot_->incrementRefCounter();
         }
 
-        AssetSlotControl* slot_ {};
-        std::uint32_t type_index_ {};
-        AssetId asset_id_ {};
-
         [[nodiscard]] bool valid() const noexcept
         {
-            return slot_ && slot_->loaded();
+            return slot_ && slot_->erased() && slot_->loaded();
         }
     };
 
-    struct AnyWeakHandle final
+    struct AnyWeakHandle final : HandleBase
     {
         friend struct AnyHandle;
 
         AnyWeakHandle() = default;
         AnyWeakHandle(std::nullptr_t) { }
         AnyWeakHandle(const AnyHandle& handle) :
-            slot_(handle.slot_),
-            generation_(handle.slot_ ? handle.slot_->generation.load() : 0),
-            type_index_(handle.type_index_),
-            asset_id_(handle.asset_id_)
+            HandleBase(handle),
+            generation_(handle.slot_ ? handle.slot_->generation.load() : 0)
         { }
         template<typename AssetT>
         AnyWeakHandle(const Handle<AssetT>& handle) noexcept :
-            slot_(handle.slot_),
-            generation_(handle.slot_ ? handle.slot_->generation.load() : 0),
-            type_index_(core::typeIndex<AssetT>()),
-            asset_id_(handle.asset_id_)
+            HandleBase(handle),
+            generation_(handle.slot_ ? handle.slot_->generation.load() : 0)
         { }
         template<typename AssetT>
         AnyWeakHandle(const WeakHandle<AssetT>& handle) noexcept :
-            slot_(handle.slot_),
-            generation_(handle.generation_),
-            type_index_(core::typeIndex<AssetT>()),
-            asset_id_(handle.asset_id_)
+            HandleBase(handle),
+            generation_(handle.generation_)
         { }
         AnyWeakHandle(const AnyWeakHandle&) = default;
         AnyWeakHandle(AnyWeakHandle&&) = default;
 
-        AnyHandle lock() const noexcept
+        [[nodiscard]] AnyHandle lock() const noexcept
         {
             if(!slot_) return {};
 
             AnyHandle handle;
             handle.slot_ = slot_;
             handle.asset_id_ = asset_id_;
-            handle.type_index_ = type_index_;
+            handle.type_id_ = type_id_;
 
             return handle;
         }
@@ -421,20 +432,16 @@ namespace sgf::assets
         AnyWeakHandle& operator=(AnyWeakHandle&&) = default;
         AnyWeakHandle& operator=(std::nullptr_t) noexcept
         {
-            slot_ = {};
+            HandleBase::operator=(nullptr);
             generation_ = {};
-            type_index_ = {};
-            asset_id_ = {};
 
             return *this;
         }
 
         AnyWeakHandle& operator=(const AnyHandle& handle) noexcept
         {
-            slot_ = handle.slot_;
+            HandleBase::operator=(handle);
             generation_ = handle.slot_ ? handle.slot_->generation.load() : 0;
-            type_index_ = handle.type_index_;
-            asset_id_ = handle.asset_id_;
 
             return *this;
         }
@@ -442,28 +449,21 @@ namespace sgf::assets
         template<typename AssetT>
         AnyWeakHandle& operator=(const Handle<AssetT>& handle) noexcept
         {
-            slot_ = handle.slot_;
+            HandleBase::operator=(handle);
             generation_ = handle.slot_ ? handle.slot_->generation.load() : 0;
-            type_index_ = core::typeIndex<AssetT>();
-            asset_id_ = handle.asset_id_;
 
             return *this;
         }
         template<typename AssetT>
         AnyWeakHandle& operator=(const WeakHandle<AssetT>& handle) noexcept
         {
-            slot_ = handle.slot_;
+            HandleBase::operator=(handle);
             generation_ = handle.generation_;
-            type_index_ = core::typeIndex<AssetT>();
-            asset_id_ = handle.asset_id_;
 
             return *this;
         }
 
     private:
-        AssetSlotControl* slot_ {};
         std::uint32_t generation_ {};
-        std::uint32_t type_index_ {};
-        AssetId asset_id_ {};
     };
 }

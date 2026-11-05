@@ -10,7 +10,13 @@ namespace sgf::assets
 {
     enum class Error
     {
-        kLoaderNotSpecified
+        kLoaderNotSpecified,
+        kInvalidStorage,
+        kUnknownAsset,
+        kNoSource,
+        kLoading,
+        kInvalidHandle,
+        kUnknownStorageType
     };
 
     struct ErrorCategory final : public std::error_category
@@ -22,6 +28,12 @@ namespace sgf::assets
             switch(static_cast<Error>(ev))
             {
                 case Error::kLoaderNotSpecified: return "The loader for this type of assets is not specified.";
+                case Error::kInvalidStorage: return "The storage for the type is invalid.";
+                case Error::kUnknownAsset: return "Catalog does not have asset with this ID";
+                case Error::kNoSource: return "This asset does not have a source. Maybe the asset is baked?";
+                case Error::kLoading: return "This asset is loading now.";
+                case Error::kInvalidHandle: return "Invalid asset handle.";
+                case Error::kUnknownStorageType: return "Asset was not saved by path and was not baked. Storage type is unknown.";
                 default: return "Unknown error";
             }
         }

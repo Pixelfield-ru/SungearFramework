@@ -49,7 +49,7 @@ std::expected<sgf::core::Vector<std::byte>, std::error_code> sgf::core::readFile
     constexpr auto max_size = static_cast<std::uintmax_t>(std::numeric_limits<std::streamsize>::max());
     if(file_size > max_size) return std::unexpected(std::make_error_code(std::errc::file_too_large));
 
-    Vector bytes(alloc);
+    Vector<std::byte> bytes(alloc);
     bytes.resize(file_size);
     if(bytes.empty()) return bytes;
 

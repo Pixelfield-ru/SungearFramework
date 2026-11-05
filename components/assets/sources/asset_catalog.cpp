@@ -7,7 +7,7 @@
 #include "sgf/assets/serializer_specs.h"
 #include "sgf/core/utility/file.h"
 
-sgf::assets::AssetCatalog::File const* sgf::assets::AssetCatalog::find(
+sgf::assets::AssetCatalog::File const* sgf::assets::AssetCatalog::findFile(
     const std::filesystem::path& file_path) const noexcept
 {
     const auto it = files_mapping_.find(file_path);
@@ -16,7 +16,7 @@ sgf::assets::AssetCatalog::File const* sgf::assets::AssetCatalog::find(
     return &files_[it->second];
 }
 
-sgf::assets::AssetCatalog::File* sgf::assets::AssetCatalog::find(const std::filesystem::path& file_path) noexcept
+sgf::assets::AssetCatalog::File* sgf::assets::AssetCatalog::findFile(const std::filesystem::path& file_path) noexcept
 {
     const auto it = files_mapping_.find(file_path);
     if(it == files_mapping_.end()) return {};
@@ -24,15 +24,52 @@ sgf::assets::AssetCatalog::File* sgf::assets::AssetCatalog::find(const std::file
     return &files_[it->second];
 }
 
+sgf::assets::Archive* sgf::assets::AssetCatalog::findArchive(const std::filesystem::path& archive_path) noexcept
+{
+    const auto it = archives_mapping_.find(archive_path);
+    if(it == archives_mapping_.end()) return {};
+
+    return &archives_[it->second];
+}
+
+sgf::assets::AssetCatalog::File* sgf::assets::AssetCatalog::findFile(AssetId id) noexcept
+{
+    const auto it = files_mapping_ids_.find(id);
+    if(it == files_mapping_ids_.end()) return {};
+
+    return &files_[it->second];
+}
+
+sgf::assets::AssetCatalog::File const* sgf::assets::AssetCatalog::findFile(AssetId id) const noexcept
+{
+    const auto it = files_mapping_ids_.find(id);
+    if(it == files_mapping_ids_.end()) return {};
+
+    return &files_[it->second];
+}
+
 sgf::assets::AssetCatalog::File& sgf::assets::AssetCatalog::acquireFile(std::filesystem::path file_path)
 {
-    files_mapping_[file_path] = files_.size();
+    const auto file_index = files_.size();
+    const auto file_id = next_asset_id_++;
+
+    files_mapping_[file_path] = file_index;
+    files_mapping_ids_[file_id] = file_index;
 
     auto& file = files_.emplace_back();
-    file.id = next_asset_id_++;
+    file.id = file_id;
     file.path = std::move(file_path);
 
     return file;
+}
+
+sgf::assets::Archive& sgf::assets::AssetCatalog::acquireArchive(std::filesystem::path archive_path)
+{
+    const auto file_index = files_.size();
+
+    files_mapping_[archive_path] = file_index;
+
+    return archives_.emplace_back(std::move(archive_path));
 }
 
 sgf::assets::AssetId sgf::assets::AssetCatalog::acquireId()
@@ -48,14 +85,14 @@ std::error_code sgf::assets::AssetCatalog::save()
 
     std::span content_view { reinterpret_cast<const std::byte*>(content.data()), content.size() };
 
-    return core::writeFile(path, content_view);
+    return core::writeFile(path / name, content_view);
 }
 
 std::error_code sgf::assets::AssetCatalog::load()
 {
     if(!std::filesystem::exists(path)) return std::make_error_code(std::errc::no_such_file_or_directory);
 
-    const auto file_content = core::readFile(path, get_allocator());
+    const auto file_content = core::readFile(path / name, get_allocator());
 
     if(!file_content)
     {
@@ -68,4 +105,9 @@ std::error_code sgf::assets::AssetCatalog::load()
     if(const auto err = serializer_.deserialize(*this)) return err;
 
     return {};
+}
+
+bool sgf::assets::AssetCatalog::exists() const noexcept
+{
+    return std::filesystem::exists(path / name);
 }

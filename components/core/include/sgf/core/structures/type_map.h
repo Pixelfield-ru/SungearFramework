@@ -49,7 +49,7 @@ namespace sgf::core
         const T& read() const noexcept
         {
             static const auto index = typeIndex<T>();
-            sgf_assert(index < storage_.size(), "Index out of bounds");
+            SGF_ASSERT(index < storage_.size(), "Index out of bounds");
 
             return static_cast<Storage<T>*>(storage_[index].get())->value;
         }
@@ -58,14 +58,14 @@ namespace sgf::core
         T& write() noexcept
         {
             static const auto index = typeIndex<T>();
-            sgf_assert(index < storage_.size(), "Index out of bounds");
+            SGF_ASSERT(index < storage_.size(), "Index out of bounds");
 
             return static_cast<Storage<T>*>(storage_[index].get())->value;
         }
 
         void* erased(std::uint32_t type_index) noexcept
         {
-            sgf_assert(type_index < storage_.size(), "Index out of bounds");
+            SGF_ASSERT(type_index < storage_.size(), "Index out of bounds");
 
             auto& erased = *storage_[type_index];
             return erased.erased_value;
@@ -73,7 +73,7 @@ namespace sgf::core
 
         const void* erased(std::uint32_t type_index) const noexcept
         {
-            sgf_assert(type_index < storage_.size(), "Index out of bounds");
+            SGF_ASSERT(type_index < storage_.size(), "Index out of bounds");
 
             const auto& erased = *storage_[type_index];
             return erased.erased_value;

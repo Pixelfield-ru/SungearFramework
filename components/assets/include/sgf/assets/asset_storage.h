@@ -14,7 +14,9 @@ namespace sgf::assets
     {
         virtual ~IAssetStorage() = default;
 
-        virtual AssetSlotControl* slotControl(AssetId asset_id) = 0;
+        [[nodiscard]] virtual AssetSlotControl* slotControl(AssetId asset_id) = 0;
+        [[nodiscard]] virtual AssetSlotControl* acquireErasedSlot(AssetId asset_id) = 0;
+        [[nodiscard]] virtual IErasedAssetLoader* erasedLoader() = 0;
     };
 
     template<typename AssetT>
@@ -43,12 +45,17 @@ namespace sgf::assets
             loader_ = std::move(loader);
         }
 
-        IAssetLoader<AssetT>* loader() noexcept
+        [[nodiscard]] IAssetLoader<AssetT>* loader() noexcept
         {
             return loader_.get();
         }
 
-        const IAssetLoader<AssetT>* loader() const noexcept
+        [[nodiscard]] IErasedAssetLoader* erasedLoader() noexcept override
+        {
+            return loader_.get();
+        }
+
+        [[nodiscard]] const IAssetLoader<AssetT>* loader() const noexcept
         {
             return loader_.get();
         }
@@ -66,7 +73,7 @@ namespace sgf::assets
             return const_cast<AssetStorage*>(this)->findSlot(asset_id);
         }
 
-        AssetSlot<AssetT>* acquireSlot(AssetId asset_id) noexcept
+        [[nodiscard]] AssetSlot<AssetT>* acquireSlot(AssetId asset_id) noexcept
         {
             auto& free_page = freePage();
 
@@ -80,8 +87,14 @@ namespace sgf::assets
 
             auto& slot = free_page.slots[index];
             slot.id_ = asset_id;
+            slot.insert(std::make_obj_using_allocator<AssetT>(get_allocator()));
 
             return &slot;
+        }
+
+        [[nodiscard]] AssetSlotControl* acquireErasedSlot(AssetId asset_id) noexcept override
+        {
+            return acquireSlot(asset_id);
         }
 
         void releaseSlot(const AssetSlot<AssetT>* slot) noexcept
@@ -95,7 +108,7 @@ namespace sgf::assets
             pages_[slot_id.page_id].free_slots[slot_id.slot_id].push_back(it->second);
         }
 
-        AssetSlotControl* slotControl(AssetId asset_id) noexcept override
+        [[nodiscard]] AssetSlotControl* slotControl(AssetId asset_id) noexcept override
         {
             return findSlot(asset_id);
         }

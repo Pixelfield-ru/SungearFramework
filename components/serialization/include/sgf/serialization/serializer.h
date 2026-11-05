@@ -109,6 +109,12 @@ namespace sgf::serialization
             return {};
         }
 
+        void reset() const noexcept
+        {
+            if(writer_) writer_->reset();
+            if(reader_) reader_->reset();
+        }
+
         [[nodiscard]] IWriter* writer() const noexcept
         {
             return writer_;
