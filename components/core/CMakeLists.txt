@@ -45,13 +45,19 @@ add_library(
 
 handle_version()
 
+target_link_libraries(
+    ${PROJECT_NAME}
+    PUBLIC
+        Boost::asio
+)
+
 target_include_directories(
     ${PROJECT_NAME}
     PRIVATE
-    ${sources_include_dirs}
+        ${sources_include_dirs}
     PUBLIC
-    $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include/>
-    $<INSTALL_INTERFACE:include/>
+        $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include/>
+        $<INSTALL_INTERFACE:include/>
 )
 
 install_component(

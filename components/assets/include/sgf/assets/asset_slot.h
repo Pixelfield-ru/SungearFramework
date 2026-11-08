@@ -6,6 +6,7 @@
 
 #include <atomic>
 #include <optional>
+#include <system_error>
 
 #include "asset_state.h"
 
@@ -40,6 +41,9 @@ namespace sgf::assets
         std::atomic<std::uint32_t> version = 1;
         std::atomic<AssetState> state = AssetState::kUnloaded;
         std::atomic<AssetId> id {};
+
+        /// If an error occurred while loading the asset.
+        std::error_code error {};
 
         void incrementRefCounter() noexcept
         {

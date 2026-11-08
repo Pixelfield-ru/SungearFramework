@@ -45,6 +45,18 @@ namespace sgf::assets
             return type_id_;
         }
 
+        [[nodiscard]] AssetState state() const noexcept
+        {
+            if(!slot_) return AssetState::kUnloaded;
+            return slot_->state;
+        }
+
+        [[nodiscard]] std::error_code error() const noexcept
+        {
+            if(!slot_) return {};
+            return slot_->error;
+        }
+
         HandleBase& operator=(const HandleBase&) = default;
         HandleBase& operator=(HandleBase&& other) noexcept
         {

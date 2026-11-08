@@ -4,41 +4,67 @@
 
 #pragma once
 
-#include "asset_handle.h"
 #include "sgf/core/memory.h"
 #include "sgf/core/structures/type_map.h"
 #include "sgf/core/utility/file.h"
+#include "sgf/core/log.h"
+#include "sgf/core/thread_pool.h"
+
+#include <atomic>
+#include <functional>
 
 #include "asset_storage.h"
 #include "asset_catalog.h"
+#include "asset_handle.h"
 #include "errors.h"
 
 namespace sgf::assets
 {
-    // todo: use log callback
+    struct AssetServerCreateInfo
+    {
+        serialization::Serializer serializer;
+        size_t page_size {};
+        const core::LogCallback* debug_output {};
+        core::ThreadPool* thread_pool {};
+    };
+
     // todo: use stable type index
-    // todo: accept threadpool
-    // todo: use AssetServerCreateInfo
     struct AssetServer final
     {
         using allocator_type = std::pmr::polymorphic_allocator<>;
 
-        AssetServer(serialization::Serializer serializer, size_t page_size) :
-            catalog_(std::move(serializer)),
-            page_size_(page_size)
+    private:
+        struct PostedJobs
+        {
+            std::atomic<std::size_t> count {};
+        };
+
+    public:
+        AssetServer() :
+            posted_(core::makeShared<PostedJobs>(allocator_type{}))
         { }
-        AssetServer(serialization::Serializer serializer, size_t page_size, const allocator_type& alloc) :
+        AssetServer(const allocator_type& alloc) :
             storages_map_(alloc),
-            catalog_(std::move(serializer)),
-            page_size_(page_size)
+            catalog_(alloc),
+            posted_(core::makeShared<PostedJobs>(alloc))
         { }
         AssetServer(const AssetServer&) = delete;
         AssetServer(AssetServer&&) = default;
         AssetServer(AssetServer&& other, const allocator_type& alloc) noexcept :
             storages_map_(std::move(other.storages_map_), alloc),
             catalog_(std::move(other.catalog_), alloc),
-            page_size_(other.page_size_)
+            page_size_(other.page_size_),
+            debug_output_(other.debug_output_),
+            thread_pool_(other.thread_pool_),
+            posted_(std::move(other.posted_))
         { }
+        ~AssetServer();
+
+        /**
+         * Block until every load posted to the pool has finished.
+         * The caller must not be a pool thread, and must not call load while waiting.
+         */
+        void waitPosted() noexcept;
 
         /***
          * Mount the catalog in a directory.
@@ -105,14 +131,22 @@ namespace sgf::assets
 
             slot->state = AssetState::kLoading;
 
-            // todo: load async
-            if(const auto err = loader->loadSource(actual_path, *slot->value))
+            if(const auto err = postTracked([loader, actual_path, slot] {
+                if(const auto err = loader->loadSource(actual_path, *slot->value))
+                {
+                    slot->error = err;
+                    slot->state = AssetState::kFailed;
+                    return;
+                }
+
+                slot->error.clear();
+                slot->state = AssetState::kLoaded;
+            }))
             {
+                slot->error = err;
                 slot->state = AssetState::kFailed;
                 return std::unexpected(err);
             }
-
-            slot->state = AssetState::kLoaded;
 
             return Handle<AssetT>(slot, type);
         }
@@ -220,12 +254,21 @@ namespace sgf::assets
             return storages_map_.get_allocator();
         }
 
+        [[nodiscard]] static std::error_code create(AssetServerCreateInfo create_info, AssetServer& output) noexcept;
+
         AssetServer& operator=(const AssetServer&) = delete;
-        AssetServer& operator=(AssetServer&&) noexcept = default;
+        AssetServer& operator=(AssetServer&& other) noexcept;
 
     private:
+        [[nodiscard]] std::error_code postTracked(std::move_only_function<void()> task) noexcept;
+        static void finishPosted(const core::SharedPtr<PostedJobs>& posted) noexcept;
+
         mutable core::TypeMap storages_map_;
         AssetCatalog catalog_;
         size_t page_size_ {};
+
+        const core::LogCallback* debug_output_ {};
+        core::ThreadPool* thread_pool_ {};
+        core::SharedPtr<PostedJobs> posted_ {};
     };
 }

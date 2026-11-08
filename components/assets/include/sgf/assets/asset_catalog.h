@@ -44,6 +44,14 @@ namespace sgf::assets
         core::String name;
         std::filesystem::path path;
 
+        AssetCatalog() :
+            name("assets_catalog")
+        { }
+
+        AssetCatalog(const allocator_type& alloc) :
+            name("assets_catalog", alloc)
+        { }
+
         AssetCatalog(serialization::Serializer serializer) :
             name("assets_catalog"),
             serializer_(std::move(serializer))

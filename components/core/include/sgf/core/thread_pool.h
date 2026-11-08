@@ -7,7 +7,7 @@
 #include <optional>
 #include <boost/asio/thread_pool.hpp>
 
-namespace sgf::runtime
+namespace sgf::core
 {
     struct ThreadPool final
     {
