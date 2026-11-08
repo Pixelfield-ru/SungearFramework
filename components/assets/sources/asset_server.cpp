@@ -34,53 +34,6 @@ void sgf::assets::AssetServer::waitPosted() noexcept
     }
 }
 
-std::error_code sgf::assets::AssetServer::postTracked(std::move_only_function<void()> task) noexcept
-{
-    if(!thread_pool_ || !posted_) return core::Error::kUninitialized;
-
-    posted_->count.fetch_add(1, std::memory_order_acq_rel);
-    try
-    {
-        auto posted = posted_;
-        thread_pool_->post([posted, task = std::move(task)]() mutable {
-            try
-            {
-                task();
-            }
-            catch (...)
-            {
-                finishPosted(posted);
-                throw;
-            }
-
-            finishPosted(posted);
-        });
-    }
-    catch(...)
-    {
-        finishPosted(posted_);
-        return std::make_error_code(std::errc::resource_unavailable_try_again);
-    }
-
-    return {};
-}
-
-sgf::assets::AssetServer& sgf::assets::AssetServer::operator=(AssetServer&& other) noexcept
-{
-    if(this == &other) return *this;
-
-    // waiting for old tasks
-    waitPosted();
-
-    storages_map_ = std::move(other.storages_map_);
-    catalog_ = std::move(other.catalog_);
-    page_size_ = other.page_size_;
-    debug_output_ = other.debug_output_;
-    thread_pool_ = other.thread_pool_;
-    posted_ = std::move(other.posted_);
-    return *this;
-}
-
 std::error_code sgf::assets::AssetServer::mount(std::filesystem::path path) noexcept
 {
     catalog_.path = std::move(path);
@@ -187,6 +140,8 @@ std::expected<sgf::assets::AnyHandle, std::error_code> sgf::assets::AssetServer:
 
         // loading baked source
         if(const auto err = postTracked([loader, asset_bytes, slot] {
+            // todo: decompress baked bytes before passing them into loadBakedErased
+
             if(const auto err = loader->loadBakedErased(asset_bytes, slot->erased()))
             {
                 slot->error = err;
@@ -272,6 +227,89 @@ std::error_code sgf::assets::AssetServer::reload(const AnyHandle& handle) noexce
     return {};
 }
 
+std::error_code sgf::assets::AssetServer::bake(const AnyHandle& handle)
+{
+    BakeContext context;
+    context.output_bytes = core::Vector(get_allocator());
+    context.baked_assets = core::UnorderedSet<AssetId>(get_allocator());
+
+    if(const auto err = bakeImpl(context, handle))
+    {
+        return err;
+    }
+
+    // todo: save output bytes in some archive
+
+    return {};
+}
+
+std::error_code sgf::assets::AssetServer::postTracked(std::move_only_function<void()> task) noexcept
+{
+    if(!thread_pool_ || !posted_) return core::Error::kUninitialized;
+
+    posted_->count.fetch_add(1, std::memory_order_acq_rel);
+    try
+    {
+        auto posted = posted_;
+        thread_pool_->post([posted, task = std::move(task)]() mutable {
+            try
+            {
+                task();
+            }
+            catch (...)
+            {
+                finishPosted(posted);
+                throw;
+            }
+
+            finishPosted(posted);
+        });
+    }
+    catch(...)
+    {
+        finishPosted(posted_);
+        return std::make_error_code(std::errc::resource_unavailable_try_again);
+    }
+
+    return {};
+}
+
+std::error_code sgf::assets::AssetServer::bakeImpl(BakeContext& context, const AnyHandle& handle)
+{
+    // already was baked
+    if(context.baked_assets.contains(handle.assetId())) return {};
+
+    auto* slot = handle.slot_;
+
+    const auto handle_valid = slot && slot->erased();
+    if(!handle_valid) return Error::kInvalidHandle;
+
+    auto* storage = this->storage(handle.type_id_);
+    if(!storage)
+    {
+        return Error::kInvalidStorage;
+    }
+
+    auto* loader = storage->erasedLoader();
+    if(!loader)
+    {
+        return Error::kLoaderNotSpecified;
+    }
+
+    const auto bake_result = loader->saveBakedErased(slot->erased());
+    if(!bake_result)
+    {
+        return bake_result.error();
+    }
+
+    // todo: save the bake result
+    // todo: bake dependencies
+    // todo: how to bake in different archives
+    // todo: compress the bake result bytes
+
+    return {};
+}
+
 std::error_code sgf::assets::AssetServer::create(AssetServerCreateInfo create_info, AssetServer& output) noexcept
 {
     if(create_info.page_size == 0) return core::Error::kInvalidArgument;
@@ -288,4 +326,20 @@ std::error_code sgf::assets::AssetServer::create(AssetServerCreateInfo create_in
     output.thread_pool_ = create_info.thread_pool;
 
     return {};
+}
+
+sgf::assets::AssetServer& sgf::assets::AssetServer::operator=(AssetServer&& other) noexcept
+{
+    if(this == &other) return *this;
+
+    // waiting for old tasks
+    waitPosted();
+
+    storages_map_ = std::move(other.storages_map_);
+    catalog_ = std::move(other.catalog_);
+    page_size_ = other.page_size_;
+    debug_output_ = other.debug_output_;
+    thread_pool_ = other.thread_pool_;
+    posted_ = std::move(other.posted_);
+    return *this;
 }

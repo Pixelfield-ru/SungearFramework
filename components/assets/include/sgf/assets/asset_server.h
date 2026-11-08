@@ -167,16 +167,8 @@ namespace sgf::assets
          */
         std::error_code reload(const AnyHandle& handle) noexcept;
 
-        template<typename AssetT>
-        std::error_code bake(const Handle<AssetT>& handle/*, Archive& archive*/)
-        {
-            return {};
-        }
 
-        std::error_code bake(const AnyHandle& handle/*, Archive& archive*/)
-        {
-            return {};
-        }
+        std::error_code bake(const AnyHandle& handle);
 
         template<typename AssetT>
         Handle<AssetT> find(AssetId asset_id) noexcept
@@ -184,9 +176,7 @@ namespace sgf::assets
             auto& st = storage<AssetT>();
             auto* slot = st.findSlot(asset_id);
 
-            Handle<AssetT> handle(slot, core::typeIndex<AssetT>());
-
-            return handle;
+            return { slot, core::typeIndex<AssetT>() };
         }
 
         AnyHandle find(AssetId asset_id, std::uint32_t type_id) noexcept
@@ -197,9 +187,7 @@ namespace sgf::assets
             auto* control = st->slotControl(asset_id);
             if(!control) return {};
 
-            AnyHandle handle(control, type_id);
-
-            return handle;
+            return { control, type_id };
         }
 
         template<typename AssetT>
@@ -260,7 +248,15 @@ namespace sgf::assets
         AssetServer& operator=(AssetServer&& other) noexcept;
 
     private:
+        struct BakeContext final
+        {
+            core::Vector<std::byte> output_bytes;
+            core::UnorderedSet<AssetId> baked_assets;
+        };
+
         [[nodiscard]] std::error_code postTracked(std::move_only_function<void()> task) noexcept;
+        std::error_code bakeImpl(BakeContext& context, const AnyHandle& handle);
+
         static void finishPosted(const core::SharedPtr<PostedJobs>& posted) noexcept;
 
         mutable core::TypeMap storages_map_;
