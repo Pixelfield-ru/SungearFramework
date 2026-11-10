@@ -21,8 +21,8 @@ namespace sgf::assets
         explicit Archive(std::filesystem::path path) :
             path_(std::move(path))
         { }
-        Archive(const Archive&) = default;
-        Archive(Archive&&) noexcept = default;
+        Archive(const Archive&) = delete;
+        Archive(Archive&&) noexcept;
 
         [[nodiscard]] std::error_code open(std::ios_base::openmode mode);
         [[nodiscard]] std::error_code close();
@@ -33,8 +33,8 @@ namespace sgf::assets
 
         [[nodiscard]] std::filesystem::path path() const noexcept;
 
-        Archive& operator=(const Archive&) = default;
-        Archive& operator=(Archive&&) = default;
+        Archive& operator=(const Archive&) = delete;
+        Archive& operator=(Archive&&) noexcept;
 
     private:
         std::filesystem::path path_;

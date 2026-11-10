@@ -29,7 +29,7 @@ sgf::assets::Archive* sgf::assets::AssetCatalog::findArchive(const std::filesyst
     const auto it = archives_mapping_.find(archive_path);
     if(it == archives_mapping_.end()) return {};
 
-    return &archives_[it->second];
+    return archives_[it->second].get();
 }
 
 sgf::assets::AssetCatalog::File* sgf::assets::AssetCatalog::findFile(AssetId id) noexcept
@@ -63,29 +63,49 @@ sgf::assets::AssetCatalog::File& sgf::assets::AssetCatalog::acquireFile(std::fil
     return file;
 }
 
-sgf::assets::Archive& sgf::assets::AssetCatalog::acquireArchive(std::filesystem::path archive_path)
+sgf::assets::AssetCatalog::File& sgf::assets::AssetCatalog::acquireFile()
 {
     const auto file_index = files_.size();
+    const auto file_id = next_asset_id_++;
 
-    files_mapping_[archive_path] = file_index;
+    files_mapping_ids_[file_id] = file_index;
 
-    return archives_.emplace_back(std::move(archive_path));
+    auto& file = files_.emplace_back();
+    file.id = file_id;
+
+    return file;
 }
 
-sgf::assets::AssetId sgf::assets::AssetCatalog::acquireId()
+sgf::assets::Archive& sgf::assets::AssetCatalog::acquireArchive(std::filesystem::path archive_path)
 {
-    return next_asset_id_++;
+    auto archive = core::makeUnique<Archive>(get_allocator(), path / archive_path);
+    const auto archive_index = archives_.size();
+
+    archives_.push_back(std::move(archive));
+    archives_mapping_.emplace(archive_path, archive_index);
+
+    return *archives_.back();
 }
 
 std::error_code sgf::assets::AssetCatalog::save()
 {
-    if(const auto err = serializer_.serialize(*this)) return err;
+    // finish previous document if it was not finished
+    serializer_.reset();
+
+    if(const auto err = serializer_.serialize(*this))
+    {
+        serializer_.reset();
+        return err;
+    }
 
     const auto content = serializer_.writer()->data();
+    const std::span content_view { reinterpret_cast<const std::byte*>(content.data()), content.size() };
+    const auto err = core::writeFile(path / name, content_view);
 
-    std::span content_view { reinterpret_cast<const std::byte*>(content.data()), content.size() };
+    // data() points into the writer buffer, so reset only after the file is written
+    serializer_.reset();
 
-    return core::writeFile(path / name, content_view);
+    return err;
 }
 
 std::error_code sgf::assets::AssetCatalog::load()
@@ -103,6 +123,8 @@ std::error_code sgf::assets::AssetCatalog::load()
 
     if(const auto err = serializer_.reader()->parse(content_view)) return err;
     if(const auto err = serializer_.deserialize(*this)) return err;
+
+    serializer_.reset();
 
     return {};
 }

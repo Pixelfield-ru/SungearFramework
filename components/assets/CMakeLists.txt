@@ -50,6 +50,8 @@ target_link_libraries(
     PUBLIC
         sgf::core
         sgf::serialization
+    PRIVATE
+        zstd::libzstd
 )
 
 target_include_directories(

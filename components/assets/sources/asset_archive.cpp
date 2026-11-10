@@ -23,6 +23,38 @@ sgf::assets::Archive::~Archive()
     std::ignore = close();
 }
 
+sgf::assets::Archive::Archive(Archive&& other) noexcept :
+    path_(std::move(other.path_))
+{
+#if SGF_PLATFORM_OS_WINDOWS
+    view_ = other.view_;
+    mapping_ = other.mapping_;
+    size_ = other.size_;
+    other.view_ = nullptr;
+    other.mapping_ = nullptr;
+    other.size_ = 0;
+#endif
+}
+
+sgf::assets::Archive& sgf::assets::Archive::operator=(Archive&& other) noexcept
+{
+    if(this == &other) return *this;
+
+    std::ignore = close();
+    path_ = std::move(other.path_);
+
+#if SGF_PLATFORM_OS_WINDOWS
+    view_ = other.view_;
+    mapping_ = other.mapping_;
+    size_ = other.size_;
+    other.view_ = nullptr;
+    other.mapping_ = nullptr;
+    other.size_ = 0;
+#endif
+
+    return *this;
+}
+
 std::error_code sgf::assets::Archive::open(std::ios_base::openmode mode)
 {
     if(opened()) return {};

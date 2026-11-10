@@ -60,6 +60,7 @@ namespace sgf::assets
         AssetCatalog(serialization::Serializer serializer, const allocator_type& alloc) :
             name("assets_catalog", alloc),
             files_(alloc),
+            archives_(alloc),
             archives_mapping_(alloc),
             files_mapping_(alloc),
             files_mapping_ids_(alloc),
@@ -70,7 +71,6 @@ namespace sgf::assets
             next_asset_id_(other.next_asset_id_.load()),
             path(other.path),
             files_(other.files_),
-            archives_mapping_(other.archives_mapping_),
             files_mapping_(other.files_mapping_),
             files_mapping_ids_(other.files_mapping_ids_),
             serializer_(other.serializer_)
@@ -80,7 +80,8 @@ namespace sgf::assets
             next_asset_id_(other.next_asset_id_.load()),
             path(other.path),
             files_(other.files_, alloc),
-            archives_mapping_(other.archives_mapping_, alloc),
+            archives_(alloc),
+            archives_mapping_(alloc),
             files_mapping_(other.files_mapping_, alloc),
             files_mapping_ids_(other.files_mapping_ids_, alloc),
             serializer_(other.serializer_, alloc)
@@ -90,6 +91,7 @@ namespace sgf::assets
             next_asset_id_(other.next_asset_id_.load()),
             path(std::move(other.path)),
             files_(std::move(other.files_)),
+            archives_(std::move(other.archives_)),
             archives_mapping_(std::move(other.archives_mapping_)),
             files_mapping_(std::move(other.files_mapping_)),
             files_mapping_ids_(std::move(other.files_mapping_ids_)),
@@ -102,6 +104,7 @@ namespace sgf::assets
             next_asset_id_(other.next_asset_id_.load()),
             path(std::move(other.path)),
             files_(std::move(other.files_), alloc),
+            archives_(std::move(other.archives_), alloc),
             archives_mapping_(std::move(other.archives_mapping_), alloc),
             files_mapping_(std::move(other.files_mapping_), alloc),
             files_mapping_ids_(std::move(other.files_mapping_ids_), alloc),
@@ -139,9 +142,8 @@ namespace sgf::assets
         Archive* findArchive(const std::filesystem::path& archive_path) noexcept;
 
         File& acquireFile(std::filesystem::path file_path);
+        File& acquireFile();
         Archive& acquireArchive(std::filesystem::path archive_path);
-
-        AssetId acquireId();
 
         /**
          * Writes catalog information in file by AssetCatalog::path.
@@ -165,7 +167,8 @@ namespace sgf::assets
             next_asset_id_ = other.next_asset_id_.load();
             path = other.path;
             files_ = other.files_;
-            archives_mapping_ = other.archives_mapping_;
+            archives_.clear();
+            archives_mapping_.clear();
             files_mapping_ = other.files_mapping_;
             files_mapping_ids_ = other.files_mapping_ids_;
             serializer_ = other.serializer_;
@@ -182,6 +185,7 @@ namespace sgf::assets
             other.next_asset_id_ = 0;
             path = std::move(other.path);
             files_ = std::move(other.files_);
+            archives_ = std::move(other.archives_);
             archives_mapping_ = std::move(other.archives_mapping_);
             files_mapping_ = std::move(other.files_mapping_);
             files_mapping_ids_ = std::move(other.files_mapping_ids_);
@@ -193,7 +197,7 @@ namespace sgf::assets
     private:
         std::atomic<AssetId> next_asset_id_ = 1;
         core::Vector<File> files_;
-        core::Vector<Archive> archives_;
+        core::Vector<core::UniquePtr<Archive>> archives_;
         core::UnorderedMap<std::filesystem::path, std::size_t> archives_mapping_;
         core::UnorderedMap<std::filesystem::path, std::size_t> files_mapping_;
         core::UnorderedMap<AssetId, std::size_t> files_mapping_ids_;

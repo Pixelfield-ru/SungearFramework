@@ -75,6 +75,35 @@ namespace sgf::serialization
             if(const auto err = serializer.deserializeField("path", value.path)) return err;
             if(const auto err = serializer.deserializeField("files", value.files_)) return err;
 
+            value.files_mapping_.clear();
+            value.files_mapping_ids_.clear();
+            value.files_mapping_.reserve(value.files_.size());
+            value.files_mapping_ids_.reserve(value.files_.size());
+
+            for(std::size_t index = 0; index < value.files_.size(); ++index)
+            {
+                const auto& file = value.files_[index];
+                value.files_mapping_ids_[file.id] = index;
+                if(file.path)
+                {
+                    value.files_mapping_[*file.path] = index;
+                }
+            }
+
+            value.archives_.clear();
+            value.archives_mapping_.clear();
+
+            for(const auto& file : value.files_)
+            {
+                if(!file.baked || file.baked->archive.empty()) continue;
+                if(value.archives_mapping_.contains(file.baked->archive)) continue;
+
+                const auto index = value.archives_.size();
+                value.archives_mapping_.emplace(file.baked->archive, index);
+                value.archives_.push_back(core::makeUnique<assets::Archive>(
+                    value.get_allocator(), value.path / file.baked->archive));
+            }
+
             return {};
         }
     };

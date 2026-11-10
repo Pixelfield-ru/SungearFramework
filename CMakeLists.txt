@@ -111,6 +111,7 @@ find_package(OpenAL CONFIG REQUIRED)
 find_package(RapidJSON CONFIG REQUIRED)
 find_package(gli CONFIG REQUIRED)
 find_package(meshoptimizer CONFIG REQUIRED)
+find_package(zstd CONFIG REQUIRED)
 find_package(Boost REQUIRED COMPONENTS system asio)
 find_package(recastnavigation CONFIG REQUIRED)
 

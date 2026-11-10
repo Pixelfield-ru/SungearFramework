@@ -4,6 +4,10 @@
 
 #include "sgf/assets/asset_server.h"
 
+#include <limits>
+
+#include <zstd.h>
+
 #include "sgf/core/errors.h"
 
 void sgf::assets::AssetServer::finishPosted(const core::SharedPtr<PostedJobs>& posted) noexcept
@@ -81,7 +85,7 @@ std::expected<sgf::assets::AnyHandle, std::error_code> sgf::assets::AssetServer:
     if(!slot) slot = storage->acquireErasedSlot(asset_id);
 
     // if files is stored by path
-    if(file->path)
+    if(file->path && std::filesystem::exists(catalog_.path / *file->path))
     {
         const auto actual_path = catalog_.path / *file->path;
 
@@ -135,14 +139,43 @@ std::expected<sgf::assets::AnyHandle, std::error_code> sgf::assets::AssetServer:
         }
 
         const auto asset_bytes = archive_bytes.subspan(baked_offset, baked_size);
+        const auto allocator = get_allocator();
 
         slot->state = AssetState::kLoading;
 
         // loading baked source
-        if(const auto err = postTracked([loader, asset_bytes, slot] {
-            // todo: decompress baked bytes before passing them into loadBakedErased
+        if(const auto err = postTracked([loader, asset_bytes, slot, allocator] {
+            std::span<const std::byte> plain = asset_bytes;
+            // owned by this task. do not store reference on it
+            core::Vector<std::byte> decoded(allocator);
 
-            if(const auto err = loader->loadBakedErased(asset_bytes, slot->erased()))
+            // missing frame means the payload was stored raw. compression did not shrink it
+            const auto raw_size = ZSTD_getFrameContentSize(asset_bytes.data(), asset_bytes.size());
+            if(raw_size != ZSTD_CONTENTSIZE_ERROR && raw_size != ZSTD_CONTENTSIZE_UNKNOWN)
+            {
+                if(raw_size > std::numeric_limits<std::size_t>::max())
+                {
+                    slot->error = Error::kCompressionFailed;
+                    slot->state = AssetState::kFailed;
+                    return;
+                }
+
+                decoded.resize(static_cast<std::size_t>(raw_size));
+
+                const auto written = ZSTD_decompress(
+                    decoded.data(), decoded.size(),
+                    asset_bytes.data(), asset_bytes.size());
+                if(ZSTD_isError(written))
+                {
+                    slot->error = Error::kCompressionFailed;
+                    slot->state = AssetState::kFailed;
+                    return;
+                }
+
+                plain = { decoded.data(), written };
+            }
+
+            if(const auto err = loader->loadBakedErased(plain, slot->erased()))
             {
                 slot->error = err;
                 slot->state = AssetState::kFailed;
@@ -227,20 +260,34 @@ std::error_code sgf::assets::AssetServer::reload(const AnyHandle& handle) noexce
     return {};
 }
 
-std::error_code sgf::assets::AssetServer::bake(const AnyHandle& handle)
+std::error_code sgf::assets::AssetServer::bake(
+    const AnyHandle& handle, std::filesystem::path archive, std::int32_t compression_level)
 {
+    if(compression_level < ZSTD_minCLevel() || compression_level > ZSTD_maxCLevel())
+    {
+        return Error::kCompressionFailed;
+    }
+
+    auto archive_path = core::normalizedRelativePath(catalog_.path / archive, catalog_.path);
+    if(!archive_path) return archive_path.error();
+
     BakeContext context;
-    context.output_bytes = core::Vector(get_allocator());
+    context.output_bytes = core::Vector<std::byte>(get_allocator());
     context.baked_assets = core::UnorderedSet<AssetId>(get_allocator());
+    context.archive_path = std::move(*archive_path);
+    context.compression_level = compression_level;
 
     if(const auto err = bakeImpl(context, handle))
     {
         return err;
     }
 
-    // todo: save output bytes in some archive
+    if(const auto err = core::writeFile(catalog_.path / context.archive_path, context.output_bytes))
+    {
+        return err;
+    }
 
-    return {};
+    return catalog_.save();
 }
 
 std::error_code sgf::assets::AssetServer::postTracked(std::move_only_function<void()> task) noexcept
@@ -277,18 +324,22 @@ std::error_code sgf::assets::AssetServer::postTracked(std::move_only_function<vo
 std::error_code sgf::assets::AssetServer::bakeImpl(BakeContext& context, const AnyHandle& handle)
 {
     // already was baked
-    if(context.baked_assets.contains(handle.assetId())) return {};
-
-    auto* slot = handle.slot_;
-
-    const auto handle_valid = slot && slot->erased();
-    if(!handle_valid) return Error::kInvalidHandle;
+    if(context.baked_assets.contains(handle.asset_id_)) return {};
+    if(handle.asset_id_ == 0 || handle.type_id_ == 0) return {};
 
     auto* storage = this->storage(handle.type_id_);
     if(!storage)
     {
         return Error::kInvalidStorage;
     }
+
+    auto* slot = handle.slot_;
+    if(!slot) slot = storage->slotControl(handle.asset_id_);
+
+    const auto handle_valid = slot && slot->erased();
+    if(!handle_valid) return Error::kInvalidHandle;
+
+    if(!slot->loaded()) return Error::kNotLoaded;
 
     auto* loader = storage->erasedLoader();
     if(!loader)
@@ -302,10 +353,46 @@ std::error_code sgf::assets::AssetServer::bakeImpl(BakeContext& context, const A
         return bake_result.error();
     }
 
-    // todo: save the bake result
-    // todo: bake dependencies
-    // todo: how to bake in different archives
-    // todo: compress the bake result bytes
+    const auto& plain = bake_result->bytes;
+
+    const auto bound = ZSTD_compressBound(plain.size());
+    if(ZSTD_isError(bound)) return Error::kCompressionFailed;
+
+    core::Vector<std::byte> compressed(bound, get_allocator());
+    const auto written = ZSTD_compress(
+        compressed.data(), compressed.size(),
+        plain.data(), plain.size(),
+        context.compression_level);
+    if(ZSTD_isError(written)) return Error::kCompressionFailed;
+
+    // a zstd frame can be larger than the raw payload. store the raw bytes in that case
+    std::span<const std::byte> stored = plain;
+    if(written < plain.size())
+    {
+        compressed.resize(written);
+        stored = { compressed.data(), compressed.size() };
+    }
+
+    AssetCatalog::File::Baked baked;
+    baked.archive = context.archive_path;
+    baked.offset = context.output_bytes.size();
+    baked.size = stored.size();
+
+    auto* file = catalog_.findFile(handle.asset_id_);
+    file->baked = std::move(baked);
+
+    context.output_bytes.reserve(context.output_bytes.size() + stored.size());
+    context.output_bytes.insert(context.output_bytes.end(), stored.begin(), stored.end());
+    context.baked_assets.insert(handle.asset_id_);
+
+    // baking all direct dependencies
+    for(const auto& dependency : bake_result->dependencies)
+    {
+        if(const auto err = bakeImpl(context, dependency))
+        {
+            return err;
+        }
+    }
 
     return {};
 }

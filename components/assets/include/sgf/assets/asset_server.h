@@ -168,7 +168,7 @@ namespace sgf::assets
         std::error_code reload(const AnyHandle& handle) noexcept;
 
 
-        std::error_code bake(const AnyHandle& handle);
+        std::error_code bake(const AnyHandle& handle, std::filesystem::path archive, std::int32_t compression_level);
 
         template<typename AssetT>
         Handle<AssetT> find(AssetId asset_id) noexcept
@@ -194,17 +194,25 @@ namespace sgf::assets
         requires(std::is_copy_constructible_v<AssetT>)
         Handle<AssetT> copy(const Handle<AssetT>& source) noexcept
         {
-            auto& storage = this->storage<AssetT>();
+            const auto* asset = source.get();
+            // kLoading and kFailed have no finished value to copy
+            if(!asset) return {};
 
-            const auto new_id = catalog_.acquireId();
+            auto& storage = this->storage<AssetT>();
+            static const auto type_id = core::typeIndex<AssetT>();
+
+            auto& new_file = catalog_.acquireFile();
+            new_file.type_id = type_id;
             // get new slot for asset
-            auto* slot = storage.acquireSlot(new_id);
+            auto* slot = storage.acquireSlot(new_file.id);
             // creating new asset using copy constructor with allocator
             // or without allocator if T does not have such constructor
-            auto new_asset = std::make_obj_using_allocator<AssetT>(get_allocator(), *source);
+            auto new_asset = std::make_obj_using_allocator<AssetT>(get_allocator(), *asset);
             slot->insert(std::move(new_asset));
+            // the source is loaded so we put kLoaded state in the copy
+            slot->state = AssetState::kLoaded;
 
-            return Handle<AssetT>(slot);
+            return Handle<AssetT>(slot, type_id);
         }
 
         template<typename AssetT>
@@ -252,6 +260,8 @@ namespace sgf::assets
         {
             core::Vector<std::byte> output_bytes;
             core::UnorderedSet<AssetId> baked_assets;
+            std::filesystem::path archive_path;
+            std::int32_t compression_level {};
         };
 
         [[nodiscard]] std::error_code postTracked(std::move_only_function<void()> task) noexcept;
