@@ -14,6 +14,8 @@ namespace sgf::assets
 {
     using AssetId = std::uint32_t;
 
+    struct IAssetStorage;
+
     struct AssetSlotControl
     {
         virtual ~AssetSlotControl() noexcept = default;
@@ -24,14 +26,16 @@ namespace sgf::assets
             generation(other.generation.load()),
             version(other.version.load()),
             state(other.state.load()),
-            id(other.id.load())
+            id(other.id.load()),
+            storage(other.storage)
         { }
         AssetSlotControl(AssetSlotControl&& other) noexcept :
             strong_refs(other.strong_refs.load()),
             generation(other.generation.load()),
             version(other.version.load()),
             state(other.state.load()),
-            id(other.id.load())
+            id(other.id.load()),
+            storage(other.storage)
         { }
 
         std::atomic<std::uint32_t> strong_refs {};
@@ -42,6 +46,8 @@ namespace sgf::assets
         std::atomic<AssetState> state = AssetState::kUnloaded;
         std::atomic<AssetId> id {};
 
+        IAssetStorage* storage {};
+
         /// If an error occurred while loading the asset.
         std::error_code error {};
 
@@ -50,10 +56,9 @@ namespace sgf::assets
             ++strong_refs;
         }
 
-        void decrementRefCounter() noexcept
-        {
-            --strong_refs;
-        }
+        [[nodiscard]] bool tryAddStrongRef(std::uint32_t expected_generation) noexcept;
+
+        void decrementRefCounter() noexcept;
 
         bool loaded() const noexcept
         {
@@ -62,6 +67,7 @@ namespace sgf::assets
 
         virtual std::byte* erased() noexcept = 0;
         virtual std::byte const* erased() const noexcept = 0;
+        virtual void clear() noexcept = 0;
 
         AssetSlotControl& operator=(const AssetSlotControl& other) noexcept
         {
@@ -72,6 +78,7 @@ namespace sgf::assets
             version = other.version.load();
             state = other.state.load();
             id = other.id.load();
+            storage = other.storage;
 
             return *this;
         }
@@ -85,6 +92,7 @@ namespace sgf::assets
             version = other.version.load();
             state = other.state.load();
             id = other.id.load();
+            storage = other.storage;
 
             return *this;
         }
@@ -119,6 +127,16 @@ namespace sgf::assets
         std::byte const* erased() const noexcept override
         {
             return value ? reinterpret_cast<std::byte const*>(&*value) : nullptr;
+        }
+
+        void clear() noexcept override
+        {
+            state = AssetState::kUnloaded;
+            error = {};
+            id = 0;
+            version = 1;
+            storage = {};
+            value = std::nullopt;
         }
     };
 }

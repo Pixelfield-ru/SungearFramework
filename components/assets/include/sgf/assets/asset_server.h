@@ -119,19 +119,41 @@ namespace sgf::assets
                 if(const auto err = loader->loadMeta(actual_path, file->id)) return std::unexpected(err);
             }
 
-            auto* slot = storage.findSlot(file->id);
+            auto* slot = storage.retainSlot(file->id);
             // if slot is already exists then leave
             if(slot && (slot->loaded() || slot->state == AssetState::kLoading))
             {
-                return Handle<AssetT>(slot, type);
+                Handle<AssetT> handle;
+                handle.slot_ = slot;
+                handle.asset_id_ = file->id;
+                handle.type_id_ = type;
+
+                return handle;
             }
 
-            // get new slot for asset
+            // retainSlot already owns one ref. a new slot starts at zero refs
+            const bool retained = slot != nullptr;
             if(!slot) slot = storage.acquireSlot(file->id);
+
+            Handle<AssetT> handle;
+            if(retained)
+            {
+                handle.slot_ = slot;
+                handle.asset_id_ = file->id;
+                handle.type_id_ = type;
+            }
+            else
+            {
+                // add one reference to a slot
+                handle = Handle<AssetT>(slot, type);
+            }
 
             slot->state = AssetState::kLoading;
 
-            if(const auto err = postTracked([loader, actual_path, slot] {
+            // capture the handle to increase lifetime of the slot
+            if(const auto err = postTracked([loader, actual_path, handle] {
+                auto* slot = handle.slot_;
+
                 if(const auto err = loader->loadSource(actual_path, *slot->value))
                 {
                     slot->error = err;
@@ -148,7 +170,7 @@ namespace sgf::assets
                 return std::unexpected(err);
             }
 
-            return Handle<AssetT>(slot, type);
+            return handle;
         }
 
         /**
@@ -174,9 +196,15 @@ namespace sgf::assets
         Handle<AssetT> find(AssetId asset_id) noexcept
         {
             auto& st = storage<AssetT>();
-            auto* slot = st.findSlot(asset_id);
+            auto* slot = st.retainSlot(asset_id);
+            if(!slot) return {};
 
-            return { slot, core::typeIndex<AssetT>() };
+            Handle<AssetT> handle;
+            handle.slot_ = slot;
+            handle.asset_id_ = asset_id;
+            handle.type_id_ = core::typeIndex<AssetT>();
+
+            return handle;
         }
 
         AnyHandle find(AssetId asset_id, std::uint32_t type_id) noexcept
@@ -184,10 +212,15 @@ namespace sgf::assets
             auto* st = storage(type_id);
             if(!st) return {};
 
-            auto* control = st->slotControl(asset_id);
+            auto* control = st->retainErasedSlot(asset_id);
             if(!control) return {};
 
-            return { control, type_id };
+            AnyHandle handle;
+            handle.slot_ = control;
+            handle.asset_id_ = asset_id;
+            handle.type_id_ = type_id;
+
+            return handle;
         }
 
         template<typename AssetT>

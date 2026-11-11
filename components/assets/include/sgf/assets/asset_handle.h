@@ -232,10 +232,10 @@ namespace sgf::assets
 
         Handle<AssetT> lock() const noexcept
         {
-            if(!slot_) return {};
+            if(!slot_ || !slot_->tryAddStrongRef(generation_)) return {};
 
             Handle<AssetT> handle;
-            handle.slot_ = slot_;
+            handle.slot_ = static_cast<AssetSlot<AssetT>*>(slot_);
             handle.asset_id_ = asset_id_;
             handle.type_id_ = type_id_;
 
@@ -246,7 +246,7 @@ namespace sgf::assets
         {
             if(!slot_) return true;
 
-            return slot_->strong_refs == 0;
+            return slot_->strong_refs == 0 || slot_->generation != generation_;
         }
 
         template<typename OtherAssetT>
@@ -436,21 +436,21 @@ namespace sgf::assets
 
         [[nodiscard]] AnyHandle lock() const noexcept
         {
-            if(!slot_) return {};
+            if(!slot_ || !slot_->tryAddStrongRef(generation_)) return {};
 
             AnyHandle handle;
             handle.slot_ = slot_;
-            handle.asset_id_ = asset_id_;
             handle.type_id_ = type_id_;
+            handle.asset_id_ = asset_id_;
 
             return handle;
         }
 
-        bool expired() const noexcept
+        [[nodiscard]] bool expired() const noexcept
         {
             if(!slot_) return true;
 
-            return slot_->strong_refs == 0;
+            return slot_->strong_refs == 0 || slot_->generation != generation_;
         }
 
         AnyWeakHandle& operator=(const AnyWeakHandle&) = default;

@@ -65,11 +65,15 @@ std::expected<sgf::assets::AnyHandle, std::error_code> sgf::assets::AssetServer:
         return std::unexpected(Error::kLoaderNotSpecified);
     }
 
-    auto* slot = storage->slotControl(asset_id);
+    auto* slot = storage->retainErasedSlot(asset_id);
     // if slot is already exists then leave
     if(slot && (slot->loaded() || slot->state == AssetState::kLoading))
     {
-        return AnyHandle(slot, type_id);
+        AnyHandle handle;
+        handle.slot_ = slot;
+        handle.asset_id_ = asset_id;
+        handle.type_id_ = type_id;
+        return handle;
     }
 
     // trying to find existing asset
@@ -78,11 +82,25 @@ std::expected<sgf::assets::AnyHandle, std::error_code> sgf::assets::AssetServer:
     // file does not exist in catalog
     if(!file)
     {
+        if(slot) slot->decrementRefCounter();
         return std::unexpected(Error::kUnknownAsset);
     }
 
-    // else if slot does not exist then acquire new slot
+    // retainErasedSlot already owns one ref. A new slot starts at zero refs.
+    const bool retained = slot != nullptr;
     if(!slot) slot = storage->acquireErasedSlot(asset_id);
+
+    AnyHandle handle;
+    if(retained)
+    {
+        handle.slot_ = slot;
+        handle.asset_id_ = asset_id;
+        handle.type_id_ = type_id;
+    }
+    else
+    {
+        handle = AnyHandle(slot, type_id);
+    }
 
     // if files is stored by path
     if(file->path && std::filesystem::exists(catalog_.path / *file->path))
@@ -95,7 +113,10 @@ std::expected<sgf::assets::AnyHandle, std::error_code> sgf::assets::AssetServer:
         slot->state = AssetState::kLoading;
 
         // loading asset by path
-        if(const auto err = postTracked([loader, actual_path, slot] {
+        // capture the handle to increase lifetime of the slot
+        if(const auto err = postTracked([loader, actual_path, handle] {
+            auto* slot = handle.slot_;
+
             if(const auto err = loader->loadSourceErased(actual_path, slot->erased()))
             {
                 slot->error = err;
@@ -112,7 +133,7 @@ std::expected<sgf::assets::AnyHandle, std::error_code> sgf::assets::AssetServer:
             return std::unexpected(err);
         }
 
-        return AnyHandle(slot, type_id);
+        return handle;
     }
 
     if(file->baked)
@@ -144,7 +165,10 @@ std::expected<sgf::assets::AnyHandle, std::error_code> sgf::assets::AssetServer:
         slot->state = AssetState::kLoading;
 
         // loading baked source
-        if(const auto err = postTracked([loader, asset_bytes, slot, allocator] {
+        // capture the handle to increase lifetime of the slot
+        if(const auto err = postTracked([loader, asset_bytes, handle, allocator] {
+            auto* slot = handle.slot_;
+
             std::span<const std::byte> plain = asset_bytes;
             // owned by this task. do not store reference on it
             core::Vector<std::byte> decoded(allocator);
@@ -191,7 +215,7 @@ std::expected<sgf::assets::AnyHandle, std::error_code> sgf::assets::AssetServer:
             return std::unexpected(err);
         }
 
-        return AnyHandle(slot, type_id);
+        return handle;
     }
 
     return std::unexpected(Error::kUnknownStorageType);
@@ -239,7 +263,10 @@ std::error_code sgf::assets::AssetServer::reload(const AnyHandle& handle) noexce
     slot->state = AssetState::kLoading;
 
     // finally, load source
-    if(const auto err = postTracked([loader, file_path, slot] {
+    // capture the handle to increase lifetime of the slot
+    if(const auto err = postTracked([loader, file_path, handle] {
+        auto* slot = handle.slot_;
+
         if(const auto err = loader->loadSourceErased(file_path, slot->erased()))
         {
             slot->error = err;
