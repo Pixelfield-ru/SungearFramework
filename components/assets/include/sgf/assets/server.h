@@ -24,7 +24,7 @@ namespace sgf::assets
     struct AssetServerCreateInfo
     {
         serialization::Serializer serializer;
-        size_t page_size {};
+        size_t page_size = 10;
         const core::LogCallback* debug_output {};
         core::ThreadPool* thread_pool {};
     };
@@ -87,7 +87,10 @@ namespace sgf::assets
 
             const auto actual_path = catalog_.path / *key;
 
-            if(!std::filesystem::exists(actual_path)) return std::unexpected(std::errc::no_such_file_or_directory);
+            if(!std::filesystem::exists(actual_path))
+            {
+                return std::unexpected(std::make_error_code(std::errc::no_such_file_or_directory));
+            }
 
             const auto type = core::registerStableType<AssetStorage<AssetT>>();
             auto& storage = this->storage<AssetT>();
@@ -95,7 +98,7 @@ namespace sgf::assets
             auto* loader = storage.loader();
             if(!loader)
             {
-                return Error::kLoaderNotSpecified;
+                return std::unexpected(Error::kLoaderNotSpecified);
             }
 
             // trying to find existing asset
@@ -153,7 +156,7 @@ namespace sgf::assets
 
             // capture the handle to increase lifetime of the slot
             if(const auto err = postTracked([loader, actual_path, handle] {
-                auto* slot = handle.slot_;
+                auto* slot = static_cast<AssetSlot<AssetT>*>(handle.slot_);
 
                 if(const auto err = loader->loadSource(actual_path, *slot->value))
                 {

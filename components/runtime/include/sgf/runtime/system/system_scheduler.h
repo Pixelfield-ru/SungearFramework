@@ -7,7 +7,7 @@
 #include <unordered_map>
 #include <mutex>
 
-#include "../../../../../core/include/sgf/core/thread_pool.h"
+#include "sgf/core/thread_pool.h"
 
 #include "system.h"
 #include "system_graph.h"
@@ -22,7 +22,7 @@ namespace sgf::runtime
         const SystemGraph* graph {};
         SystemContext* context {};
         core::Vector<SystemScheduleState> schedules;
-        ThreadPool* thread_pool {};
+        core::ThreadPool* thread_pool {};
         const core::LogCallback* debug_output {};
 
         SystemSchedulerCreateInfo() = default;

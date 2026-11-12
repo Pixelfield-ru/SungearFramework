@@ -82,6 +82,12 @@ namespace sgf::assets
         {
             return static_cast<AssetSlot<AssetT>*>(slot_);
         }
+
+        template<typename AssetT>
+        const AssetSlot<AssetT>* slotAs() const noexcept
+        {
+            return static_cast<const AssetSlot<AssetT>*>(slot_);
+        }
     };
 
     template<typename AssetT>
@@ -104,16 +110,26 @@ namespace sgf::assets
             HandleBase(nullptr)
         { }
 
+        Handle(const Handle& other) noexcept :
+            HandleBase(other)
+        {
+            if(slot_) slot_->incrementRefCounter();
+        }
+
+        Handle(Handle&& other) noexcept :
+            HandleBase(std::move(other))
+        { }
+
         template<typename OtherAssetT>
-        requires(std::is_base_of_v<AssetT, OtherAssetT> || std::is_same_v<AssetT, OtherAssetT>)
+        requires(std::is_base_of_v<AssetT, OtherAssetT> && !std::is_same_v<AssetT, OtherAssetT>)
         Handle(const Handle<OtherAssetT>& other) noexcept :
             HandleBase(other)
         {
-            auto* slot = slotAs<AssetT>();
-            if(slot) slot->incrementRefCounter();
+            if(slot_) slot_->incrementRefCounter();
         }
+
         template<typename OtherAssetT>
-        requires(std::is_base_of_v<AssetT, OtherAssetT> || std::is_same_v<AssetT, OtherAssetT>)
+        requires(std::is_base_of_v<AssetT, OtherAssetT> && !std::is_same_v<AssetT, OtherAssetT>)
         Handle(Handle<OtherAssetT>&& other) noexcept :
             HandleBase(std::move(other))
         { }
@@ -137,7 +153,7 @@ namespace sgf::assets
             return valid();
         }
 
-        AssetT* operator->() const noexcept
+        const AssetT* operator->() const noexcept
         {
             auto* slot = slotAs<AssetT>();
             return valid() ? &(*slot->value) : nullptr;
@@ -149,11 +165,36 @@ namespace sgf::assets
             return valid() ? &(*slot->value) : nullptr;
         }
 
+        Handle& operator=(const Handle& other) noexcept
+        {
+            if(this == std::addressof(other)) return *this;
+            if(slot_ == other.slot_) return *this;
+
+            if(slot_) slot_->decrementRefCounter();
+
+            HandleBase::operator=(other);
+
+            if(slot_) slot_->incrementRefCounter();
+
+            return *this;
+        }
+
+        Handle& operator=(Handle&& other) noexcept
+        {
+            if(this == std::addressof(other)) return *this;
+            if(slot_ == other.slot_) return *this;
+
+            if(slot_) slot_->decrementRefCounter();
+
+            HandleBase::operator=(std::move(other));
+
+            return *this;
+        }
+
         template<typename OtherAssetT>
-        requires(std::is_base_of_v<AssetT, OtherAssetT> || std::is_same_v<AssetT, OtherAssetT>)
+        requires(std::is_base_of_v<AssetT, OtherAssetT> && !std::is_same_v<AssetT, OtherAssetT>)
         Handle& operator=(const Handle<OtherAssetT>& other) noexcept
         {
-            if(std::addressof(other) == this) return *this;
             if(slot_ == other.slot_) return *this;
 
             if(slot_) slot_->decrementRefCounter();
@@ -166,10 +207,9 @@ namespace sgf::assets
         }
 
         template<typename OtherAssetT>
-        requires(std::is_base_of_v<AssetT, OtherAssetT> || std::is_same_v<AssetT, OtherAssetT>)
+        requires(std::is_base_of_v<AssetT, OtherAssetT> && !std::is_same_v<AssetT, OtherAssetT>)
         Handle& operator=(Handle<OtherAssetT>&& other) noexcept
         {
-            if(std::addressof(other) == this) return *this;
             if(slot_ == other.slot_) return *this;
 
             if(slot_) slot_->decrementRefCounter();

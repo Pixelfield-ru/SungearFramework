@@ -23,7 +23,8 @@ function(install_component)
         INSTALL_DIR_REGEX
         TARGET_NAME)
     set(multiValueArgs
-        DEPENDS)
+        DEPENDS
+        PACKAGES)
     cmake_parse_arguments(
         PARAMS
         "${options}"
@@ -72,6 +73,7 @@ function(install_component)
 
     set_property(GLOBAL APPEND PROPERTY SGF_COMPONENTS "${PARAMS_TARGET_NAME}")
     set_property(GLOBAL PROPERTY SGF_COMPONENT_${PARAMS_TARGET_NAME}_DEPENDS "${PARAMS_DEPENDS}")
+    set_property(GLOBAL PROPERTY SGF_COMPONENT_${PARAMS_TARGET_NAME}_PACKAGES "${PARAMS_PACKAGES}")
 endfunction()
 
 function(sgf_install_package)
@@ -83,7 +85,9 @@ function(sgf_install_package)
     set(dependencies "")
     foreach(component IN LISTS components)
         get_property(component_depends GLOBAL PROPERTY SGF_COMPONENT_${component}_DEPENDS)
+        get_property(component_packages GLOBAL PROPERTY SGF_COMPONENT_${component}_PACKAGES)
         string(APPEND dependencies "set(_sgf_${component}_deps \"${component_depends}\")\n")
+        string(APPEND dependencies "set(_sgf_${component}_packages \"${component_packages}\")\n")
     endforeach()
 
     set(SGF_COMPONENTS "${components}")

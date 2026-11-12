@@ -7,6 +7,7 @@
 #include <filesystem>
 #include <span>
 #include <system_error>
+#include <expected>
 
 #include "sgf/core/memory.h"
 #include "slot.h"
@@ -49,7 +50,7 @@ namespace sgf::assets
         [[nodiscard]] virtual std::expected<BakeResult, std::error_code> saveBaked(const AssetT& asset) = 0;
         [[nodiscard]] std::expected<BakeResult, std::error_code> saveBakedErased(std::byte const* asset) noexcept final
         {
-            return saveBaked(*reinterpret_cast<AssetT*>(asset));
+            return saveBaked(*reinterpret_cast<AssetT const*>(asset));
         }
     };
 }

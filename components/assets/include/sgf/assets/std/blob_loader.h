@@ -4,8 +4,6 @@
 
 #pragma once
 
-#include <expected>
-
 #include "sgf/assets/handle.h"
 #include "sgf/assets/loader.h"
 #include "sgf/assets/std/blob.h"
