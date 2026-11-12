@@ -33,13 +33,10 @@ namespace sgf::rhi
         core::Vector<std::filesystem::path> search_paths;
         std::filesystem::path cache_path = "cache/shaders";
 
-        std::pmr::memory_resource* memory_resource = std::pmr::get_default_resource();
-
         IShaderCompiler() = default;
         explicit IShaderCompiler(const allocator_type& allocator) :
             standard_entry_points(allocator),
-            search_paths(allocator),
-            memory_resource(allocator.resource())
+            search_paths(allocator)
         {
             standard_entry_points.emplace(ShaderStageType::kVertex, "vertexMain");
             standard_entry_points.emplace(ShaderStageType::kFragment, "fragmentMain");
@@ -52,15 +49,13 @@ namespace sgf::rhi
         IShaderCompiler(const IShaderCompiler& other, const allocator_type& allocator) :
             standard_entry_points(other.standard_entry_points, allocator),
             search_paths(other.search_paths, allocator),
-            cache_path(other.cache_path),
-            memory_resource(other.memory_resource)
+            cache_path(other.cache_path)
         { }
         IShaderCompiler(IShaderCompiler&&) noexcept = default;
         IShaderCompiler(IShaderCompiler&& other, const allocator_type& allocator) :
             standard_entry_points(std::move(other.standard_entry_points), allocator),
             search_paths(std::move(other.search_paths), allocator),
-            cache_path(std::move(other.cache_path)),
-            memory_resource(other.memory_resource)
+            cache_path(std::move(other.cache_path))
         { }
 
         [[nodiscard]] allocator_type get_allocator() const noexcept
