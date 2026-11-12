@@ -6,8 +6,8 @@
 
 #include <shared_mutex>
 
-#include "asset_loader.h"
-#include "asset_slot.h"
+#include "loader.h"
+#include "slot.h"
 #include "sgf/core/memory.h"
 
 namespace sgf::assets

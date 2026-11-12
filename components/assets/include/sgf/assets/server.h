@@ -9,13 +9,14 @@
 #include "sgf/core/utility/file.h"
 #include "sgf/core/log.h"
 #include "sgf/core/thread_pool.h"
+#include "sgf/core/utility/type_index.h"
 
 #include <atomic>
 #include <functional>
 
-#include "asset_storage.h"
-#include "asset_catalog.h"
-#include "asset_handle.h"
+#include "storage.h"
+#include "catalog.h"
+#include "handle.h"
 #include "errors.h"
 
 namespace sgf::assets
@@ -88,7 +89,7 @@ namespace sgf::assets
 
             if(!std::filesystem::exists(actual_path)) return std::unexpected(std::errc::no_such_file_or_directory);
 
-            const auto type = core::typeIndex<AssetT>();
+            const auto type = core::registerStableType<AssetStorage<AssetT>>();
             auto& storage = this->storage<AssetT>();
 
             auto* loader = storage.loader();
@@ -202,14 +203,14 @@ namespace sgf::assets
             Handle<AssetT> handle;
             handle.slot_ = slot;
             handle.asset_id_ = asset_id;
-            handle.type_id_ = core::typeIndex<AssetT>();
+            handle.type_id_ = core::registerStableType<AssetStorage<AssetT>>();
 
             return handle;
         }
 
         AnyHandle find(AssetId asset_id, std::uint32_t type_id) noexcept
         {
-            auto* st = storage(type_id);
+            auto* st = storage(core::typeIndexFromStableHash(type_id));
             if(!st) return {};
 
             auto* control = st->retainErasedSlot(asset_id);
@@ -232,7 +233,7 @@ namespace sgf::assets
             if(!asset) return {};
 
             auto& storage = this->storage<AssetT>();
-            static const auto type_id = core::typeIndex<AssetT>();
+            static const auto type_id = core::registerStableType<AssetStorage<AssetT>>();
 
             auto& new_file = catalog_.acquireFile();
             new_file.type_id = type_id;
@@ -252,6 +253,8 @@ namespace sgf::assets
         AssetStorage<AssetT>& storage() noexcept
         {
             using Storage = AssetStorage<AssetT>;
+
+            core::registerStableType<Storage>();
 
             if(storages_map_.hasType<Storage>())
             {
@@ -275,7 +278,7 @@ namespace sgf::assets
         template<typename AssetT>
         const AssetStorage<AssetT>& storage() const noexcept
         {
-            return storage<AssetT>();
+            return const_cast<AssetServer*>(this)->storage<AssetT>();
         }
 
         [[nodiscard]] allocator_type get_allocator() const noexcept

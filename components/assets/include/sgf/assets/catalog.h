@@ -7,12 +7,12 @@
 #include <filesystem>
 #include <optional>
 
-#include "asset_slot.h"
+#include "slot.h"
 
 #include "sgf/core/memory.h"
 #include "sgf/serialization/macroses.h"
 #include "sgf/serialization/serializer.h"
-#include "asset_archive.h"
+#include "archive.h"
 
 namespace sgf::assets
 {

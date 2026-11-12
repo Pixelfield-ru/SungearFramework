@@ -2,7 +2,7 @@
 // Created by stuka on 28.10.2026.
 //
 
-#include "sgf/assets/asset_server.h"
+#include "sgf/assets/server.h"
 
 #include <limits>
 
@@ -53,7 +53,7 @@ std::error_code sgf::assets::AssetServer::mount(std::filesystem::path path) noex
 std::expected<sgf::assets::AnyHandle, std::error_code> sgf::assets::AssetServer::load(
     AssetId asset_id, std::uint32_t type_id) noexcept
 {
-    auto* storage = this->storage(type_id);
+    auto* storage = this->storage(core::typeIndexFromStableHash(type_id));
     if(!storage)
     {
         return std::unexpected(Error::kInvalidStorage);
@@ -230,7 +230,7 @@ std::error_code sgf::assets::AssetServer::reload(const AnyHandle& handle) noexce
 
     if(slot->state == AssetState::kLoading) return {};
 
-    auto* storage = this->storage(handle.type_id_);
+    auto* storage = this->storage(core::typeIndexFromStableHash(handle.type_id_));
     if(!storage)
     {
         return Error::kInvalidStorage;
@@ -354,7 +354,7 @@ std::error_code sgf::assets::AssetServer::bakeImpl(BakeContext& context, const A
     if(context.baked_assets.contains(handle.asset_id_)) return {};
     if(handle.asset_id_ == 0 || handle.type_id_ == 0) return {};
 
-    auto* storage = this->storage(handle.type_id_);
+    auto* storage = this->storage(core::typeIndexFromStableHash(handle.type_id_));
     if(!storage)
     {
         return Error::kInvalidStorage;

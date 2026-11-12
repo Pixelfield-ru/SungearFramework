@@ -2,9 +2,9 @@
 // Created by stuka on 11.11.2026.
 //
 
-#include "sgf/assets/asset_slot.h"
+#include "sgf/assets/slot.h"
 
-#include "sgf/assets/asset_storage.h"
+#include "sgf/assets/storage.h"
 
 bool sgf::assets::AssetSlotControl::tryAddStrongRef(std::uint32_t expected_generation) noexcept
 {

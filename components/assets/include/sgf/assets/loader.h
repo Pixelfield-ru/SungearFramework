@@ -9,7 +9,7 @@
 #include <system_error>
 
 #include "sgf/core/memory.h"
-#include "asset_slot.h"
+#include "slot.h"
 
 namespace sgf::assets
 {

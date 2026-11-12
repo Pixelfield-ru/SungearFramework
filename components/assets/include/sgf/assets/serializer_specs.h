@@ -6,8 +6,8 @@
 
 #include "sgf/serialization/spec/specs.h"
 
-#include "asset_catalog.h"
-#include "asset_handle.h"
+#include "catalog.h"
+#include "handle.h"
 
 namespace sgf::serialization
 {

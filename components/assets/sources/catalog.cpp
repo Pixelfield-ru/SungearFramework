@@ -2,7 +2,7 @@
 // Created by stuka on 03.11.2026.
 //
 
-#include "sgf/assets/asset_catalog.h"
+#include "sgf/assets/catalog.h"
 
 #include "sgf/assets/serializer_specs.h"
 #include "sgf/core/utility/file.h"

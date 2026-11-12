@@ -2,7 +2,7 @@
 // Created by stuka on 05.11.2026.
 //
 
-#include "sgf/assets/asset_archive.h"
+#include "sgf/assets/archive.h"
 
 #include <limits>
 

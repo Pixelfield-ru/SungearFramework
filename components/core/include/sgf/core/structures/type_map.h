@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "sgf/core/utility/type_traits.h"
+#include "sgf/core/utility/type_index.h"
 #include "sgf/core/utility/assert.h"
 #include "sgf/core/memory.h"
 

@@ -6,15 +6,18 @@
 
 #include <cstddef>
 
-#include "sgf/core/utility/type_traits.h"
+#include "sgf/core/utility/type_index.h"
 
-#include "asset_slot.h"
+#include "slot.h"
 #include "sgf/serialization/macroses.h"
 
 namespace sgf::assets
 {
     template<typename>
     struct WeakHandle;
+
+    template<typename>
+    struct AssetStorage;
 
     struct HandleBase
     {
@@ -321,7 +324,7 @@ namespace sgf::assets
         template<typename AssetT>
         Handle<AssetT> as() const noexcept
         {
-            if(!slot_ || core::typeIndex<AssetT>() != type_id_) return {};
+            if(!slot_ || core::stableTypeHash<AssetStorage<AssetT>>() != type_id_) return {};
 
             Handle<AssetT> handle;
             handle.slot_ = static_cast<AssetSlot<AssetT>*>(slot_);
