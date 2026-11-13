@@ -15,21 +15,24 @@ struct sgf::platform::Window::Impl
 {
     GLFWwindow* handle {};
 
-    static void nativeCloseCallback(GLFWwindow* window) noexcept;
-    static void nativeIconifyCallback(GLFWwindow* window, int iconified) noexcept;
-    static void nativeFramebufferSizeCallback(GLFWwindow* window, int width, int height) noexcept;
+    static void closeCallback(GLFWwindow* window) noexcept;
+    static void iconifyCallback(GLFWwindow* window, int iconified) noexcept;
+    static void framebufferSizeCallback(GLFWwindow* window, int width, int height) noexcept;
+    static void windowFocusedCallback(GLFWwindow* window, int focused) noexcept;
+    static void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) noexcept;
 };
 
 sgf::platform::Window::Window() noexcept :
     impl_(core::makeUnique<Impl>(std::pmr::get_default_resource()))
 {
+    platform().addWindow(this);
 }
 
 sgf::platform::Window::Window(const allocator_type& alloc) noexcept :
     resource_(alloc.resource()),
     impl_(core::makeUnique<Impl>(alloc))
 {
-
+    platform().addWindow(this);
 }
 
 sgf::platform::Window::Window(Window&& other) noexcept :
@@ -37,6 +40,8 @@ sgf::platform::Window::Window(Window&& other) noexcept :
     impl_(std::move(other.impl_)),
     debug_output_(other.debug_output_)
 {
+    platform().addWindow(this);
+    adoptNativeOwner(other);
 }
 
 sgf::platform::Window::Window(Window&& other, const allocator_type& alloc) noexcept :
@@ -44,12 +49,14 @@ sgf::platform::Window::Window(Window&& other, const allocator_type& alloc) noexc
     impl_(std::move(other.impl_)),
     debug_output_(other.debug_output_)
 {
-
+    platform().addWindow(this);
+    adoptNativeOwner(other);
 }
 
 sgf::platform::Window::~Window() noexcept
 {
     destroy();
+    platform().removeWindow(this);
 }
 
 void sgf::platform::Window::setTitle(std::string_view title) noexcept
@@ -87,10 +94,13 @@ sgf::platform::Window& sgf::platform::Window::operator=(Window&& other) noexcept
     if(this == std::addressof(other)) return *this;
 
     destroy();
+    setFocused(false);
 
     resource_ = other.resource_;
     impl_ = std::move(other.impl_);
     debug_output_ = other.debug_output_;
+
+    adoptNativeOwner(other);
 
     return *this;
 }
@@ -136,9 +146,11 @@ std::error_code sgf::platform::Window::create(const WindowCreateInfo& create_inf
     }
 
     glfwSetWindowUserPointer(impl->handle, &output);
-    glfwSetWindowCloseCallback(impl->handle, &Impl::nativeCloseCallback);
-    glfwSetWindowIconifyCallback(impl->handle, &Impl::nativeIconifyCallback);
-    glfwSetFramebufferSizeCallback(impl->handle, &Impl::nativeFramebufferSizeCallback);
+    glfwSetWindowCloseCallback(impl->handle, &Impl::closeCallback);
+    glfwSetWindowIconifyCallback(impl->handle, &Impl::iconifyCallback);
+    glfwSetFramebufferSizeCallback(impl->handle, &Impl::framebufferSizeCallback);
+    glfwSetWindowFocusCallback(impl->handle, &Impl::windowFocusedCallback);
+    glfwSetKeyCallback(impl->handle, &Impl::keyCallback);
 
     if(create_info.client_api == WindowClientApi::kOpenGL)
     {
@@ -152,24 +164,60 @@ std::error_code sgf::platform::Window::create(const WindowCreateInfo& create_inf
 
 void sgf::platform::Window::destroy() noexcept
 {
-    if(impl_->handle)
+    if(impl_ && impl_->handle)
     {
         glfwDestroyWindow(impl_->handle);
         impl_->handle = {};
     }
 }
 
-void sgf::platform::Window::Impl::nativeCloseCallback(GLFWwindow* window) noexcept
+void sgf::platform::Window::setFocused(bool focused) noexcept
+{
+    if(focused)
+    {
+        platform().focused_window_ = this;
+    }
+    else if(platform().focused_window_ == this)
+    {
+        platform().focused_window_ = {};
+    }
+}
+
+void sgf::platform::Window::adoptNativeOwner(Window& from) noexcept
+{
+    if(platform().focused_window_ == &from)
+    {
+        platform().focused_window_ = this;
+    }
+
+    if(impl_ && impl_->handle)
+    {
+        glfwSetWindowUserPointer(impl_->handle, this);
+    }
+}
+
+void sgf::platform::Window::Impl::closeCallback(GLFWwindow* window) noexcept
 {
     auto* my_window = static_cast<Window*>(glfwGetWindowUserPointer(window));
 }
 
-void sgf::platform::Window::Impl::nativeIconifyCallback(GLFWwindow* window, int iconified) noexcept
+void sgf::platform::Window::Impl::iconifyCallback(GLFWwindow* window, int iconified) noexcept
 {
     auto* my_window = static_cast<Window*>(glfwGetWindowUserPointer(window));
 }
 
-void sgf::platform::Window::Impl::nativeFramebufferSizeCallback(GLFWwindow* window, int width, int height) noexcept
+void sgf::platform::Window::Impl::framebufferSizeCallback(GLFWwindow* window, int width, int height) noexcept
+{
+    auto* my_window = static_cast<Window*>(glfwGetWindowUserPointer(window));
+}
+
+void sgf::platform::Window::Impl::windowFocusedCallback(GLFWwindow* window, int focused) noexcept
+{
+    auto* my_window = static_cast<Window*>(glfwGetWindowUserPointer(window));
+    my_window->setFocused(focused == GLFW_TRUE);
+}
+
+void sgf::platform::Window::Impl::keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) noexcept
 {
     auto* my_window = static_cast<Window*>(glfwGetWindowUserPointer(window));
 }

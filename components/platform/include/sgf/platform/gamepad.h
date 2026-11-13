@@ -6,6 +6,7 @@
 
 namespace sgf::platform
 {
+    // todo:
     struct Gamepad final
     {
 

@@ -68,5 +68,7 @@ namespace sgf::platform
         const core::LogCallback* debug_output_ {};
 
         void destroy() noexcept;
+        void setFocused(bool focused) noexcept;
+        void adoptNativeOwner(Window& from) noexcept;
     };
 }
