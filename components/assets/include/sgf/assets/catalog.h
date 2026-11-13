@@ -48,11 +48,11 @@ namespace sgf::assets
             name("assets_catalog")
         { }
 
-        AssetCatalog(const allocator_type& alloc) :
+        explicit AssetCatalog(const allocator_type& alloc) :
             name("assets_catalog", alloc)
         { }
 
-        AssetCatalog(serialization::Serializer serializer) :
+        explicit AssetCatalog(serialization::Serializer serializer) :
             name("assets_catalog"),
             serializer_(std::move(serializer))
         { }
