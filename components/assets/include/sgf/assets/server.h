@@ -84,6 +84,8 @@ namespace sgf::assets
 
             if(!std::filesystem::exists(actual_path))
             {
+                core::LogCallback::error(debug_output_, "Cannot find file. Path: '{}', asset type: '{}'",
+                                         path.generic_string(), core::typeName<AssetT>());
                 return std::unexpected(std::make_error_code(std::errc::no_such_file_or_directory));
             }
 
@@ -93,6 +95,8 @@ namespace sgf::assets
             auto* loader = storage.loader();
             if(!loader)
             {
+                core::LogCallback::error(debug_output_, "Cannot find loader. Path: '{}', asset type: '{}'",
+                                         path.generic_string(), core::typeName<AssetT>());
                 return std::unexpected(Error::kLoaderNotSpecified);
             }
 
