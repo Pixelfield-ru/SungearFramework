@@ -12,6 +12,13 @@
 
 namespace sgf::assets
 {
+    /// Result of claiming a slot for load. `load` is false when another caller already owns the load.
+    struct ClaimedSlot final
+    {
+        AssetSlotControl* slot {};
+        bool load = false;
+    };
+
     struct IAssetStorage
     {
         virtual ~IAssetStorage() = default;
@@ -20,6 +27,9 @@ namespace sgf::assets
         /// Finds a slot and adds one strong reference. Empty when the slot is missing or already released.
         [[nodiscard]] virtual AssetSlotControl* retainErasedSlot(AssetId asset_id) = 0;
         [[nodiscard]] virtual AssetSlotControl* acquireErasedSlot(AssetId asset_id) = 0;
+        /// Finds the slot or creates one. The returned slot already owns one strong reference.
+        /// `load` is true only for the caller that must perform the load. The slot is then already kLoading.
+        [[nodiscard]] virtual ClaimedSlot claimErasedSlot(AssetId asset_id) = 0;
         virtual void releaseSlot(AssetSlotControl* slot) = 0;
         [[nodiscard]] virtual IErasedAssetLoader* erasedLoader() = 0;
     };
@@ -96,29 +106,15 @@ namespace sgf::assets
         [[nodiscard]] AssetSlot<AssetT>* acquireSlot(AssetId asset_id) noexcept
         {
             std::unique_lock lock(mutex_);
-            auto& free_page = freePage();
-
-            const auto index = free_page.free_slots.back();
-            free_page.free_slots.pop_back();
-
-            PageSlotId slot_id;
-            slot_id.page_id = free_page.id;
-            slot_id.slot_id = index;
-            slots_mapping_[asset_id] = slot_id;
-
-            auto& slot = free_page.slots[index];
-            slot.id = asset_id;
-            slot.storage = this;
-            slot.insert(std::make_obj_using_allocator<AssetT>(get_allocator()));
-
-            return &slot;
+            return &insertNewSlot(asset_id);
         }
 
         /// Finds a slot and adds one strong reference. Empty when the slot is missing or already released.
         [[nodiscard]] AssetSlot<AssetT>* retainSlot(AssetId asset_id) noexcept
         {
-            AssetSlot<AssetT>* slot = nullptr;
-            std::uint32_t generation = 0;
+            AssetSlot<AssetT>* slot;
+            std::uint32_t generation;
+
             {
                 std::shared_lock lock(mutex_);
                 const auto it = slots_mapping_.find(asset_id);
@@ -132,6 +128,48 @@ namespace sgf::assets
             return slot;
         }
 
+        /// One lock covers find-or-create. A second load of the same id attaches to the slot already in kLoading.
+        [[nodiscard]] ClaimedSlot claimSlot(AssetId asset_id) noexcept
+        {
+            for(;;)
+            {
+                std::unique_lock lock(mutex_);
+                const auto it = slots_mapping_.find(asset_id);
+                if(it != slots_mapping_.end())
+                {
+                    auto& slot = pages_[it->second.page_id].slots[it->second.slot_id];
+
+                    const auto state = slot.state.load(std::memory_order_acquire);
+                    const bool start_load = state != AssetState::kLoaded && state != AssetState::kLoading;
+                    if(start_load) slot.state.store(AssetState::kLoading, std::memory_order_release);
+
+                    // fetch_sub in the destructor does not take this lock, so a plain increment can resurrect a slot
+                    auto refs = slot.strong_refs.load(std::memory_order_acquire);
+                    // we want to add a ref to an alive slot
+                    while(refs != 0)
+                    {
+                        if(slot.strong_refs.compare_exchange_weak(
+                            refs, refs + 1,
+                            std::memory_order_acq_rel,
+                            std::memory_order_acquire))
+                        {
+                            return { &slot, start_load };
+                        }
+                    }
+
+                    // refs hit 0. releaseSlot is waiting for this lock
+                    // continue is used to create the slot after release. see the cycle for(;;) above
+                    continue;
+                }
+
+                // insert new slot if slot was not found
+                auto& slot = insertNewSlot(asset_id);
+                slot.state.store(AssetState::kLoading, std::memory_order_release);
+                slot.incrementRefCounter();
+                return { &slot, true };
+            }
+        }
+
         [[nodiscard]] AssetSlotControl* retainErasedSlot(AssetId asset_id) noexcept override
         {
             return retainSlot(asset_id);
@@ -140,6 +178,11 @@ namespace sgf::assets
         [[nodiscard]] AssetSlotControl* acquireErasedSlot(AssetId asset_id) noexcept override
         {
             return acquireSlot(asset_id);
+        }
+
+        [[nodiscard]] ClaimedSlot claimErasedSlot(AssetId asset_id) noexcept override
+        {
+            return claimSlot(asset_id);
         }
 
         void releaseSlot(AssetSlotControl* slot) noexcept override
@@ -255,7 +298,7 @@ namespace sgf::assets
         core::UnorderedMap<AssetId, PageSlotId> slots_mapping_;
         core::UniquePtr<IAssetLoader<AssetT>> loader_;
         std::uint32_t page_size_ {};
-        /// Shared for find. Exclusive for acquire and release.
+        /// Shared for find. Exclusive for acquire, claim and release.
         mutable std::shared_mutex mutex_;
 
         void rebindStorage() noexcept
@@ -267,6 +310,27 @@ namespace sgf::assets
                     if(slot.storage) slot.storage = this;
                 }
             }
+        }
+
+        /// Caller holds the exclusive lock. The id must not already be mapped.
+        AssetSlot<AssetT>& insertNewSlot(AssetId asset_id)
+        {
+            auto& free_page = freePage();
+
+            const auto index = free_page.free_slots.back();
+            free_page.free_slots.pop_back();
+
+            PageSlotId slot_id;
+            slot_id.page_id = free_page.id;
+            slot_id.slot_id = index;
+            slots_mapping_[asset_id] = slot_id;
+
+            auto& slot = free_page.slots[index];
+            slot.id = asset_id;
+            slot.storage = this;
+            slot.insert(std::make_obj_using_allocator<AssetT>(get_allocator()));
+
+            return slot;
         }
 
         /// Caller holds the exclusive lock.

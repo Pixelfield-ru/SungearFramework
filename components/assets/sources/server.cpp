@@ -86,17 +86,6 @@ std::expected<sgf::assets::AnyHandle, std::error_code> sgf::assets::AssetServer:
         return std::unexpected(Error::kLoaderNotSpecified);
     }
 
-    auto* slot = storage->retainErasedSlot(asset_id);
-    // if slot is already exists then leave
-    if(slot && (slot->loaded() || slot->state == AssetState::kLoading))
-    {
-        AnyHandle handle;
-        handle.slot_ = slot;
-        handle.asset_id_ = asset_id;
-        handle.type_id_ = type_id;
-        return handle;
-    }
-
     // trying to find existing asset
     const auto file = catalog_.findFile(asset_id);
 
@@ -106,28 +95,22 @@ std::expected<sgf::assets::AnyHandle, std::error_code> sgf::assets::AssetServer:
         core::LogCallback::error(debug_output_,
                                  "Cannot find file in catalog. Asset ID: {}, type ID: {}",
                                  asset_id, type_id);
-
-        if(slot) slot->decrementRefCounter();
         return std::unexpected(Error::kUnknownAsset);
     }
 
     const auto root = catalog_.root();
 
-    // retainErasedSlot already owns one ref. A new slot starts at zero refs.
-    const bool retained = slot != nullptr;
-    if(!slot) slot = storage->acquireErasedSlot(asset_id);
+    // one lock finds or creates the slot and publishes kLoading before anyone else can acquire it
+    const auto claimed = storage->claimErasedSlot(asset_id);
+    auto* slot = claimed.slot;
 
     AnyHandle handle;
-    if(retained)
-    {
-        handle.slot_ = slot;
-        handle.asset_id_ = asset_id;
-        handle.type_id_ = type_id;
-    }
-    else
-    {
-        handle = AnyHandle(slot, type_id);
-    }
+    handle.slot_ = slot;
+    handle.asset_id_ = asset_id;
+    handle.type_id_ = type_id;
+
+    // the slot is already kLoading by other caller
+    if(!claimed.load) return handle;
 
     // if files is stored by path
     if(file->path && std::filesystem::exists(root / *file->path))
@@ -135,9 +118,12 @@ std::expected<sgf::assets::AnyHandle, std::error_code> sgf::assets::AssetServer:
         const auto actual_path = root / *file->path;
 
         // loading meta of the file near the file
-        if(const auto err = loader->loadMeta(actual_path, file->id)) return std::unexpected(err);
-
-        slot->state = AssetState::kLoading;
+        if(const auto err = loader->loadMeta(actual_path, file->id))
+        {
+            slot->error = err;
+            slot->state = AssetState::kFailed;
+            return std::unexpected(err);
+        }
 
         // loading asset by path
         // capture the handle to increase lifetime of the slot
@@ -168,7 +154,12 @@ std::expected<sgf::assets::AnyHandle, std::error_code> sgf::assets::AssetServer:
         // loading asset from archive. acquire finds an existing mapping or creates one
         auto& archive = catalog_.acquireArchive(file->baked->archive);
 
-        if(const auto err = archive.open(std::ios::in)) return std::unexpected(err);
+        if(const auto err = archive.open(std::ios::in))
+        {
+            slot->error = err;
+            slot->state = AssetState::kFailed;
+            return std::unexpected(err);
+        }
 
         const auto archive_bytes = archive.bytes();
 
@@ -183,6 +174,8 @@ std::expected<sgf::assets::AnyHandle, std::error_code> sgf::assets::AssetServer:
                                      "Invalid baked file. Archive: '{}', asset ID: {}, type ID: {}",
                                      archive.path().generic_string(),
                                      asset_id, type_id);
+            slot->error = std::make_error_code(std::errc::result_out_of_range);
+            slot->state = AssetState::kFailed;
             return std::unexpected(std::make_error_code(std::errc::result_out_of_range));
         }
 
@@ -194,6 +187,8 @@ std::expected<sgf::assets::AnyHandle, std::error_code> sgf::assets::AssetServer:
                                      "No bytes for asset. Archive: '{}', asset ID: {}, type ID: {}",
                                      archive.path().generic_string(),
                                      asset_id, type_id);
+            slot->error = std::make_error_code(std::errc::result_out_of_range);
+            slot->state = AssetState::kFailed;
             return std::unexpected(std::make_error_code(std::errc::result_out_of_range));
         }
 
@@ -209,6 +204,8 @@ std::expected<sgf::assets::AnyHandle, std::error_code> sgf::assets::AssetServer:
                                      "Invalid header of asset. Archive: '{}', asset ID: {}, type ID: {}",
                                      archive.path().generic_string(),
                                      asset_id, type_id);
+            slot->error = std::make_error_code(std::errc::result_out_of_range);
+            slot->state = AssetState::kFailed;
             return std::unexpected(std::make_error_code(std::errc::result_out_of_range));
         }
 
@@ -220,6 +217,8 @@ std::expected<sgf::assets::AnyHandle, std::error_code> sgf::assets::AssetServer:
                                      "Invalid dependencies block. Archive: '{}', asset ID: {}, type ID: {}",
                                      archive.path().generic_string(),
                                      asset_id, type_id);
+            slot->error = std::make_error_code(std::errc::result_out_of_range);
+            slot->state = AssetState::kFailed;
             return std::unexpected(std::make_error_code(std::errc::result_out_of_range));
         }
 
@@ -230,9 +229,6 @@ std::expected<sgf::assets::AnyHandle, std::error_code> sgf::assets::AssetServer:
             static_cast<std::size_t>(header.dependencies_block_size));
 
         const auto allocator = get_allocator();
-
-        // a dependency that points back here must see this asset as already loading
-        slot->state = AssetState::kLoading;
 
         core::Vector<AnyHandle> dependencies(allocator);
         const auto dependency_count = header.dependencies_block_size / handle_stride;
@@ -325,6 +321,8 @@ std::expected<sgf::assets::AnyHandle, std::error_code> sgf::assets::AssetServer:
                              "The asset was saved using unknown way. Asset ID: {}, type ID: {}",
                              asset_id, type_id);
 
+    slot->error = Error::kUnknownStorageType;
+    slot->state = AssetState::kFailed;
     return std::unexpected(Error::kUnknownStorageType);
 }
 

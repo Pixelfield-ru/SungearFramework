@@ -121,36 +121,16 @@ namespace sgf::assets
                 if(const auto err = loader->loadMeta(actual_path, file_id)) return std::unexpected(err);
             }
 
-            auto* slot = storage.retainSlot(file_id);
-            // if slot is already exists then leave
-            if(slot && (slot->loaded() || slot->state == AssetState::kLoading))
-            {
-                Handle<AssetT> handle;
-                handle.slot_ = slot;
-                handle.asset_id_ = file_id;
-                handle.type_id_ = type;
-
-                return handle;
-            }
-
-            // retainSlot already owns one ref. a new slot starts at zero refs
-            const bool retained = slot != nullptr;
-            if(!slot) slot = storage.acquireSlot(file_id);
+            const auto claimed = storage.claimSlot(file_id);
+            auto* slot = static_cast<AssetSlot<AssetT>*>(claimed.slot);
 
             Handle<AssetT> handle;
-            if(retained)
-            {
-                handle.slot_ = slot;
-                handle.asset_id_ = file_id;
-                handle.type_id_ = type;
-            }
-            else
-            {
-                // add one reference to a slot
-                handle = Handle<AssetT>(slot, type);
-            }
+            handle.slot_ = slot;
+            handle.asset_id_ = file_id;
+            handle.type_id_ = type;
 
-            slot->state = AssetState::kLoading;
+            // the slot is already kLoading by other caller
+            if(!claimed.load) return handle;
 
             // capture the handle to increase lifetime of the slot
             if(const auto err = postTracked([loader, actual_path, handle] {
@@ -226,7 +206,7 @@ namespace sgf::assets
 
         template<typename AssetT>
         requires(std::is_copy_constructible_v<AssetT>)
-        Handle<AssetT> copy(const Handle<AssetT>& source) noexcept
+        Handle<AssetT> copy(Handle<AssetT> source) noexcept
         {
             const auto* asset = source.get();
             // kLoading and kFailed have no finished value to copy

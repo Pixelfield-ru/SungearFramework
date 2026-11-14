@@ -56,6 +56,7 @@ namespace sgf::assets
             ++strong_refs;
         }
 
+        /// Needs to prevent adding a strong ref in object that has 0 strong refs.
         [[nodiscard]] bool tryAddStrongRef(std::uint32_t expected_generation) noexcept;
 
         void decrementRefCounter() noexcept;
