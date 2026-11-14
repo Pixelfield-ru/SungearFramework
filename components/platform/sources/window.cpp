@@ -138,10 +138,7 @@ std::error_code sgf::platform::Window::create(const WindowCreateInfo& create_inf
                                             create_info.fullscreen ? glfwGetPrimaryMonitor() : nullptr, nullptr);
     if (!impl->handle)
     {
-        if(output.debug_output_)
-        {
-            (*output.debug_output_)(core::LogLevel::kError, "Cannot create GLFW window.");
-        }
+        core::LogCallback::error(output.debug_output_, "Cannot create GLFW window.");
         return GLFWError::kCannotCreateWindow;
     }
 

@@ -13,6 +13,7 @@
 
 #include <atomic>
 #include <functional>
+#include <shared_mutex>
 
 #include "storage.h"
 #include "catalog.h"
@@ -50,15 +51,8 @@ namespace sgf::assets
             posted_(core::makeShared<PostedJobs>(alloc))
         { }
         AssetServer(const AssetServer&) = delete;
-        AssetServer(AssetServer&&) = default;
-        AssetServer(AssetServer&& other, const allocator_type& alloc) noexcept :
-            storages_map_(std::move(other.storages_map_), alloc),
-            catalog_(std::move(other.catalog_), alloc),
-            page_size_(other.page_size_),
-            debug_output_(other.debug_output_),
-            thread_pool_(other.thread_pool_),
-            posted_(std::move(other.posted_))
-        { }
+        AssetServer(AssetServer&& other) noexcept;
+        AssetServer(AssetServer&& other, const allocator_type& alloc) noexcept;
         ~AssetServer();
 
         /**
@@ -82,10 +76,11 @@ namespace sgf::assets
         template<typename AssetT>
         std::expected<Handle<AssetT>, std::error_code> load(const std::filesystem::path& path) noexcept
         {
-            const auto key = core::normalizedRelativePath(catalog_.path / path, catalog_.path);
+            const auto root = catalog_.root();
+            const auto key = core::normalizedRelativePath(root / path, root);
             if(!key) return std::unexpected(key.error());
 
-            const auto actual_path = catalog_.path / *key;
+            const auto actual_path = root / *key;
 
             if(!std::filesystem::exists(actual_path))
             {
@@ -101,35 +96,34 @@ namespace sgf::assets
                 return std::unexpected(Error::kLoaderNotSpecified);
             }
 
-            // trying to find existing asset
-            auto* file = catalog_.findFile(*key);
-
-            // if file was not found then creating new file in catalog
-            if(!file)
+            // one catalog lock covers the find-or-create, so two loads of the same path share one row
+            const auto acquired = catalog_.acquireFile(*key);
+            const auto file_id = acquired.file.id;
+            // if new file was created in the catalog
+            if(acquired.created)
             {
-                // acquire new id for new asset
-                file = &catalog_.acquireFile(*key);
-                file->type_id = type;
+                // set the type id for new file
+                catalog_.setTypeId(file_id, type);
 
                 // saving catalog to file
                 if(const auto err = catalog_.save()) return std::unexpected(err);
 
                 // writing meta of the file near the file
-                if(const auto err = loader->writeMeta(actual_path, file->id)) return std::unexpected(err);
+                if(const auto err = loader->writeMeta(actual_path, file_id)) return std::unexpected(err);
             }
             else
             {
                 // load meta of the file near the file
-                if(const auto err = loader->loadMeta(actual_path, file->id)) return std::unexpected(err);
+                if(const auto err = loader->loadMeta(actual_path, file_id)) return std::unexpected(err);
             }
 
-            auto* slot = storage.retainSlot(file->id);
+            auto* slot = storage.retainSlot(file_id);
             // if slot is already exists then leave
             if(slot && (slot->loaded() || slot->state == AssetState::kLoading))
             {
                 Handle<AssetT> handle;
                 handle.slot_ = slot;
-                handle.asset_id_ = file->id;
+                handle.asset_id_ = file_id;
                 handle.type_id_ = type;
 
                 return handle;
@@ -137,13 +131,13 @@ namespace sgf::assets
 
             // retainSlot already owns one ref. a new slot starts at zero refs
             const bool retained = slot != nullptr;
-            if(!slot) slot = storage.acquireSlot(file->id);
+            if(!slot) slot = storage.acquireSlot(file_id);
 
             Handle<AssetT> handle;
             if(retained)
             {
                 handle.slot_ = slot;
-                handle.asset_id_ = file->id;
+                handle.asset_id_ = file_id;
                 handle.type_id_ = type;
             }
             else
@@ -193,8 +187,7 @@ namespace sgf::assets
          */
         std::error_code reload(const AnyHandle& handle) noexcept;
 
-
-        std::error_code bake(const AnyHandle& handle, std::filesystem::path archive, std::int32_t compression_level);
+        std::error_code bake(const AnyHandle& handle, const std::filesystem::path& archive, std::int32_t compression_level);
 
         template<typename AssetT>
         Handle<AssetT> find(AssetId asset_id) noexcept
@@ -238,8 +231,8 @@ namespace sgf::assets
             auto& storage = this->storage<AssetT>();
             static const auto type_id = core::registerStableType<AssetStorage<AssetT>>();
 
-            auto& new_file = catalog_.acquireFile();
-            new_file.type_id = type_id;
+            const auto new_file = catalog_.acquireFile();
+            catalog_.setTypeId(new_file.id, type_id);
             // get new slot for asset
             auto* slot = storage.acquireSlot(new_file.id);
             // creating new asset using copy constructor with allocator
@@ -253,12 +246,14 @@ namespace sgf::assets
         }
 
         template<typename AssetT>
-        AssetStorage<AssetT>& storage() noexcept
+        AssetStorage<AssetT>& storage()
         {
             using Storage = AssetStorage<AssetT>;
 
             core::registerStableType<Storage>();
 
+            // hasType and emplace stay one critical section: two callers must not both insert Storage
+            std::unique_lock lock(storages_mutex_);
             if(storages_map_.hasType<Storage>())
             {
                 return storages_map_.write<Storage>();
@@ -268,24 +263,27 @@ namespace sgf::assets
             return storage;
         }
 
-        IAssetStorage* storage(std::uint32_t type_id) noexcept
+        IAssetStorage* storage(std::uint32_t type_id)
         {
+            std::shared_lock lock(storages_mutex_);
             if(!storages_map_.hasType(type_id))
             {
                 return {};
             }
 
+            // the storage object stays on the heap, so the pointer outlives this lock
             return static_cast<IAssetStorage*>(storages_map_.erased(type_id));
         }
 
         template<typename AssetT>
-        const AssetStorage<AssetT>& storage() const noexcept
+        const AssetStorage<AssetT>& storage() const
         {
             return const_cast<AssetServer*>(this)->storage<AssetT>();
         }
 
-        [[nodiscard]] allocator_type get_allocator() const noexcept
+        [[nodiscard]] allocator_type get_allocator() const
         {
+            std::shared_lock lock(storages_mutex_);
             return storages_map_.get_allocator();
         }
 
@@ -299,6 +297,7 @@ namespace sgf::assets
         {
             core::Vector<std::byte> output_bytes;
             core::UnorderedSet<AssetId> baked_assets;
+            core::Vector<AssetCatalog::BakedAsset> baked_data;
             std::filesystem::path archive_path;
             std::int32_t compression_level {};
         };
@@ -309,6 +308,7 @@ namespace sgf::assets
         static void finishPosted(const core::SharedPtr<PostedJobs>& posted) noexcept;
 
         mutable core::TypeMap storages_map_;
+        mutable std::shared_mutex storages_mutex_;
         AssetCatalog catalog_;
         size_t page_size_ {};
 

@@ -22,7 +22,7 @@ std::error_code sgf::platform::Platform::init() noexcept
 
     if(!glfwInit())
     {
-        if(debug_output_) (*debug_output_)(core::LogLevel::kError, "Cannot init GLFW library");
+        core::LogCallback::error(debug_output_, "Cannot init GLFW library");
         return GLFWError::kCannotInitGLFW;
     }
 
@@ -70,11 +70,8 @@ void sgf::platform::Platform::removeWindow(Window* window) noexcept
 
 void sgf::platform::Platform::glfwErrorCallback(int level, const char* description) noexcept
 {
-    auto* output = platform().debug_output_;
-    if(output)
-    {
-        (*output)(core::LogLevel::kError, description);
-    }
+    // todo: use level
+    core::LogCallback::error(platform().debug_output_, description);
 }
 
 sgf::platform::Platform& sgf::platform::platform() noexcept

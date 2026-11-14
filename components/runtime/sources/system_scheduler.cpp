@@ -27,12 +27,9 @@ std::error_code sgf::runtime::SystemScheduler::create(SystemSchedulerCreateInfo 
     {
         if(schedule.interval == std::chrono::nanoseconds::zero())
         {
-            if(output.create_info_.debug_output)
-            {
-                (*output.create_info_.debug_output)(core::LogLevel::kError,
-                                                    std::format("Schedule {} has zero interval",
-                                                                std::to_underlying(schedule.type)));
-            }
+            core::LogCallback::error(output.create_info_.debug_output,
+                                     "Schedule {} has zero interval",
+                                     std::to_underlying(schedule.type));
             return Error::kInvalidScheduleInterval;
         }
 
@@ -47,12 +44,9 @@ std::error_code sgf::runtime::SystemScheduler::create(SystemSchedulerCreateInfo 
         const auto& schedule = output.schedules_[system->schedule()];
         if(schedule.interval == std::chrono::nanoseconds::zero())
         {
-            if(output.create_info_.debug_output)
-            {
-                (*output.create_info_.debug_output)(core::LogLevel::kError,
-                                                    std::format("Schedule {} has zero interval",
-                                                                std::to_underlying(schedule.type)));
-            }
+            core::LogCallback::error(output.create_info_.debug_output,
+                                     "Schedule {} has zero interval",
+                                     std::to_underlying(schedule.type));
             return Error::kInvalidScheduleInterval;
         }
     }
@@ -74,12 +68,9 @@ void sgf::runtime::SystemScheduler::run()
     {
         if(const auto execution_res = runImpl(first_time))
         {
-            if(create_info_.debug_output)
-            {
-                (*create_info_.debug_output)(core::LogLevel::kError,
-                                             std::format("Unexpected error while running scheduler: {}",
-                                                         execution_res.message()));
-            }
+            core::LogCallback::error(create_info_.debug_output,
+                                     "Unexpected error while running scheduler: {}",
+                                     execution_res.message());
         }
 
         first_time = false;

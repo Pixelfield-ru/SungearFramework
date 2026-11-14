@@ -5,6 +5,7 @@
 #include "sgf/assets/archive.h"
 
 #include <limits>
+#include <mutex>
 
 #if SGF_PLATFORM_OS_WINDOWS
 #ifndef WIN32_LEAN_AND_MEAN
@@ -20,12 +21,15 @@
 
 sgf::assets::Archive::~Archive()
 {
-    std::ignore = close();
+    std::unique_lock lock(mutex_);
+    std::ignore = unmap();
 }
 
-sgf::assets::Archive::Archive(Archive&& other) noexcept :
-    path_(std::move(other.path_))
+sgf::assets::Archive::Archive(Archive&& other) noexcept
 {
+    std::unique_lock lock(other.mutex_);
+    path_ = std::move(other.path_);
+
 #if SGF_PLATFORM_OS_WINDOWS
     view_ = other.view_;
     mapping_ = other.mapping_;
@@ -40,7 +44,11 @@ sgf::assets::Archive& sgf::assets::Archive::operator=(Archive&& other) noexcept
 {
     if(this == &other) return *this;
 
-    std::ignore = close();
+    std::unique_lock lock(mutex_, std::defer_lock);
+    std::unique_lock other_lock(other.mutex_, std::defer_lock);
+    std::lock(lock, other_lock);
+
+    std::ignore = unmap();
     path_ = std::move(other.path_);
 
 #if SGF_PLATFORM_OS_WINDOWS
@@ -55,9 +63,57 @@ sgf::assets::Archive& sgf::assets::Archive::operator=(Archive&& other) noexcept
     return *this;
 }
 
+bool sgf::assets::Archive::hasView() const noexcept
+{
+#if SGF_PLATFORM_OS_WINDOWS
+    return view_ != nullptr;
+#else
+    return false;
+#endif
+}
+
+std::span<const std::byte> sgf::assets::Archive::mappedBytes() const noexcept
+{
+#if SGF_PLATFORM_OS_WINDOWS
+    return { static_cast<std::byte const*>(view_), size_ };
+#else
+    return {};
+#endif
+}
+
+std::error_code sgf::assets::Archive::unmap()
+{
+#if SGF_PLATFORM_OS_WINDOWS
+    std::error_code error;
+    if(view_)
+    {
+        if(!::UnmapViewOfFile(view_))
+        {
+            error = { static_cast<int>(::GetLastError()), std::system_category() };
+        }
+        view_ = {};
+    }
+
+    if(mapping_)
+    {
+        if(!::CloseHandle(static_cast<HANDLE>(mapping_)) && !error)
+        {
+            error = { static_cast<int>(::GetLastError()), std::system_category() };
+        }
+        mapping_ = {};
+    }
+
+    size_ = 0;
+    return error;
+#else
+    return {};
+#endif
+}
+
 std::error_code sgf::assets::Archive::open(std::ios_base::openmode mode)
 {
-    if(opened()) return {};
+    std::unique_lock lock(mutex_);
+    if(hasView()) return {};
 
 #if SGF_PLATFORM_OS_WINDOWS
     if(path_.empty()) return std::make_error_code(std::errc::invalid_argument);
@@ -149,52 +205,24 @@ std::error_code sgf::assets::Archive::open(std::ios_base::openmode mode)
 
 std::error_code sgf::assets::Archive::close()
 {
-#if SGF_PLATFORM_OS_WINDOWS
-    std::error_code error;
-    if(view_)
-    {
-        if(!::UnmapViewOfFile(view_))
-        {
-            error = { static_cast<int>(::GetLastError()), std::system_category() };
-        }
-        view_ = {};
-    }
-
-    if(mapping_)
-    {
-        if(!::CloseHandle(static_cast<HANDLE>(mapping_)) && !error)
-        {
-            error = { static_cast<int>(::GetLastError()), std::system_category() };
-        }
-        mapping_ = {};
-    }
-
-    size_ = 0;
-    return error;
-#elif SGF_PLATFORM_OS_LINUX
-#endif
-    return {};
+    std::unique_lock lock(mutex_);
+    return unmap();
 }
 
-bool sgf::assets::Archive::opened() const noexcept
+bool sgf::assets::Archive::opened() const
 {
-#if SGF_PLATFORM_OS_WINDOWS
-    return view_ != nullptr;
-#elif SGF_PLATFORM_OS_LINUX
-    return false;
-#endif
+    std::shared_lock lock(mutex_);
+    return hasView();
 }
 
-std::span<const std::byte> sgf::assets::Archive::bytes() const noexcept
+std::span<const std::byte> sgf::assets::Archive::bytes() const
 {
-#if SGF_PLATFORM_OS_WINDOWS
-    return { static_cast<std::byte const*>(view_), size_ };
-#elif SGF_PLATFORM_OS_LINUX
-    return {};
-#endif
+    std::shared_lock lock(mutex_);
+    return mappedBytes();
 }
 
-std::filesystem::path sgf::assets::Archive::path() const noexcept
+std::filesystem::path sgf::assets::Archive::path() const
 {
+    std::shared_lock lock(mutex_);
     return path_;
 }

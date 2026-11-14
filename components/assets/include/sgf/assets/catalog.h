@@ -6,6 +6,8 @@
 
 #include <filesystem>
 #include <optional>
+#include <shared_mutex>
+#include <span>
 
 #include "slot.h"
 
@@ -39,26 +41,38 @@ namespace sgf::assets
             std::optional<Baked> baked;
         };
 
+        /// Result of acquiring a catalog row by path. `created` is false when that path already had a row.
+        struct AcquiredFile final
+        {
+            File file;
+            bool created = false;
+        };
+
+        /// Baked file location without the archive path. One bake shares a single archive.
+        struct BakedAsset final
+        {
+            AssetId asset_id {};
+            std::size_t offset {};
+            std::size_t size {};
+        };
+
         using allocator_type = std::pmr::polymorphic_allocator<>;
 
-        core::String name;
-        std::filesystem::path path;
-
         AssetCatalog() :
-            name("assets_catalog")
+            name_("assets_catalog")
         { }
 
         explicit AssetCatalog(const allocator_type& alloc) :
-            name("assets_catalog", alloc)
+            name_("assets_catalog", alloc)
         { }
 
         explicit AssetCatalog(serialization::Serializer serializer) :
-            name("assets_catalog"),
+            name_("assets_catalog"),
             serializer_(std::move(serializer))
         { }
 
         AssetCatalog(serialization::Serializer serializer, const allocator_type& alloc) :
-            name("assets_catalog", alloc),
+            name_("assets_catalog", alloc),
             files_(alloc),
             archives_(alloc),
             archives_mapping_(alloc),
@@ -66,84 +80,42 @@ namespace sgf::assets
             files_mapping_ids_(alloc),
             serializer_(std::move(serializer))
         { }
-        AssetCatalog(const AssetCatalog& other) :
-            name(other.name),
-            next_asset_id_(other.next_asset_id_.load()),
-            path(other.path),
-            files_(other.files_),
-            files_mapping_(other.files_mapping_),
-            files_mapping_ids_(other.files_mapping_ids_),
-            serializer_(other.serializer_)
-        { }
-        AssetCatalog(const AssetCatalog& other, const allocator_type& alloc) :
-            name(other.name, alloc),
-            next_asset_id_(other.next_asset_id_.load()),
-            path(other.path),
-            files_(other.files_, alloc),
-            archives_(alloc),
-            archives_mapping_(alloc),
-            files_mapping_(other.files_mapping_, alloc),
-            files_mapping_ids_(other.files_mapping_ids_, alloc),
-            serializer_(other.serializer_, alloc)
-        { }
-        AssetCatalog(AssetCatalog&& other) noexcept :
-            name(std::move(other.name)),
-            next_asset_id_(other.next_asset_id_.load()),
-            path(std::move(other.path)),
-            files_(std::move(other.files_)),
-            archives_(std::move(other.archives_)),
-            archives_mapping_(std::move(other.archives_mapping_)),
-            files_mapping_(std::move(other.files_mapping_)),
-            files_mapping_ids_(std::move(other.files_mapping_ids_)),
-            serializer_(std::move(other.serializer_))
-        {
-            other.next_asset_id_ = 0;
-        }
-        AssetCatalog(AssetCatalog&& other, const allocator_type& alloc) noexcept :
-            name(std::move(other.name), alloc),
-            next_asset_id_(other.next_asset_id_.load()),
-            path(std::move(other.path)),
-            files_(std::move(other.files_), alloc),
-            archives_(std::move(other.archives_), alloc),
-            archives_mapping_(std::move(other.archives_mapping_), alloc),
-            files_mapping_(std::move(other.files_mapping_), alloc),
-            files_mapping_ids_(std::move(other.files_mapping_ids_), alloc),
-            serializer_(std::move(other.serializer_), alloc)
-        {
-            other.next_asset_id_ = 0;
-        }
+        AssetCatalog(const AssetCatalog& other);
+        AssetCatalog(const AssetCatalog& other, const allocator_type& alloc);
+        AssetCatalog(AssetCatalog&& other) noexcept;
+        AssetCatalog(AssetCatalog&& other, const allocator_type& alloc) noexcept;
 
         /**
-         * Get file by path.
-         * @param file_path Path of file to get.
-         * @return File. Do not store this pointer.
+         * Copy of the row for this path. Empty when the path is not in the catalog.
+         * The copy stays valid after the catalog lock is released.
          */
-        File const* findFile(const std::filesystem::path& file_path) const noexcept;
+        [[nodiscard]] std::optional<File> findFile(const std::filesystem::path& file_path) const;
         /**
-        * Get file by path.
-        * @param file_path Path of file to get.
-        * @return File. Do not store this pointer.
-        */
-        File* findFile(const std::filesystem::path& file_path) noexcept;
+         * Copy of the row for this id. Empty when the id is not in the catalog.
+         * The copy stays valid after the catalog lock is released.
+         */
+        [[nodiscard]] std::optional<File> findFile(AssetId id) const;
 
-        /**
-        * Get file by asset ID.
-        * @param id ID of asset.
-        * @return File. Do not store this pointer.
-        */
-        File* findFile(AssetId id) noexcept;
-        /**
-       * Get file by asset ID.
-       * @param id ID of asset.
-       * @return File. Do not store this pointer.
-       */
-        File const* findFile(AssetId id) const noexcept;
+        [[nodiscard]] bool hasFile(AssetId id) const noexcept;
 
-        Archive* findArchive(const std::filesystem::path& archive_path) noexcept;
+        /// Archive object for this path. Stays allocated until the catalog is reloaded or destroyed.
+        Archive* findArchive(const std::filesystem::path& archive_path);
 
-        File& acquireFile(std::filesystem::path file_path);
-        File& acquireFile();
+        /// Finds the row for this path or creates one. Creation is serialized with other catalog writes.
+        AcquiredFile acquireFile(std::filesystem::path file_path);
+        /// Creates a row without a path.
+        File acquireFile();
+        /// Finds the archive for this path or creates a closed one.
         Archive& acquireArchive(std::filesystem::path archive_path);
+
+        void setTypeId(AssetId id, std::int64_t type_id);
+        /// Writes the baked location of an existing row. False when the id is missing.
+        bool setBaked(AssetId id, File::Baked baked);
+        /// Writes every location under one lock. False when any id is missing, and then no row is changed.
+        bool setBaked(const std::filesystem::path& archive, std::span<const BakedAsset> assets);
+
+        [[nodiscard]] std::filesystem::path root() const;
+        void setRoot(std::filesystem::path root);
 
         /**
          * Writes catalog information in file by AssetCatalog::path.
@@ -152,47 +124,15 @@ namespace sgf::assets
         std::error_code save();
         std::error_code load();
 
-        [[nodiscard]] bool exists() const noexcept;
+        [[nodiscard]] bool exists() const;
 
         [[nodiscard]] allocator_type get_allocator() const noexcept
         {
             return files_.get_allocator();
         }
 
-        AssetCatalog& operator=(const AssetCatalog& other)
-        {
-            if(this == std::addressof(other)) return *this;
-
-            name = other.name;
-            next_asset_id_ = other.next_asset_id_.load();
-            path = other.path;
-            files_ = other.files_;
-            archives_.clear();
-            archives_mapping_.clear();
-            files_mapping_ = other.files_mapping_;
-            files_mapping_ids_ = other.files_mapping_ids_;
-            serializer_ = other.serializer_;
-
-            return *this;
-        }
-
-        AssetCatalog& operator=(AssetCatalog&& other) noexcept
-        {
-            if(this == std::addressof(other)) return *this;
-
-            name = std::move(other.name);
-            next_asset_id_ = other.next_asset_id_.load();
-            other.next_asset_id_ = 0;
-            path = std::move(other.path);
-            files_ = std::move(other.files_);
-            archives_ = std::move(other.archives_);
-            archives_mapping_ = std::move(other.archives_mapping_);
-            files_mapping_ = std::move(other.files_mapping_);
-            files_mapping_ids_ = std::move(other.files_mapping_ids_);
-            serializer_ = std::move(other.serializer_);
-
-            return *this;
-        }
+        AssetCatalog& operator=(const AssetCatalog& other);
+        AssetCatalog& operator=(AssetCatalog&& other) noexcept;
 
     private:
         std::atomic<AssetId> next_asset_id_ = 1;
@@ -202,5 +142,10 @@ namespace sgf::assets
         core::UnorderedMap<std::filesystem::path, std::size_t> files_mapping_;
         core::UnorderedMap<AssetId, std::size_t> files_mapping_ids_;
         serialization::Serializer serializer_;
+
+        core::String name_;
+        std::filesystem::path path_;
+
+        mutable std::shared_mutex mutex_;
     };
 }

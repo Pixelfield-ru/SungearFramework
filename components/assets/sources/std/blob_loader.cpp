@@ -15,7 +15,10 @@ std::error_code sgf::assets::BlobLoader::loadSource(const std::filesystem::path&
     return {};
 }
 
-std::error_code sgf::assets::BlobLoader::loadBaked(std::span<const std::byte> bytes, Blob& asset)
+std::error_code sgf::assets::BlobLoader::loadBaked(
+    std::span<const std::byte> bytes,
+    std::span<const AnyHandle>,
+    Blob& asset)
 {
     asset.bytes.assign(bytes.begin(), bytes.end());
     return {};

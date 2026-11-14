@@ -13,7 +13,9 @@ namespace sgf::assets
     struct BlobLoader final : IAssetLoader<Blob>
     {
         [[nodiscard]] std::error_code loadSource(const std::filesystem::path& source, Blob& asset) override;
-        [[nodiscard]] std::error_code loadBaked(std::span<const std::byte> bytes, Blob& asset) override;
+        [[nodiscard]] std::error_code loadBaked(std::span<const std::byte> bytes,
+                                                std::span<const AnyHandle> dependencies,
+                                                Blob& asset) override;
         [[nodiscard]] std::expected<BakeResult, std::error_code> saveBaked(const Blob& asset) override;
 
         [[nodiscard]] std::error_code loadMeta(const std::filesystem::path& source, AssetId id) override;

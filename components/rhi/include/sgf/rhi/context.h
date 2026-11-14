@@ -67,6 +67,8 @@ namespace sgf::rhi
     {
         using allocator_type = std::pmr::polymorphic_allocator<>;
 
+        const core::LogCallback* rhi_debug_output {};
+
         virtual ~IContext() = default;
 
         [[nodiscard]] virtual bool valid() const noexcept = 0;
@@ -75,16 +77,5 @@ namespace sgf::rhi
 
         [[nodiscard]] virtual std::expected<core::UniquePtr<ILogicalDevice>, std::error_code> createLogicalDevice(
             const LogicalDeviceCreateInfo& create_info, const allocator_type& alloc) noexcept = 0;
-
-        void printDebugMessage(core::LogLevel level, std::string_view msg) const noexcept
-        {
-            if(rhi_debug_output_)
-            {
-                (*rhi_debug_output_)(level, msg);
-            }
-        }
-
-    protected:
-        const core::LogCallback* rhi_debug_output_ {};
     };
 }

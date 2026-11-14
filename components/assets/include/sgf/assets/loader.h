@@ -26,7 +26,9 @@ namespace sgf::assets
     {
         virtual ~IErasedAssetLoader() = default;
         [[nodiscard]] virtual std::error_code loadSourceErased(const std::filesystem::path& source, std::byte* asset) = 0;
-        [[nodiscard]] virtual std::error_code loadBakedErased(std::span<const std::byte> source, std::byte* asset) = 0;
+        [[nodiscard]] virtual std::error_code loadBakedErased(std::span<const std::byte> source,
+                                                              std::span<const AnyHandle> dependencies,
+                                                              std::byte* asset) = 0;
         [[nodiscard]] virtual std::expected<BakeResult, std::error_code> saveBakedErased(std::byte const* asset) = 0;
 
         [[nodiscard]] virtual std::error_code loadMeta(const std::filesystem::path& source, AssetId id) = 0;
@@ -42,10 +44,14 @@ namespace sgf::assets
         {
             return loadSource(source, *reinterpret_cast<AssetT*>(asset));
         }
-        [[nodiscard]] virtual std::error_code loadBaked(std::span<const std::byte> bytes, AssetT& asset) = 0;
-        [[nodiscard]] std::error_code loadBakedErased(std::span<const std::byte> source, std::byte* asset) noexcept final
+        [[nodiscard]] virtual std::error_code loadBaked(std::span<const std::byte> bytes,
+                                                        std::span<const AnyHandle> dependencies,
+                                                        AssetT& asset) = 0;
+        [[nodiscard]] std::error_code loadBakedErased(std::span<const std::byte> source,
+                                                      std::span<const AnyHandle> dependencies,
+                                                      std::byte* asset) noexcept final
         {
-            return loadBaked(source, *reinterpret_cast<AssetT*>(asset));
+            return loadBaked(source, dependencies, *reinterpret_cast<AssetT*>(asset));
         }
         [[nodiscard]] virtual std::expected<BakeResult, std::error_code> saveBaked(const AssetT& asset) = 0;
         [[nodiscard]] std::expected<BakeResult, std::error_code> saveBakedErased(std::byte const* asset) noexcept final

@@ -63,7 +63,7 @@ namespace sgf::serialization
         static std::error_code serialize(Serializer& serializer, const assets::AssetCatalog& value)
         {
             if(const auto err = serializer.serializeField("next_asset_id", value.next_asset_id_)) return err;
-            if(const auto err = serializer.serializeField("path", value.path)) return err;
+            if(const auto err = serializer.serializeField("path", value.path_)) return err;
             if(const auto err = serializer.serializeField("files", value.files_)) return err;
 
             return {};
@@ -72,7 +72,7 @@ namespace sgf::serialization
         static std::error_code deserialize(Serializer& serializer, assets::AssetCatalog& value)
         {
             if(const auto err = serializer.deserializeField("next_asset_id", value.next_asset_id_)) return err;
-            if(const auto err = serializer.deserializeField("path", value.path)) return err;
+            if(const auto err = serializer.deserializeField("path", value.path_)) return err;
             if(const auto err = serializer.deserializeField("files", value.files_)) return err;
 
             value.files_mapping_.clear();
@@ -101,7 +101,7 @@ namespace sgf::serialization
                 const auto index = value.archives_.size();
                 value.archives_mapping_.emplace(file.baked->archive, index);
                 value.archives_.push_back(core::makeUnique<assets::Archive>(
-                    value.get_allocator(), value.path / file.baked->archive));
+                    value.get_allocator(), value.path_ / file.baked->archive));
             }
 
             return {};

@@ -36,12 +36,8 @@ std::error_code sgf::runtime::SystemGraph::build(
         for(const auto type : types)
         {
             if(context->resources.hasType(type)) continue;
-            if(logger)
-            {
-                (*logger)(core::LogLevel::kError,
-                          std::format("System '{}' {} missing type {}.",
-                                      typeid(system).name(), access, type));
-            }
+            core::LogCallback::error(logger, "System '{}' {} missing type {}.",
+                                     typeid(system).name(), access, type);
             return false;
         }
         return true;
@@ -154,12 +150,8 @@ std::error_code sgf::runtime::SystemGraph::build(
         const auto remaining = state.remaining[node.index];
         if(remaining == 0) continue;
 
-        if(logger)
-        {
-            (*logger)(core::LogLevel::kError,
-                      std::format("Graph is cyclic. System {} has {} unfulfilled edges left.",
-                                  typeid(*node.system).name(), remaining));
-        }
+        core::LogCallback::error(logger, "Graph is cyclic. System {} has {} unfulfilled edges left.",
+                                 typeid(*node.system).name(), remaining);
 
         return Error::kCyclicSystemGraph;
     }

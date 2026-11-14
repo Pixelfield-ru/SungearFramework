@@ -72,7 +72,7 @@ sgf::rhi::VulkanContext::VulkanContext(VulkanContext&& other) noexcept :
     enabled_validation_layers_(std::move(other.enabled_validation_layers_)),
     enabled_extensions_(std::move(other.enabled_extensions_))
 {
-    rhi_debug_output_ = std::exchange(other.rhi_debug_output_, {});
+    rhi_debug_output = std::exchange(other.rhi_debug_output, {});
 }
 
 sgf::rhi::VulkanContext::VulkanContext(VulkanContext&& other, const allocator_type& allocator) :
@@ -85,7 +85,7 @@ sgf::rhi::VulkanContext::VulkanContext(VulkanContext&& other, const allocator_ty
     enabled_validation_layers_(std::move(other.enabled_validation_layers_), allocator),
     enabled_extensions_(std::move(other.enabled_extensions_), allocator)
 {
-    rhi_debug_output_ = std::exchange(other.rhi_debug_output_, {});
+    rhi_debug_output = std::exchange(other.rhi_debug_output, {});
 }
 
 sgf::rhi::VulkanContext::~VulkanContext() noexcept
@@ -102,7 +102,7 @@ std::error_code sgf::rhi::VulkanContext::create(VulkanContextCreateInfo create_i
     output.allocator_ = std::move(create_info.allocator);
     output.enabled_extensions_ = std::move(create_info.extensions);
     output.enabled_validation_layers_ = std::move(create_info.validation_layers);
-    output.rhi_debug_output_ = std::exchange(create_info.rhi_debug_output, {});
+    output.rhi_debug_output = std::exchange(create_info.rhi_debug_output, {});
 
     // getting count of extensions that are supported by instance
     uint32_t extension_count = 0;
@@ -385,7 +385,7 @@ sgf::rhi::VulkanContext& sgf::rhi::VulkanContext::operator=(VulkanContext&& othe
     messenger_ = std::exchange(other.messenger_, VK_NULL_HANDLE);
     enabled_validation_layers_ = std::move(other.enabled_validation_layers_);
     enabled_extensions_ = std::move(other.enabled_extensions_);
-    rhi_debug_output_ = std::exchange(other.rhi_debug_output_, {});
+    rhi_debug_output = std::exchange(other.rhi_debug_output, {});
 
     return *this;
 }

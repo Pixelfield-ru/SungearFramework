@@ -23,7 +23,7 @@ std::error_code sgf::rhi::SlangShaderCompiler::compileShader(const IContext& con
     if(!slang_shader)
     {
         const auto msg = std::format("Cannot compile shader '{}': incompatible compiler.", core::pathToUtf8(shader_path));
-        context.printDebugMessage(core::LogLevel::kError, msg);
+        core::LogCallback::error(context.rhi_debug_output, msg);
         return core::Error::kInvalidArgument;
     }
 
@@ -100,7 +100,7 @@ std::error_code sgf::rhi::SlangShaderCompiler::compileShader(const IContext& con
                 core::pathToUtf8(shader_path),
                 diagnostics_blob ? (const char*) diagnostics_blob->getBufferPointer() : "no diagnostics provided");
 
-            context.printDebugMessage(core::LogLevel::kError, msg);
+            core::LogCallback::error(context.rhi_debug_output, msg);
             return SlangError::kCannotLoadShader;
         }
 
@@ -125,7 +125,7 @@ std::error_code sgf::rhi::SlangShaderCompiler::compileShader(const IContext& con
                 stage.entry_point_name,
                 core::pathToUtf8(shader_path));
 
-            context.printDebugMessage(core::LogLevel::kTrace, msg);
+            core::LogCallback::trace(context.rhi_debug_output, msg);
         }
 
         return { stage, entry_point };
@@ -166,7 +166,7 @@ std::error_code sgf::rhi::SlangShaderCompiler::compileShader(const IContext& con
                 core::pathToUtf8(shader_path),
                 diagnostics_blob ? (const char*) diagnostics_blob->getBufferPointer() : "no diagnostics provided");
 
-            context.printDebugMessage(core::LogLevel::kError, msg);
+            core::LogCallback::error(context.rhi_debug_output, msg);
 
             return SlangError::kCannotComposeShader;
         }
@@ -187,7 +187,7 @@ std::error_code sgf::rhi::SlangShaderCompiler::compileShader(const IContext& con
                 core::pathToUtf8(shader_path),
                 diagnostics_blob ? (const char*) diagnostics_blob->getBufferPointer() : "no diagnostics provided");
 
-            context.printDebugMessage(core::LogLevel::kError, msg);
+            core::LogCallback::error(context.rhi_debug_output, msg);
 
             return SlangError::kCannotLinkShader;
         }
@@ -211,7 +211,7 @@ std::error_code sgf::rhi::SlangShaderCompiler::compileShader(const IContext& con
                 core::pathToUtf8(shader_path),
                 diagnostics_blob ? (const char*) diagnostics_blob->getBufferPointer() : "no diagnostics provided");
 
-                context.printDebugMessage(core::LogLevel::kError, msg);
+                core::LogCallback::error(context.rhi_debug_output, msg);
 
                 return SlangError::kCannotCompileShader;
             }
