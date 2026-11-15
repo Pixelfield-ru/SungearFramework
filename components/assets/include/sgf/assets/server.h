@@ -10,6 +10,7 @@
 #include "sgf/core/log.h"
 #include "sgf/core/thread_pool.h"
 #include "sgf/core/utility/type_index.h"
+#include "sgf/core/utility/encoding.h"
 
 #include <atomic>
 #include <functional>
@@ -87,7 +88,7 @@ namespace sgf::assets
             if(!std::filesystem::exists(actual_path))
             {
                 core::LogCallback::error(debug_output_, "Cannot find file. Path: '{}', asset type: '{}'",
-                                         path.generic_string(), core::typeName<AssetT>());
+                                         core::pathToUtf8(path), core::typeName<AssetT>());
                 return std::unexpected(std::make_error_code(std::errc::no_such_file_or_directory));
             }
 
@@ -98,7 +99,7 @@ namespace sgf::assets
             if(!loader)
             {
                 core::LogCallback::error(debug_output_, "Cannot find loader. Path: '{}', asset type: '{}'",
-                                         path.generic_string(), core::typeName<AssetT>());
+                                         core::pathToUtf8(path), core::typeName<AssetT>());
                 return std::unexpected(Error::kLoaderNotSpecified);
             }
 

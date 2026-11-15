@@ -167,7 +167,7 @@ std::expected<sgf::assets::AnyHandle, std::error_code> sgf::assets::AssetServer:
             return std::unexpected(err);
         }
 
-        const auto archive_path = archive.path().generic_string();
+        const auto archive_path = core::pathToUtf8(archive.path());
         const auto archive_span = archive.bytes();
 
         const auto baked_offset = file->baked->offset;

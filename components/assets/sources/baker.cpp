@@ -5,6 +5,7 @@
 #include "baker.h"
 
 #include "sgf/assets/header.h"
+#include "sgf/core/utility/encoding.h"
 
 #include <cstring>
 #include <filesystem>
@@ -42,18 +43,88 @@ std::error_code sgf::assets::Baker::bake(
     // every asset already lives in another archive
     if(context.output_bytes.empty()) return {};
 
-    // close the destination archive to write it
-    if(auto* mapped = server_->catalog_.findArchive(context.archive_path))
-    {
-        if(mapped->opened())
-        {
-            if(const auto err = mapped->close()) return err;
-        }
-    }
+    auto& mapped = server_->catalog_.claimArchive(context.archive_path);
 
-    if(const auto err = core::writeFile(server_->catalog_.root() / context.archive_path, context.output_bytes))
+    if(std::filesystem::exists(mapped.path()))
     {
-        return err;
+        if(const auto err = mapped.open(std::ios_base::in)) return err;
+
+        const auto mapped_bytes = mapped.bytes();
+
+        AssetHeader header;
+        std::size_t current_offset {};
+
+        // moving old assets that were not baked in the current call of bake(...) to the new archive
+        while(current_offset < mapped_bytes.size())
+        {
+            // a short tail is a truncated record. replacing the file would drop it
+            if(mapped_bytes.size() - current_offset < sizeof(AssetHeader))
+            {
+                core::LogCallback::error(server_->debug_output_,
+                                         "Invalid header. Archive: '{}'",
+                                         core::pathToUtf8(archive));
+                return std::make_error_code(std::errc::result_out_of_range);
+            }
+
+            const auto header_bytes = mapped_bytes.subspan(current_offset, sizeof(AssetHeader));
+            std::memcpy(&header, header_bytes.data(), sizeof(AssetHeader));
+
+            // each block is checked on its own so the sum cannot wrap past the end of the file
+            const auto remaining = mapped_bytes.size() - current_offset;
+            const auto after_header = remaining - sizeof(AssetHeader);
+            if(header.content_block_size > after_header)
+            {
+                core::LogCallback::error(server_->debug_output_,
+                                         "Invalid content block size. Archive: '{}', asset ID: {}, version: {}, block size: {}",
+                                         core::pathToUtf8(archive), header.asset_id, header.version,
+                                         header.content_block_size);
+                return std::make_error_code(std::errc::result_out_of_range);
+            }
+
+            const auto after_content = after_header - static_cast<std::size_t>(header.content_block_size);
+            if(header.dependencies_block_size > after_content)
+            {
+                core::LogCallback::error(server_->debug_output_,
+                                         "Invalid dependencies block size. Archive: '{}', asset ID: {}, version: {}, block size: {}",
+                                         core::pathToUtf8(archive), header.asset_id, header.version,
+                                         header.dependencies_block_size);
+                return std::make_error_code(std::errc::result_out_of_range);
+            }
+
+            const auto record_size = sizeof(AssetHeader) +
+                                     static_cast<std::size_t>(header.content_block_size) +
+                                     static_cast<std::size_t>(header.dependencies_block_size);
+
+            if(context.baked_ids.contains(header.asset_id))
+            {
+                current_offset += record_size;
+                continue;
+            }
+
+            const auto saved_file = server_->catalog_.findFile(header.asset_id);
+            if(!saved_file)
+            {
+                current_offset += record_size;
+                continue;
+            }
+
+            // if the asset was not baked in current bake(...) call
+            // then moving the old asset to the new archive
+
+            AssetCatalog::BakedAsset baked_asset;
+            baked_asset.offset = context.output_bytes.size();
+            baked_asset.asset_id = header.asset_id;
+            // setBaked sets file.version so we need to keep version from the file, not from the header
+            baked_asset.version = saved_file->version;
+            baked_asset.size = record_size;
+
+            context.baked_data.push_back(baked_asset);
+
+            const auto record_bytes = mapped_bytes.subspan(current_offset, record_size);
+            context.output_bytes.insert(context.output_bytes.end(), record_bytes.begin(), record_bytes.end());
+
+            current_offset += record_size;
+        }
     }
 
     // one lock for the whole list, and no row changes when an id is missing
@@ -62,7 +133,15 @@ std::error_code sgf::assets::Baker::bake(
         return Error::kUnknownAsset;
     }
 
-    return server_->catalog_.save();
+    if(const auto err = server_->catalog_.save())
+    {
+        return err;
+    }
+
+    // close the destination archive to write it
+    if(const auto err = mapped.close()) return err;
+
+    return core::writeFile(server_->catalog_.root() / context.archive_path, context.output_bytes);
 }
 
 std::error_code sgf::assets::Baker::bakeImpl(BakeContext& context, const AnyHandle& handle)
