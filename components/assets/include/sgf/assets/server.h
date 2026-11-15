@@ -283,8 +283,9 @@ namespace sgf::assets
     private:
         struct BakeContext final
         {
+            core::UnorderedSet<AssetId> baked_ids;
+
             core::Vector<std::byte> output_bytes;
-            core::UnorderedSet<AssetId> baked_assets;
             core::Vector<AssetCatalog::BakedAsset> baked_data;
             std::filesystem::path archive_path;
             std::int32_t compression_level {};
@@ -292,6 +293,9 @@ namespace sgf::assets
 
         [[nodiscard]] std::error_code postTracked(std::move_only_function<void()> task) noexcept;
         std::error_code bakeImpl(BakeContext& context, const AnyHandle& handle);
+        void bakeBytes(BakeContext& context, AssetId asset_id, std::uint64_t version,
+                       std::span<const std::byte> asset_bytes,
+                       std::span<const AnyHandle> dependencies) const;
 
         static void finishPosted(const core::SharedPtr<PostedJobs>& posted) noexcept;
 

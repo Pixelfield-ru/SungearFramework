@@ -8,9 +8,13 @@
 
 namespace sgf::assets
 {
+#pragma pack(push, 1)
     struct AssetHeader final
     {
         std::uint64_t content_block_size {};
         std::uint64_t dependencies_block_size {};
+        std::uint32_t version {};
+        AssetId asset_id {};
     };
+#pragma pack(pop)
 }

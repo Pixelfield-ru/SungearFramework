@@ -24,11 +24,9 @@ std::error_code sgf::assets::BlobLoader::loadBaked(
     return {};
 }
 
-std::expected<sgf::assets::BakeResult, std::error_code> sgf::assets::BlobLoader::saveBaked(const Blob& asset)
+std::expected<sgf::core::Vector<std::byte>, std::error_code> sgf::assets::BlobLoader::saveBaked(const Blob& asset)
 {
-    BakeResult result;
-    result.bytes = core::Vector<std::byte>(asset.bytes, asset.bytes.get_allocator());
-    return result;
+    return core::Vector(asset.bytes, asset.bytes.get_allocator());
 }
 
 std::error_code sgf::assets::BlobLoader::loadMeta(const std::filesystem::path&, AssetId)
@@ -37,6 +35,11 @@ std::error_code sgf::assets::BlobLoader::loadMeta(const std::filesystem::path&, 
 }
 
 std::error_code sgf::assets::BlobLoader::writeMeta(const std::filesystem::path&, AssetId)
+{
+    return {};
+}
+
+sgf::core::Vector<sgf::assets::AnyHandle> sgf::assets::BlobLoader::dependencies(const Blob& asset)
 {
     return {};
 }

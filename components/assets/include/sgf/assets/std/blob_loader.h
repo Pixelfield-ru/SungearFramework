@@ -16,9 +16,11 @@ namespace sgf::assets
         [[nodiscard]] std::error_code loadBaked(std::span<const std::byte> bytes,
                                                 std::span<const AnyHandle> dependencies,
                                                 Blob& asset) override;
-        [[nodiscard]] std::expected<BakeResult, std::error_code> saveBaked(const Blob& asset) override;
+        [[nodiscard]] std::expected<core::Vector<std::byte>, std::error_code> saveBaked(const Blob& asset) override;
 
         [[nodiscard]] std::error_code loadMeta(const std::filesystem::path& source, AssetId id) override;
         [[nodiscard]] std::error_code writeMeta(const std::filesystem::path& source, AssetId id) override;
+
+        [[nodiscard]] core::Vector<AnyHandle> dependencies(const Blob& asset) override;
     };
 }

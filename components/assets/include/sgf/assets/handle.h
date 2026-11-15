@@ -134,17 +134,19 @@ namespace sgf::assets
             HandleBase(std::move(other))
         { }
 
-        /// The pointer stays valid while this slot is not loading or reloading.
-        /// Do not load or reload the asset while the pointer is in use.
-        [[nodiscard]] const AssetT* get() const noexcept
+        template<typename Func>
+        requires std::invocable<Func, AssetT&>
+        void edit(Func&& func)
         {
-            auto* slot = slotAs<AssetT>();
-            return valid() ? &(*slot->value) : nullptr;
+            if(!valid()) return;
+
+            ++slot_->version;
+            std::forward<Func>(func)(*slotAs<AssetT>()->value);
         }
 
         /// The pointer stays valid while this slot is not loading or reloading.
         /// Do not load or reload the asset while the pointer is in use.
-        [[nodiscard]] AssetT* get() noexcept
+        [[nodiscard]] const AssetT* get() const noexcept
         {
             auto* slot = slotAs<AssetT>();
             return valid() ? &(*slot->value) : nullptr;
@@ -158,12 +160,6 @@ namespace sgf::assets
         }
 
         const AssetT* operator->() const noexcept
-        {
-            auto* slot = slotAs<AssetT>();
-            return valid() ? &(*slot->value) : nullptr;
-        }
-
-        AssetT* operator->() noexcept
         {
             auto* slot = slotAs<AssetT>();
             return valid() ? &(*slot->value) : nullptr;

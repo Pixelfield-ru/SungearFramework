@@ -103,7 +103,7 @@ namespace sgf::assets
         File acquireFile();
         /// Finds the archive for this path or creates a closed one.
         /// Stays valid until mount. Do not call mount while a load is using the archive.
-        core::MappedFile& acquireArchive(std::filesystem::path archive_path);
+        core::MappedFile& claimArchive(std::filesystem::path archive_path);
 
         void setTypeId(AssetId id, std::int64_t type_id);
         /// Writes the baked location of an existing row. False when the id is missing.

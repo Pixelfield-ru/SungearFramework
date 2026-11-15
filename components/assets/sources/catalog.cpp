@@ -82,7 +82,7 @@ sgf::assets::AssetCatalog::File sgf::assets::AssetCatalog::acquireFile()
     return file;
 }
 
-sgf::core::MappedFile& sgf::assets::AssetCatalog::acquireArchive(std::filesystem::path archive_path)
+sgf::core::MappedFile& sgf::assets::AssetCatalog::claimArchive(std::filesystem::path archive_path)
 {
     std::unique_lock lock(mutex_);
     const auto existing = archives_mapping_.find(archive_path);

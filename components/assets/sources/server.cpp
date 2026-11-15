@@ -132,7 +132,7 @@ std::expected<sgf::assets::AnyHandle, std::error_code> sgf::assets::AssetServer:
         if(const auto err = postTracked([loader, actual_path, handle] {
             auto* slot = handle.slot_;
 
-            if(const auto err = loader->loadSourceErased(actual_path, slot->erased()))
+            if(const auto err = loader->loadSource(actual_path, slot->erased()))
             {
                 slot->error = err;
                 slot->state = AssetState::kFailed;
@@ -154,7 +154,7 @@ std::expected<sgf::assets::AnyHandle, std::error_code> sgf::assets::AssetServer:
     if(file->baked)
     {
         // the archive stays open for this load. mount and close are not called while it runs
-        auto& archive = catalog_.acquireArchive(file->baked->archive);
+        auto& archive = catalog_.claimArchive(file->baked->archive);
         if(const auto err = archive.open(std::ios::in))
         {
             slot->error = err;
@@ -265,6 +265,8 @@ std::expected<sgf::assets::AnyHandle, std::error_code> sgf::assets::AssetServer:
             dependencies.push_back(std::move(*loaded));
         }
 
+        handle.slot_->version = header.version;
+
         // loading baked source
         // capture the handle to increase lifetime of the slot
         if(const auto err = postTracked([loader, asset_bytes, handle, allocator, dependencies = std::move(dependencies)] {
@@ -300,7 +302,7 @@ std::expected<sgf::assets::AnyHandle, std::error_code> sgf::assets::AssetServer:
                 plain = { decoded.data(), written };
             }
 
-            if(const auto err = loader->loadBakedErased(plain, dependencies, slot->erased()))
+            if(const auto err = loader->loadBaked(plain, dependencies, slot->erased()))
             {
                 slot->error = err;
                 slot->state = AssetState::kFailed;
@@ -398,7 +400,7 @@ std::error_code sgf::assets::AssetServer::reload(const AnyHandle& handle) noexce
     if(const auto err = postTracked([loader, file_path, handle] {
         auto* slot = handle.slot_;
 
-        if(const auto err = loader->loadSourceErased(file_path, slot->erased()))
+        if(const auto err = loader->loadSource(file_path, slot->erased()))
         {
             slot->error = err;
             slot->state = AssetState::kFailed;
@@ -435,8 +437,8 @@ std::error_code sgf::assets::AssetServer::bake(
     if(!archive_path) return archive_path.error();
 
     BakeContext context;
+    context.baked_ids = core::UnorderedSet<AssetId>(get_allocator());
     context.output_bytes = core::Vector<std::byte>(get_allocator());
-    context.baked_assets = core::UnorderedSet<AssetId>(get_allocator());
     context.baked_data = core::Vector<AssetCatalog::BakedAsset>(get_allocator());
     context.archive_path = std::move(*archive_path);
     context.compression_level = compression_level;
@@ -452,7 +454,7 @@ std::error_code sgf::assets::AssetServer::bake(
     }
 
     // one lock for the whole list, and no row changes when an id is missing
-    if(!catalog_.setBaked(context.archive_path, context.baked_data))
+    if(!catalog_.setBaked(archive, context.baked_data))
     {
         return Error::kUnknownAsset;
     }
@@ -503,8 +505,9 @@ void sgf::assets::AssetServer::finishPosted(const core::SharedPtr<PostedJobs>& p
 
 std::error_code sgf::assets::AssetServer::bakeImpl(BakeContext& context, const AnyHandle& handle)
 {
-    // already was baked
-    if(context.baked_assets.contains(handle.asset_id_)) return {};
+    // already baked
+    if(context.baked_ids.contains(handle.asset_id_)) return {};
+    context.baked_ids.insert(handle.asset_id_);
     if(handle.asset_id_ == 0 || handle.type_id_ == 0) return {};
 
     auto* storage = this->storage(core::typeIndexFromStableHash(handle.type_id_));
@@ -533,15 +536,70 @@ std::error_code sgf::assets::AssetServer::bakeImpl(BakeContext& context, const A
         return Error::kLoaderNotSpecified;
     }
 
-    const auto bake_result = loader->saveBakedErased(slot->erased());
-    if(!bake_result)
+    const auto dependencies = loader->dependencies(slot->erased());
+
+    const auto file = catalog_.findFile(handle.asset_id_);
+    if(file && file->baked)
     {
-        return bake_result.error();
+        auto& asset_archive = catalog_.claimArchive(file->baked->archive);
+        // open existing archive
+        if(!asset_archive.opened() && std::filesystem::exists(asset_archive.path()))
+        {
+            if(const auto err = asset_archive.open(std::ios_base::in)) return err;
+        }
+
+        const auto archive_bytes = asset_archive.bytes();
+
+        if(file->baked->offset > archive_bytes.size())
+        {
+            return std::make_error_code(std::errc::result_out_of_range);
+        }
+
+        if(archive_bytes.size() - file->baked->offset < file->baked->size)
+        {
+            return std::make_error_code(std::errc::result_out_of_range);
+        }
+
+        const auto header_bytes = archive_bytes.subspan(file->baked->offset, sizeof(AssetHeader));
+        AssetHeader header;
+        // reading header
+        std::memcpy(&header, header_bytes.data(), sizeof(AssetHeader));
+
+        if(archive_bytes.size() - file->baked->offset < header.content_block_size)
+        {
+            return std::make_error_code(std::errc::result_out_of_range);
+        }
+
+        const auto content_bytes = archive_bytes.subspan(file->baked->offset + sizeof(AssetHeader),
+                                                         header.content_block_size);
+
+        // asset was not changed
+        if(header.version == slot->version &&
+           header.asset_id == handle.asset_id_)
+        {
+            // saving already baked bytes
+            bakeBytes(context, handle.asset_id_, slot->version, content_bytes, dependencies);
+
+            // baking dependencies
+            for(const auto& dep : dependencies)
+            {
+                if(const auto err = bakeImpl(context, dep))
+                {
+                    return err;
+                }
+            }
+
+            return {};
+        }
     }
 
-    const auto& plain = bake_result->bytes;
+    const auto baked_bytes = loader->saveBaked(slot->erased());
+    if(!baked_bytes)
+    {
+        return baked_bytes.error();
+    }
 
-    const auto bound = ZSTD_compressBound(plain.size());
+    const auto bound = ZSTD_compressBound(baked_bytes->size());
     if(ZSTD_isError(bound))
     {
         core::LogCallback::error(debug_output_,
@@ -554,7 +612,7 @@ std::error_code sgf::assets::AssetServer::bakeImpl(BakeContext& context, const A
     core::Vector<std::byte> compressed(bound, get_allocator());
     const auto written = ZSTD_compress(
         compressed.data(), compressed.size(),
-        plain.data(), plain.size(),
+        baked_bytes->data(), baked_bytes->size(),
         context.compression_level);
     if(ZSTD_isError(written))
     {
@@ -566,17 +624,36 @@ std::error_code sgf::assets::AssetServer::bakeImpl(BakeContext& context, const A
     }
 
     // a zstd frame can be larger than the raw payload. store the raw bytes in that case
-    std::span stored = plain;
-    if(written < plain.size())
+    std::span stored = *baked_bytes;
+    if(written < baked_bytes->size())
     {
         compressed.resize(written);
         stored = { compressed.data(), compressed.size() };
     }
 
+    // saving record
+    bakeBytes(context, handle.asset_id_, slot->version, stored, dependencies);
+
+    // baking all direct dependencies
+    for(const auto& dep : dependencies)
+    {
+        if(const auto err = bakeImpl(context, dep))
+        {
+            return err;
+        }
+    }
+
+    return {};
+}
+
+void sgf::assets::AssetServer::bakeBytes(BakeContext& context, AssetId asset_id, std::uint64_t version,
+                                         std::span<const std::byte> asset_bytes,
+                                         std::span<const AnyHandle> dependencies) const
+{
     // 8 bytes per handle: asset id, then type id
     core::Vector<std::uint32_t> handles_bytes(get_allocator());
-    handles_bytes.reserve(bake_result->dependencies.size() * 2);
-    for(const auto& dep : bake_result->dependencies)
+    handles_bytes.reserve(dependencies.size() * 2);
+    for(const auto& dep : dependencies)
     {
         handles_bytes.push_back(dep.asset_id_);
         handles_bytes.push_back(dep.type_id_);
@@ -585,14 +662,16 @@ std::error_code sgf::assets::AssetServer::bakeImpl(BakeContext& context, const A
     const auto dependencies_bytes = handles_bytes.size() * sizeof(std::uint32_t);
 
     AssetHeader header;
-    header.content_block_size = stored.size();
+    header.content_block_size = asset_bytes.size();
     header.dependencies_block_size = dependencies_bytes;
+    header.version = version;
+    header.asset_id = asset_id;
 
     // asset record size
-    const auto record_size = sizeof(header) + stored.size() + dependencies_bytes;
+    const auto record_size = sizeof(header) + asset_bytes.size() + dependencies_bytes;
 
     AssetCatalog::BakedAsset baked;
-    baked.asset_id = handle.asset_id_;
+    baked.asset_id = asset_id;
     baked.offset = context.output_bytes.size();
     baked.size = record_size;
 
@@ -602,26 +681,13 @@ std::error_code sgf::assets::AssetServer::bakeImpl(BakeContext& context, const A
 
     const auto* header_bytes = reinterpret_cast<const std::byte*>(&header);
     context.output_bytes.insert(context.output_bytes.end(), header_bytes, header_bytes + sizeof(header));
-    context.output_bytes.insert(context.output_bytes.end(), stored.begin(), stored.end());
+    context.output_bytes.insert(context.output_bytes.end(), asset_bytes.begin(), asset_bytes.end());
     // if asset has dependencies then inserting the dependencies block
     if(dependencies_bytes != 0)
     {
         const auto* dependency_bytes = reinterpret_cast<const std::byte*>(handles_bytes.data());
         context.output_bytes.insert(context.output_bytes.end(), dependency_bytes, dependency_bytes + dependencies_bytes);
     }
-
-    context.baked_assets.insert(handle.asset_id_);
-
-    // baking all direct dependencies
-    for(const auto& dep : bake_result->dependencies)
-    {
-        if(const auto err = bakeImpl(context, dep))
-        {
-            return err;
-        }
-    }
-
-    return {};
 }
 
 std::error_code sgf::assets::AssetServer::create(AssetServerCreateInfo create_info, AssetServer& output) noexcept
