@@ -19,8 +19,7 @@ namespace sgf::core
     {
         using allocator_type = std::pmr::polymorphic_allocator<TypeMap>;
 
-        TypeMap() noexcept = default;
-        TypeMap(const allocator_type& alloc) noexcept :
+        TypeMap(const allocator_type& alloc = {}) noexcept :
             storage_(alloc)
         { }
         TypeMap(const TypeMap&) = delete;

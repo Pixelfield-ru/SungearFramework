@@ -26,8 +26,7 @@ namespace sgf::rhi
 
         core::UnorderedMap<ShaderStageType, Stage> entry_points;
 
-        SlangCompiledShader() = default;
-        explicit SlangCompiledShader(const allocator_type& allocator) :
+        explicit SlangCompiledShader(const allocator_type& allocator = {}) :
             ICompiledShader(allocator),
             entry_points(allocator)
         { }

@@ -71,7 +71,7 @@ namespace sgf::core
 
         explicit MappedFile(std::filesystem::path path, const allocator_type& allocator = {}) :
             path_(std::move(path)),
-            allocator_(allocator)
+            resource_(allocator.resource())
         { }
         MappedFile(const MappedFile&) = delete;
         MappedFile(MappedFile&&) noexcept;
@@ -91,7 +91,7 @@ namespace sgf::core
 
     private:
         std::filesystem::path path_;
-        allocator_type allocator_ {};
+        std::pmr::memory_resource* resource_ {};
         mutable std::shared_mutex mutex_;
         SharedPtr<Mapping> mapping_;
     };

@@ -197,10 +197,6 @@ struct sgf::serialization::JsonReader::Impl
     std::error_code parse_error_ {};
 };
 
-sgf::serialization::JsonReader::JsonReader() : JsonReader(allocator_type {})
-{
-}
-
 sgf::serialization::JsonReader::JsonReader(const allocator_type& allocator) :
     impl_ { core::makeUnique<Impl>(allocator, allocator.resource()) }
 {

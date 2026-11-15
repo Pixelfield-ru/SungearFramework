@@ -21,10 +21,9 @@ namespace sgf::runtime
 
         core::TypeMap resources;
 
-        SystemContext(const allocator_type& alloc) noexcept :
+        SystemContext(const allocator_type& alloc = {}) noexcept :
             resources(alloc)
         { }
-        SystemContext() noexcept = default;
         SystemContext(const SystemContext& other) noexcept = delete;
         SystemContext(SystemContext&&) noexcept = default;
         SystemContext(SystemContext&& other, const allocator_type& alloc) :

@@ -33,8 +33,7 @@ namespace sgf::rhi
         core::Vector<std::filesystem::path> search_paths;
         std::filesystem::path cache_path = "cache/shaders";
 
-        IShaderCompiler() = default;
-        explicit IShaderCompiler(const allocator_type& allocator) :
+        explicit IShaderCompiler(const allocator_type& allocator = {}) :
             standard_entry_points(allocator),
             search_paths(allocator)
         {

@@ -13,10 +13,8 @@ namespace sgf::core
     {
         using allocator_type = std::pmr::polymorphic_allocator<>;
 
-        explicit ThreadPool(std::size_t thread_count);
-        ThreadPool(std::size_t thread_count, const allocator_type& alloc);
-        ThreadPool() noexcept = default;
-        ThreadPool(const allocator_type& alloc) noexcept;
+        explicit ThreadPool(std::size_t thread_count, const allocator_type& alloc = {});
+        ThreadPool(const allocator_type& alloc = {}) noexcept;
         ThreadPool(const ThreadPool&) = delete;
         ThreadPool(ThreadPool&&) = delete;
 

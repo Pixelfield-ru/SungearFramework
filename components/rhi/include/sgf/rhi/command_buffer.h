@@ -50,8 +50,7 @@ namespace sgf::rhi
         Rect<std::int32_t> render_area {};
         core::Vector<ClearInfo> clear_infos;
 
-        BeginRenderingInfo() = default;
-        BeginRenderingInfo(const allocator_type& alloc) :
+        BeginRenderingInfo(const allocator_type& alloc = {}) :
             clear_infos(alloc)
         { }
         BeginRenderingInfo(const BeginRenderingInfo&) = default;

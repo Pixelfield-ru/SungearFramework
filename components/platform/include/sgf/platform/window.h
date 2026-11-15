@@ -37,8 +37,7 @@ namespace sgf::platform
     {
         using allocator_type = std::pmr::polymorphic_allocator<>;
 
-        Window() noexcept;
-        explicit Window(const allocator_type& alloc) noexcept;
+        explicit Window(const allocator_type& alloc = {}) noexcept;
         Window(const Window&) = delete;
         Window(Window&& other) noexcept;
         Window(Window&& other, const allocator_type& alloc) noexcept;

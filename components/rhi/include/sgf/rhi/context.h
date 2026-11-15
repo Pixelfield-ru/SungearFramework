@@ -28,8 +28,7 @@ namespace sgf::rhi
         /// Optional.
         const core::LogCallback* rhi_debug_output {};
 
-        ContextCreateInfo() = default;
-        ContextCreateInfo(const allocator_type& alloc) :
+        ContextCreateInfo(const allocator_type& alloc = {}) :
             app_name(alloc),
             engine_name(alloc)
         { }

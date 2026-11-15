@@ -42,10 +42,7 @@ namespace sgf::assets
         };
 
     public:
-        AssetServer() :
-            posted_(core::makeShared<PostedJobs>(allocator_type{}))
-        { }
-        explicit AssetServer(const allocator_type& alloc) :
+        explicit AssetServer(const allocator_type& alloc = {}) :
             storages_map_(alloc),
             catalog_(alloc),
             posted_(core::makeShared<PostedJobs>(alloc))

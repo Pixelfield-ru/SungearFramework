@@ -84,7 +84,7 @@ sgf::core::MappedFile::MappedFile(MappedFile&& other) noexcept
 {
     std::unique_lock lock(other.mutex_);
     path_ = std::move(other.path_);
-    allocator_ = other.allocator_;
+    resource_ = other.resource_;
     mapping_ = std::move(other.mapping_);
 }
 
@@ -98,7 +98,7 @@ sgf::core::MappedFile& sgf::core::MappedFile::operator=(MappedFile&& other) noex
 
     mapping_.reset();
     path_ = std::move(other.path_);
-    allocator_ = other.allocator_;
+    resource_ = other.resource_;
     mapping_ = std::move(other.mapping_);
 
     return *this;
@@ -204,7 +204,7 @@ std::error_code sgf::core::MappedFile::open(std::ios_base::openmode mode)
     // an empty file has no view. the next open tries again
     if(mapped.bytes().empty()) return {};
 
-    mapping_ = core::makeShared<Mapping>(allocator_, std::move(mapped));
+    mapping_ = core::makeShared<Mapping>(resource_, std::move(mapped));
     return {};
 }
 

@@ -32,10 +32,9 @@ namespace sgf::runtime
         /// Indicates count of unfulfilled links for each node.
         core::Vector<std::uint32_t> remaining;
 
-        SystemGraphState(const allocator_type& alloc) noexcept :
+        SystemGraphState(const allocator_type& alloc = {}) noexcept :
             remaining(alloc)
         { }
-        SystemGraphState() noexcept = default;
         SystemGraphState(const SystemGraphState& other) noexcept = default;
         SystemGraphState(const SystemGraphState& other, const allocator_type& alloc) :
            remaining(other.remaining, alloc)
@@ -73,10 +72,9 @@ namespace sgf::runtime
             /// Count of links.
             std::uint32_t dependency_count {};
 
-            Node(const allocator_type& alloc) noexcept :
+            Node(const allocator_type& alloc = {}) noexcept :
                 successors(alloc)
             { }
-            Node() noexcept = default;
             Node(const Node& other) noexcept = default;
             Node(const Node& other, const allocator_type& alloc) :
                 system(other.system),
@@ -106,8 +104,7 @@ namespace sgf::runtime
         /// Entry nodes.
         core::Vector<std::uint32_t> entries;
 
-        SystemGraph() = default;
-        SystemGraph(const allocator_type& alloc) :
+        SystemGraph(const allocator_type& alloc = {}) :
             nodes(alloc),
             entries(alloc)
         { }

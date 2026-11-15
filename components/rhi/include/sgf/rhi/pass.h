@@ -28,8 +28,7 @@ namespace sgf::rhi
         core::Vector<ColorAttachmentCreateInfo> color_attachments;
         std::optional<DepthStencilAttachmentCreateInfo> depth_stencil_attachment;
 
-        PassCreateInfo() = default;
-        PassCreateInfo(const allocator_type& alloc) :
+        PassCreateInfo(const allocator_type& alloc = {}) :
             color_attachments(alloc)
         { }
         PassCreateInfo(const PassCreateInfo&) = default;

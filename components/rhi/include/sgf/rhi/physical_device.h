@@ -16,8 +16,8 @@ namespace sgf::rhi
         using allocator_type = std::pmr::polymorphic_allocator<>;
 
         virtual ~IPhysicalDevice() = default;
-        IPhysicalDevice() = default;
-        IPhysicalDevice(const allocator_type& alloc) :
+
+        IPhysicalDevice(const allocator_type& alloc = {}) :
             name_(alloc)
         { }
         IPhysicalDevice(const IPhysicalDevice&) = default;

@@ -716,8 +716,7 @@ namespace sgf::rhi
 
         core::Vector<VertexAttributeDescription> attributes;
 
-        VertexBindingDescription() = default;
-        VertexBindingDescription(const allocator_type& alloc) :
+        VertexBindingDescription(const allocator_type& alloc = {}) :
             attributes(alloc)
         { }
         VertexBindingDescription(const VertexBindingDescription&) = default;

@@ -58,20 +58,16 @@ namespace sgf::assets
 
         using allocator_type = std::pmr::polymorphic_allocator<>;
 
-        AssetCatalog() :
-            name_("assets_catalog")
+        explicit AssetCatalog(const allocator_type& alloc = {}) :
+            name_("assets_catalog", alloc),
+            files_(alloc),
+            archives_(alloc),
+            archives_mapping_(alloc),
+            files_mapping_(alloc),
+            files_mapping_ids_(alloc)
         { }
 
-        explicit AssetCatalog(const allocator_type& alloc) :
-            name_("assets_catalog", alloc)
-        { }
-
-        explicit AssetCatalog(serialization::Serializer serializer) :
-            name_("assets_catalog"),
-            serializer_(std::move(serializer))
-        { }
-
-        AssetCatalog(serialization::Serializer serializer, const allocator_type& alloc) :
+        explicit AssetCatalog(serialization::Serializer serializer, const allocator_type& alloc = {}) :
             name_("assets_catalog", alloc),
             files_(alloc),
             archives_(alloc),

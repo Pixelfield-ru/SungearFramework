@@ -23,8 +23,7 @@ namespace sgf::rhi
         friend struct VulkanBuffer;
         friend struct VulkanImage;
 
-        VulkanPhysicalDevice() = default;
-        explicit VulkanPhysicalDevice(const allocator_type& allocator);
+        explicit VulkanPhysicalDevice(const allocator_type& allocator = {});
         VulkanPhysicalDevice(const VulkanPhysicalDevice&) = delete;
         VulkanPhysicalDevice(VulkanPhysicalDevice&& other) noexcept;
         VulkanPhysicalDevice(VulkanPhysicalDevice&& other, const allocator_type& allocator);
@@ -47,8 +46,7 @@ namespace sgf::rhi
             core::Vector<VkSurfaceFormatKHR> formats_;
             core::Vector<VkPresentModeKHR> present_modes_;
 
-            SurfaceSupport() = default;
-            explicit SurfaceSupport(const allocator_type& allocator) :
+            explicit SurfaceSupport(const allocator_type& allocator = {}) :
                 formats_(allocator),
                 present_modes_(allocator)
             { }

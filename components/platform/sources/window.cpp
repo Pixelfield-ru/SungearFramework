@@ -22,12 +22,6 @@ struct sgf::platform::Window::Impl
     static void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) noexcept;
 };
 
-sgf::platform::Window::Window() noexcept :
-    impl_(core::makeUnique<Impl>(std::pmr::get_default_resource()))
-{
-    platform().addWindow(this);
-}
-
 sgf::platform::Window::Window(const allocator_type& alloc) noexcept :
     resource_(alloc.resource()),
     impl_(core::makeUnique<Impl>(alloc))

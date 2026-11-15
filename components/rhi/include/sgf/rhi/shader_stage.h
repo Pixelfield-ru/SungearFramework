@@ -18,8 +18,7 @@ namespace sgf::rhi
         ShaderStageType type = ShaderStageType::kUnknown;
         core::String entry_point_name;
 
-        ShaderStage() = default;
-        explicit ShaderStage(const allocator_type& allocator) :
+        explicit ShaderStage(const allocator_type& allocator = {}) :
             entry_point_name(allocator)
         { }
         ShaderStage(const ShaderStage&) = default;

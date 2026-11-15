@@ -7,11 +7,6 @@
 #include <boost/asio/post.hpp>
 #include <boost/asio/bind_allocator.hpp>
 
-sgf::core::ThreadPool::ThreadPool(std::size_t thread_count) :
-    pool_(thread_count)
-{
-}
-
 sgf::core::ThreadPool::ThreadPool(std::size_t thread_count, const allocator_type& alloc) :
     allocator_(alloc),
     pool_(std::allocator_arg, alloc, thread_count)

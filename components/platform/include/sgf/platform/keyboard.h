@@ -238,8 +238,7 @@ namespace sgf::platform
 
         using allocator_type = std::pmr::polymorphic_allocator<>;
 
-        Keyboard() = default;
-        explicit Keyboard(const allocator_type& allocator) :
+        explicit Keyboard(const allocator_type& allocator = {}) :
             events_(allocator),
             text_(allocator)
         { }

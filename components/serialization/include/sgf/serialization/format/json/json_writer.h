@@ -15,8 +15,7 @@ namespace sgf::serialization
     {
         using allocator_type = std::pmr::polymorphic_allocator<>;
 
-        JsonWriter();
-        explicit JsonWriter(const allocator_type& allocator);
+        explicit JsonWriter(const allocator_type& allocator = {});
         ~JsonWriter() override;
 
         JsonWriter(const JsonWriter&) = delete;

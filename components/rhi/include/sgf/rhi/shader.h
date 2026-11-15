@@ -29,8 +29,7 @@ namespace sgf::rhi
         const ILogicalDevice* logical_device {};
         core::Vector<ShaderStageCreateInfo> stages_create_info;
 
-        ShaderCreateInfo() = default;
-        explicit ShaderCreateInfo(const allocator_type& allocator) :
+        explicit ShaderCreateInfo(const allocator_type& allocator = {}) :
             stages_create_info(allocator)
         { }
         ShaderCreateInfo(const ShaderCreateInfo&) = default;

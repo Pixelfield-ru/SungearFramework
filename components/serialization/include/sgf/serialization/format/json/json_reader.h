@@ -15,8 +15,7 @@ namespace sgf::serialization
     {
         using allocator_type = std::pmr::polymorphic_allocator<>;
 
-        JsonReader();
-        explicit JsonReader(const allocator_type& allocator);
+        explicit JsonReader(const allocator_type& allocator = {});
         ~JsonReader() override;
 
         [[nodiscard]] allocator_type get_allocator() const noexcept;

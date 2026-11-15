@@ -17,9 +17,7 @@ namespace sgf::assets
 
         core::Vector<std::byte> bytes;
 
-        Blob() = default;
-
-        explicit Blob(allocator_type allocator) :
+        explicit Blob(allocator_type allocator = {}) :
             bytes(allocator)
         { }
 

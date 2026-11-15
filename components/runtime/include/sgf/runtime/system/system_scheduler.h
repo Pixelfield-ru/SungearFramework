@@ -25,8 +25,7 @@ namespace sgf::runtime
         core::ThreadPool* thread_pool {};
         const core::LogCallback* debug_output {};
 
-        SystemSchedulerCreateInfo() = default;
-        SystemSchedulerCreateInfo(const allocator_type& alloc) noexcept :
+        SystemSchedulerCreateInfo(const allocator_type& alloc = {}) noexcept :
             schedules(alloc)
         { }
         SystemSchedulerCreateInfo(const SystemSchedulerCreateInfo&) = default;
@@ -59,8 +58,7 @@ namespace sgf::runtime
     {
         using allocator_type = std::pmr::polymorphic_allocator<>;
 
-        SystemScheduler() noexcept = default;
-        SystemScheduler(const allocator_type& alloc) noexcept :
+        SystemScheduler(const allocator_type& alloc = {}) noexcept :
             create_info_(alloc),
             executable_systems_(alloc),
             schedules_(alloc) { }

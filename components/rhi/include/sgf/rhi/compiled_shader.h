@@ -16,8 +16,7 @@ namespace sgf::rhi
 
         core::Vector<ShaderStage> stages;
 
-        ICompiledShader() = default;
-        ICompiledShader(const allocator_type& alloc) :
+        ICompiledShader(const allocator_type& alloc = {}) :
             stages(alloc)
         { }
         ICompiledShader(const ICompiledShader&) = default;

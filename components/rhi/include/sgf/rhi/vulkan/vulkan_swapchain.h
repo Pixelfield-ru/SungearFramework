@@ -23,8 +23,7 @@ namespace sgf::rhi
 
         using allocator_type = std::pmr::polymorphic_allocator<>;
 
-        VulkanSwapchain() noexcept = default;
-        explicit VulkanSwapchain(const allocator_type& allocator) noexcept;
+        explicit VulkanSwapchain(const allocator_type& allocator = {}) noexcept;
         VulkanSwapchain(const VulkanSwapchain&) = delete;
         VulkanSwapchain(VulkanSwapchain&& other) noexcept;
         VulkanSwapchain(VulkanSwapchain&& other, const allocator_type& allocator);

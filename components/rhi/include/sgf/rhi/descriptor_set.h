@@ -45,8 +45,7 @@ namespace sgf::rhi
         /// Offset in buffers or images.
         std::uint32_t array_offset {};
 
-        DescriptorInfo() = default;
-        DescriptorInfo(const allocator_type& alloc) :
+        DescriptorInfo(const allocator_type& alloc = {}) :
             buffers(alloc),
             images(alloc)
         { }
@@ -92,8 +91,7 @@ namespace sgf::rhi
         ILogicalDevice* logical_device {};
         core::Vector<DescriptorSetLayoutBinding> bindings;
 
-        DescriptorSetCreateInfo() = default;
-        DescriptorSetCreateInfo(const allocator_type& alloc) :
+        DescriptorSetCreateInfo(const allocator_type& alloc = {}) :
             bindings(alloc)
         { }
         DescriptorSetCreateInfo(const DescriptorSetCreateInfo&) = default;

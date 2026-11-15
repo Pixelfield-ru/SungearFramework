@@ -28,8 +28,7 @@ namespace sgf::rhi
 
         glm::uvec2 size {};
 
-        FramebufferCreateInfo() = default;
-        FramebufferCreateInfo(const allocator_type& alloc) :
+        FramebufferCreateInfo(const allocator_type& alloc = {}) :
             images(alloc)
         { }
         FramebufferCreateInfo(const FramebufferCreateInfo&) = default;

@@ -21,8 +21,7 @@ namespace sgf::rhi
 
         using allocator_type = std::pmr::polymorphic_allocator<>;
 
-        VulkanPass() noexcept = default;
-        explicit VulkanPass(const allocator_type& allocator) noexcept;
+        explicit VulkanPass(const allocator_type& allocator = {}) noexcept;
         VulkanPass(const VulkanPass&) = delete;
         VulkanPass(VulkanPass&& other) noexcept;
         VulkanPass(VulkanPass&& other, const allocator_type& allocator);

@@ -39,11 +39,7 @@ namespace sgf::assets
     {
         using allocator_type = std::pmr::polymorphic_allocator<>;
 
-        explicit AssetStorage(std::uint32_t page_size) :
-            pages_({ Page(page_size) }),
-            page_size_(page_size)
-        { }
-        AssetStorage(std::uint32_t page_size, const allocator_type& alloc) :
+        explicit AssetStorage(std::uint32_t page_size, const allocator_type& alloc = {}) :
             pages_({ Page(page_size, alloc) }, alloc),
             page_size_(page_size)
         { }
@@ -252,17 +248,7 @@ namespace sgf::assets
             core::Vector<std::uint32_t> free_slots;
             std::uint32_t id {};
 
-            Page() = default;
-            explicit Page(std::uint32_t size) :
-                slots(size),
-                free_slots(size)
-            {
-                for(std::uint32_t i = 0; i < size; ++i)
-                {
-                    free_slots[i] = i;
-                }
-            }
-            Page(std::uint32_t size, const allocator_type& alloc) :
+            explicit Page(std::uint32_t size, const allocator_type& alloc = {}) :
                 slots(size, alloc),
                 free_slots(size, alloc)
             {

@@ -20,8 +20,7 @@ namespace sgf::rhi
 
         using allocator_type = std::pmr::polymorphic_allocator<>;
 
-        VulkanShader() noexcept = default;
-        explicit VulkanShader(const allocator_type& allocator) noexcept;
+        explicit VulkanShader(const allocator_type& allocator = {}) noexcept;
         VulkanShader(const VulkanShader&) = delete;
         VulkanShader(VulkanShader&& other) noexcept;
         VulkanShader(VulkanShader&& other, const allocator_type& allocator);

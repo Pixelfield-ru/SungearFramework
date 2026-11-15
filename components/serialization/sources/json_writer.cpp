@@ -140,10 +140,6 @@ struct sgf::serialization::JsonWriter::Impl
     bool finished { false };
 };
 
-sgf::serialization::JsonWriter::JsonWriter() : JsonWriter(allocator_type {})
-{
-}
-
 sgf::serialization::JsonWriter::JsonWriter(const allocator_type& allocator) :
     impl_ { core::makeUnique<Impl>(allocator, allocator.resource()) }
 {

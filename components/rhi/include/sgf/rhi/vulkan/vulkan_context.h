@@ -41,8 +41,7 @@ namespace sgf::rhi
         /// Optional. Defaults to new/delete-backed host allocator.
         core::UniquePtr<VkAllocationCallbacks> allocator;
 
-        VulkanContextCreateInfo() = default;
-        explicit VulkanContextCreateInfo(const allocator_type& allocator) :
+        explicit VulkanContextCreateInfo(const allocator_type& allocator = {}) :
             ContextCreateInfo(allocator),
             validation_layers(allocator),
             extensions(allocator)
@@ -83,8 +82,7 @@ namespace sgf::rhi
         friend struct VulkanBuffer;
         friend struct VulkanDescriptorSet;
 
-        VulkanContext() noexcept = default;
-        explicit VulkanContext(const allocator_type& allocator) noexcept;
+        explicit VulkanContext(const allocator_type& allocator = {}) noexcept;
         VulkanContext(const VulkanContext&) = delete;
         VulkanContext(VulkanContext&& other) noexcept;
         VulkanContext(VulkanContext&& other, const allocator_type& allocator);

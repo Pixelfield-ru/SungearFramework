@@ -58,8 +58,7 @@ namespace sgf::rhi
 
         IShader* shader {};
 
-        PipelineStateCreateInfo() = default;
-        PipelineStateCreateInfo(const allocator_type& alloc) :
+        PipelineStateCreateInfo(const allocator_type& alloc = {}) :
             attachments_blend_info(alloc),
             vertex_bindings(alloc),
             descriptor_sets(alloc)
