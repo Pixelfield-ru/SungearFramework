@@ -4,6 +4,8 @@
 
 #include "sgf/assets/server.h"
 
+#include "sgf/assets/header.h"
+
 #include <limits>
 #include <mutex>
 
@@ -161,31 +163,33 @@ std::expected<sgf::assets::AnyHandle, std::error_code> sgf::assets::AssetServer:
             return std::unexpected(err);
         }
 
-        const auto archive_bytes = archive.bytes();
+        const auto archive_path = archive.path().generic_string();
+        const auto archive_access = archive.access();
+        const auto archive_span = archive_access.bytes();
 
         const auto baked_offset = file->baked->offset;
         const auto baked_size = file->baked->size;
 
         // baked_offset + baked_size may provide integer overflow
-        if(baked_offset > archive_bytes.size() ||
-           baked_size > archive_bytes.size() - baked_offset)
+        if(baked_offset > archive_span.size() ||
+           baked_size > archive_span.size() - baked_offset)
         {
             core::LogCallback::error(debug_output_,
                                      "Invalid baked file. Archive: '{}', asset ID: {}, type ID: {}",
-                                     archive.path().generic_string(),
+                                     archive_path,
                                      asset_id, type_id);
             slot->error = std::make_error_code(std::errc::result_out_of_range);
             slot->state = AssetState::kFailed;
             return std::unexpected(std::make_error_code(std::errc::result_out_of_range));
         }
 
-        const auto asset_record_bytes = archive_bytes.subspan(baked_offset, baked_size);
+        const auto asset_record_bytes = archive_span.subspan(baked_offset, baked_size);
 
         if(asset_record_bytes.size() < sizeof(AssetHeader))
         {
             core::LogCallback::error(debug_output_,
                                      "No bytes for asset. Archive: '{}', asset ID: {}, type ID: {}",
-                                     archive.path().generic_string(),
+                                     archive_path,
                                      asset_id, type_id);
             slot->error = std::make_error_code(std::errc::result_out_of_range);
             slot->state = AssetState::kFailed;
@@ -202,7 +206,7 @@ std::expected<sgf::assets::AnyHandle, std::error_code> sgf::assets::AssetServer:
         {
             core::LogCallback::error(debug_output_,
                                      "Invalid header of asset. Archive: '{}', asset ID: {}, type ID: {}",
-                                     archive.path().generic_string(),
+                                     archive_path,
                                      asset_id, type_id);
             slot->error = std::make_error_code(std::errc::result_out_of_range);
             slot->state = AssetState::kFailed;
@@ -215,7 +219,7 @@ std::expected<sgf::assets::AnyHandle, std::error_code> sgf::assets::AssetServer:
         {
             core::LogCallback::error(debug_output_,
                                      "Invalid dependencies block. Archive: '{}', asset ID: {}, type ID: {}",
-                                     archive.path().generic_string(),
+                                     archive_path,
                                      asset_id, type_id);
             slot->error = std::make_error_code(std::errc::result_out_of_range);
             slot->state = AssetState::kFailed;
@@ -265,7 +269,10 @@ std::expected<sgf::assets::AnyHandle, std::error_code> sgf::assets::AssetServer:
 
         // loading baked source
         // capture the handle to increase lifetime of the slot
-        if(const auto err = postTracked([loader, asset_bytes, handle, allocator, dependencies = std::move(dependencies)] {
+        if(const auto err = postTracked([loader, asset_bytes, archive_access, handle, allocator, dependencies = std::move(dependencies)] {
+            // archive_access owns the mapping that asset_bytes points into
+            // copying archive_access just to increase lifetime of mapped file
+            (void) archive_access;
             auto* slot = handle.slot_;
 
             std::span<const std::byte> plain = asset_bytes;

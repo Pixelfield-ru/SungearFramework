@@ -14,7 +14,7 @@
 #include "sgf/core/memory.h"
 #include "sgf/serialization/macroses.h"
 #include "sgf/serialization/serializer.h"
-#include "archive.h"
+#include "sgf/core/utility/mapped_file.h"
 
 namespace sgf::assets
 {
@@ -99,14 +99,14 @@ namespace sgf::assets
         [[nodiscard]] bool hasFile(AssetId id) const noexcept;
 
         /// Archive object for this path. Stays allocated until the catalog is reloaded or destroyed.
-        Archive* findArchive(const std::filesystem::path& archive_path);
+        core::MappedFile* findArchive(const std::filesystem::path& archive_path);
 
         /// Finds the row for this path or creates one. Creation is serialized with other catalog writes.
         AcquiredFile acquireFile(std::filesystem::path file_path);
         /// Creates a row without a path.
         File acquireFile();
         /// Finds the archive for this path or creates a closed one.
-        Archive& acquireArchive(std::filesystem::path archive_path);
+        core::MappedFile& acquireArchive(std::filesystem::path archive_path);
 
         void setTypeId(AssetId id, std::int64_t type_id);
         /// Writes the baked location of an existing row. False when the id is missing.
@@ -137,7 +137,7 @@ namespace sgf::assets
     private:
         std::atomic<AssetId> next_asset_id_ = 1;
         core::Vector<File> files_;
-        core::Vector<core::UniquePtr<Archive>> archives_;
+        core::Vector<core::UniquePtr<core::MappedFile>> archives_;
         core::UnorderedMap<std::filesystem::path, std::size_t> archives_mapping_;
         core::UnorderedMap<std::filesystem::path, std::size_t> files_mapping_;
         core::UnorderedMap<AssetId, std::size_t> files_mapping_ids_;

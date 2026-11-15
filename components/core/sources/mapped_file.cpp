@@ -1,11 +1,12 @@
 //
-// Created by stuka on 05.11.2026.
+// Created by stuka on 15.11.2026.
 //
 
-#include "sgf/assets/archive.h"
+#include "sgf/core/utility/mapped_file.h"
 
 #include <limits>
 #include <mutex>
+#include <utility>
 
 #if SGF_PLATFORM_OS_WINDOWS
 #ifndef WIN32_LEAN_AND_MEAN
@@ -19,60 +20,23 @@
 
 #endif
 
-sgf::assets::Archive::~Archive()
-{
-    std::unique_lock lock(mutex_);
-    std::ignore = unmap();
-}
-
-sgf::assets::Archive::Archive(Archive&& other) noexcept
-{
-    std::unique_lock lock(other.mutex_);
-    path_ = std::move(other.path_);
-
-#if SGF_PLATFORM_OS_WINDOWS
-    view_ = other.view_;
-    mapping_ = other.mapping_;
-    size_ = other.size_;
-    other.view_ = nullptr;
-    other.mapping_ = nullptr;
-    other.size_ = 0;
-#endif
-}
-
-sgf::assets::Archive& sgf::assets::Archive::operator=(Archive&& other) noexcept
-{
-    if(this == &other) return *this;
-
-    std::unique_lock lock(mutex_, std::defer_lock);
-    std::unique_lock other_lock(other.mutex_, std::defer_lock);
-    std::lock(lock, other_lock);
-
-    std::ignore = unmap();
-    path_ = std::move(other.path_);
-
-#if SGF_PLATFORM_OS_WINDOWS
-    view_ = other.view_;
-    mapping_ = other.mapping_;
-    size_ = other.size_;
-    other.view_ = nullptr;
-    other.mapping_ = nullptr;
-    other.size_ = 0;
-#endif
-
-    return *this;
-}
-
-bool sgf::assets::Archive::hasView() const noexcept
+sgf::core::MappedFile::Mapping::Mapping(Mapping&& other) noexcept
 {
 #if SGF_PLATFORM_OS_WINDOWS
-    return view_ != nullptr;
+    view_ = std::exchange(other.view_, nullptr);
+    file_mapping_ = std::exchange(other.file_mapping_, nullptr);
+    size_ = std::exchange(other.size_, 0);
 #else
-    return false;
+    static_cast<void>(other);
 #endif
 }
 
-std::span<const std::byte> sgf::assets::Archive::mappedBytes() const noexcept
+sgf::core::MappedFile::Mapping::~Mapping()
+{
+    std::ignore = unmap();
+}
+
+std::span<const std::byte> sgf::core::MappedFile::Mapping::bytes() const noexcept
 {
 #if SGF_PLATFORM_OS_WINDOWS
     return { static_cast<std::byte const*>(view_), size_ };
@@ -81,7 +45,7 @@ std::span<const std::byte> sgf::assets::Archive::mappedBytes() const noexcept
 #endif
 }
 
-std::error_code sgf::assets::Archive::unmap()
+std::error_code sgf::core::MappedFile::Mapping::unmap()
 {
 #if SGF_PLATFORM_OS_WINDOWS
     std::error_code error;
@@ -94,13 +58,13 @@ std::error_code sgf::assets::Archive::unmap()
         view_ = {};
     }
 
-    if(mapping_)
+    if(file_mapping_)
     {
-        if(!::CloseHandle(static_cast<HANDLE>(mapping_)) && !error)
+        if(!::CloseHandle(static_cast<HANDLE>(file_mapping_)) && !error)
         {
             error = { static_cast<int>(::GetLastError()), std::system_category() };
         }
-        mapping_ = {};
+        file_mapping_ = {};
     }
 
     size_ = 0;
@@ -110,13 +74,40 @@ std::error_code sgf::assets::Archive::unmap()
 #endif
 }
 
-std::error_code sgf::assets::Archive::open(std::ios_base::openmode mode)
+sgf::core::MappedFile::~MappedFile()
 {
     std::unique_lock lock(mutex_);
-    if(hasView()) return {};
+    mapping_.reset();
+}
 
+sgf::core::MappedFile::MappedFile(MappedFile&& other) noexcept
+{
+    std::unique_lock lock(other.mutex_);
+    path_ = std::move(other.path_);
+    allocator_ = other.allocator_;
+    mapping_ = std::move(other.mapping_);
+}
+
+sgf::core::MappedFile& sgf::core::MappedFile::operator=(MappedFile&& other) noexcept
+{
+    if(this == &other) return *this;
+
+    std::unique_lock lock(mutex_, std::defer_lock);
+    std::unique_lock other_lock(other.mutex_, std::defer_lock);
+    std::lock(lock, other_lock);
+
+    mapping_.reset();
+    path_ = std::move(other.path_);
+    allocator_ = other.allocator_;
+    mapping_ = std::move(other.mapping_);
+
+    return *this;
+}
+
+std::error_code sgf::core::MappedFile::Mapping::map(const std::filesystem::path& path, std::ios_base::openmode mode)
+{
 #if SGF_PLATFORM_OS_WINDOWS
-    if(path_.empty()) return std::make_error_code(std::errc::invalid_argument);
+    if(path.empty()) return std::make_error_code(std::errc::invalid_argument);
 
     const bool read = (mode & std::ios::in) == std::ios::in;
     const bool write = (mode & std::ios::out) == std::ios::out;
@@ -143,7 +134,7 @@ std::error_code sgf::assets::Archive::open(std::ios_base::openmode mode)
     }
 
     const HANDLE file = ::CreateFileW(
-        path_.c_str(),
+        path.c_str(),
         access,
         share_mode,
         nullptr,
@@ -190,38 +181,64 @@ std::error_code sgf::assets::Archive::open(std::ios_base::openmode mode)
         return { static_cast<int>(error), std::system_category() };
     }
 
-    mapping_ = mapping;
     view_ = view;
+    file_mapping_ = mapping;
     size_ = static_cast<std::size_t>(file_size.QuadPart);
-
     return {};
 #elif SGF_PLATFORM_OS_LINUX
     // todo: mmap
+    static_cast<void>(path);
     static_cast<void>(mode);
 #endif
 
     return {};
 }
 
-std::error_code sgf::assets::Archive::close()
+std::error_code sgf::core::MappedFile::open(std::ios_base::openmode mode)
 {
     std::unique_lock lock(mutex_);
-    return unmap();
+    if(mapping_) return {};
+
+    Mapping mapped;
+    if(const auto err = mapped.map(path_, mode)) return err;
+    // an empty file has no view. the next open tries again
+    if(mapped.bytes().empty()) return {};
+
+    mapping_ = core::makeShared<Mapping>(allocator_, std::move(mapped));
+    return {};
 }
 
-bool sgf::assets::Archive::opened() const
+std::error_code sgf::core::MappedFile::close()
+{
+    std::unique_lock lock(mutex_);
+    if(!mapping_) return {};
+
+    // readers already hold their own Access, so their view stays mapped
+    std::error_code error;
+    if(mapping_.use_count() == 1) error = mapping_->unmap();
+
+    mapping_.reset();
+
+    return error;
+}
+
+bool sgf::core::MappedFile::opened() const
 {
     std::shared_lock lock(mutex_);
-    return hasView();
+    return static_cast<bool>(mapping_);
 }
 
-std::span<const std::byte> sgf::assets::Archive::bytes() const
+sgf::core::MappedFile::Access sgf::core::MappedFile::access() const
 {
     std::shared_lock lock(mutex_);
-    return mappedBytes();
+
+    Access result;
+    result.mapping_ = mapping_;
+    if(mapping_) result.bytes_ = mapping_->bytes();
+    return result;
 }
 
-std::filesystem::path sgf::assets::Archive::path() const
+std::filesystem::path sgf::core::MappedFile::path() const
 {
     std::shared_lock lock(mutex_);
     return path_;

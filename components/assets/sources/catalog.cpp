@@ -37,7 +37,7 @@ bool sgf::assets::AssetCatalog::hasFile(AssetId id) const noexcept
     return true;
 }
 
-sgf::assets::Archive* sgf::assets::AssetCatalog::findArchive(const std::filesystem::path& archive_path)
+sgf::core::MappedFile* sgf::assets::AssetCatalog::findArchive(const std::filesystem::path& archive_path)
 {
     std::shared_lock lock(mutex_);
     const auto it = archives_mapping_.find(archive_path);
@@ -82,7 +82,7 @@ sgf::assets::AssetCatalog::File sgf::assets::AssetCatalog::acquireFile()
     return file;
 }
 
-sgf::assets::Archive& sgf::assets::AssetCatalog::acquireArchive(std::filesystem::path archive_path)
+sgf::core::MappedFile& sgf::assets::AssetCatalog::acquireArchive(std::filesystem::path archive_path)
 {
     std::unique_lock lock(mutex_);
     const auto existing = archives_mapping_.find(archive_path);
@@ -91,7 +91,7 @@ sgf::assets::Archive& sgf::assets::AssetCatalog::acquireArchive(std::filesystem:
         return *archives_[existing->second];
     }
 
-    auto archive = core::makeUnique<Archive>(get_allocator(), path_ / archive_path);
+    auto archive = core::makeUnique<core::MappedFile>(get_allocator(), path_ / archive_path);
     const auto archive_index = archives_.size();
 
     archives_.push_back(std::move(archive));
