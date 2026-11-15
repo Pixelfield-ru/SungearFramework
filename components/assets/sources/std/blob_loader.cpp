@@ -26,7 +26,7 @@ std::error_code sgf::assets::BlobLoader::loadBaked(
 
 std::expected<sgf::core::Vector<std::byte>, std::error_code> sgf::assets::BlobLoader::saveBaked(const Blob& asset)
 {
-    return core::Vector(asset.bytes, asset.bytes.get_allocator());
+    return core::Vector<std::byte>(asset.bytes, asset.bytes.get_allocator());
 }
 
 std::error_code sgf::assets::BlobLoader::loadMeta(const std::filesystem::path&, AssetId)

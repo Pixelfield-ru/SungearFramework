@@ -39,8 +39,6 @@ namespace sgf::serialization
         static std::error_code serialize(Serializer& serializer, const assets::AssetCatalog::File::Source& value)
         {
             if(const auto err = serializer.serializeField("path", value.path)) return err;
-            if(const auto err = serializer.serializeField("last_write_time", value.last_write_time)) return err;
-            if(const auto err = serializer.serializeField("size", value.size)) return err;
 
             return {};
         }
@@ -48,8 +46,6 @@ namespace sgf::serialization
         static std::error_code deserialize(Serializer& serializer, assets::AssetCatalog::File::Source& value)
         {
             if(const auto err = serializer.deserializeField("path", value.path)) return err;
-            if(const auto err = serializer.deserializeField("last_write_time", value.last_write_time)) return err;
-            if(const auto err = serializer.deserializeField("size", value.size)) return err;
 
             return {};
         }
@@ -62,6 +58,7 @@ namespace sgf::serialization
         {
             if(const auto err = serializer.serializeField("id", value.id)) return err;
             if(const auto err = serializer.serializeField("type_id", value.type_id)) return err;
+            if(const auto err = serializer.serializeField("version", value.version)) return err;
             if(const auto err = serializer.serializeField("source", value.source)) return err;
             if(const auto err = serializer.serializeField("baked", value.baked)) return err;
 
@@ -72,6 +69,7 @@ namespace sgf::serialization
         {
             if(const auto err = serializer.deserializeField("id", value.id)) return err;
             if(const auto err = serializer.deserializeField("type_id", value.type_id)) return err;
+            if(const auto err = serializer.deserializeField("version", value.version)) return err;
             if(const auto err = serializer.deserializeField("source", value.source)) return err;
             if(const auto err = serializer.deserializeField("baked", value.baked)) return err;
 

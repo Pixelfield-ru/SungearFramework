@@ -39,10 +39,6 @@ namespace sgf::assets
             {
                 /// Path to a file.
                 std::filesystem::path path;
-                /// Last write time of a file.
-                std::uint64_t last_write_time {};
-                /// Size of a file.
-                std::uint64_t size {};
             };
 
             AssetId id {};
@@ -60,12 +56,13 @@ namespace sgf::assets
             bool created = false;
         };
 
-        /// Baked file location without the archive path. One bake shares a single archive.
+        /// One record written by a bake.
         struct BakedAsset final
         {
             AssetId asset_id {};
             std::size_t offset {};
             std::size_t size {};
+            std::uint32_t version = 1;
         };
 
         using allocator_type = std::pmr::polymorphic_allocator<>;

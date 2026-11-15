@@ -4,8 +4,10 @@
 
 #include "sgf/assets/server.h"
 
+#include "baker.h"
 #include "sgf/assets/header.h"
 
+#include <filesystem>
 #include <limits>
 #include <mutex>
 
@@ -126,6 +128,9 @@ std::expected<sgf::assets::AnyHandle, std::error_code> sgf::assets::AssetServer:
             slot->state = AssetState::kFailed;
             return std::unexpected(err);
         }
+
+        // first read of this slot. set version from the catalog
+        slot->version = file->version;
 
         // loading asset by path
         // capture the handle to increase lifetime of the slot
@@ -265,7 +270,8 @@ std::expected<sgf::assets::AnyHandle, std::error_code> sgf::assets::AssetServer:
             dependencies.push_back(std::move(*loaded));
         }
 
-        handle.slot_->version = header.version;
+        // first read of this slot. set version from the catalog
+        slot->version = file->version;
 
         // loading baked source
         // capture the handle to increase lifetime of the slot
@@ -423,43 +429,7 @@ std::error_code sgf::assets::AssetServer::reload(const AnyHandle& handle) noexce
 std::error_code sgf::assets::AssetServer::bake(
     const AnyHandle& handle, const std::filesystem::path& archive, std::int32_t compression_level)
 {
-    if(compression_level < ZSTD_minCLevel() || compression_level > ZSTD_maxCLevel())
-    {
-        core::LogCallback::error(debug_output_,
-                                 "Invalid compression level '{}'. Asset ID: {}, type ID: {}",
-                                 compression_level,
-                                 handle.asset_id_, handle.type_id_);
-        return Error::kCompressionFailed;
-    }
-
-    const auto root = catalog_.root();
-    auto archive_path = core::normalizedRelativePath(root / archive, root);
-    if(!archive_path) return archive_path.error();
-
-    BakeContext context;
-    context.baked_ids = core::UnorderedSet<AssetId>(get_allocator());
-    context.output_bytes = core::Vector<std::byte>(get_allocator());
-    context.baked_data = core::Vector<AssetCatalog::BakedAsset>(get_allocator());
-    context.archive_path = std::move(*archive_path);
-    context.compression_level = compression_level;
-
-    if(const auto err = bakeImpl(context, handle))
-    {
-        return err;
-    }
-
-    if(const auto err = core::writeFile(catalog_.root() / context.archive_path, context.output_bytes))
-    {
-        return err;
-    }
-
-    // one lock for the whole list, and no row changes when an id is missing
-    if(!catalog_.setBaked(archive, context.baked_data))
-    {
-        return Error::kUnknownAsset;
-    }
-
-    return catalog_.save();
+    return Baker(*this).bake(handle, archive, compression_level);
 }
 
 std::error_code sgf::assets::AssetServer::postTracked(std::move_only_function<void()> task) noexcept
@@ -500,193 +470,6 @@ void sgf::assets::AssetServer::finishPosted(const core::SharedPtr<PostedJobs>& p
     if(posted->count.fetch_sub(1, std::memory_order_acq_rel) == 1)
     {
         posted->count.notify_all();
-    }
-}
-
-std::error_code sgf::assets::AssetServer::bakeImpl(BakeContext& context, const AnyHandle& handle)
-{
-    // already baked
-    if(context.baked_ids.contains(handle.asset_id_)) return {};
-    context.baked_ids.insert(handle.asset_id_);
-    if(handle.asset_id_ == 0 || handle.type_id_ == 0) return {};
-
-    auto* storage = this->storage(core::typeIndexFromStableHash(handle.type_id_));
-    if(!storage)
-    {
-        core::LogCallback::error(debug_output_,
-                                 "Cannot find storage. Asset ID: {}, type ID: {}",
-                                 handle.asset_id_, handle.type_id_);
-        return Error::kInvalidStorage;
-    }
-
-    auto* slot = handle.slot_;
-    if(!slot) slot = storage->slotControl(handle.asset_id_);
-
-    const auto handle_valid = slot && slot->erased();
-    if(!handle_valid) return Error::kInvalidHandle;
-
-    if(!slot->loaded()) return Error::kNotLoaded;
-
-    auto* loader = storage->erasedLoader();
-    if(!loader)
-    {
-        core::LogCallback::error(debug_output_,
-                                 "Cannot find loader. Asset ID: {}, type ID: {}",
-                                 handle.asset_id_, handle.type_id_);
-        return Error::kLoaderNotSpecified;
-    }
-
-    const auto dependencies = loader->dependencies(slot->erased());
-
-    const auto file = catalog_.findFile(handle.asset_id_);
-    if(file && file->baked)
-    {
-        auto& asset_archive = catalog_.claimArchive(file->baked->archive);
-        // open existing archive
-        if(!asset_archive.opened() && std::filesystem::exists(asset_archive.path()))
-        {
-            if(const auto err = asset_archive.open(std::ios_base::in)) return err;
-        }
-
-        const auto archive_bytes = asset_archive.bytes();
-
-        if(file->baked->offset > archive_bytes.size())
-        {
-            return std::make_error_code(std::errc::result_out_of_range);
-        }
-
-        if(archive_bytes.size() - file->baked->offset < file->baked->size)
-        {
-            return std::make_error_code(std::errc::result_out_of_range);
-        }
-
-        const auto header_bytes = archive_bytes.subspan(file->baked->offset, sizeof(AssetHeader));
-        AssetHeader header;
-        // reading header
-        std::memcpy(&header, header_bytes.data(), sizeof(AssetHeader));
-
-        if(archive_bytes.size() - file->baked->offset < header.content_block_size)
-        {
-            return std::make_error_code(std::errc::result_out_of_range);
-        }
-
-        const auto content_bytes = archive_bytes.subspan(file->baked->offset + sizeof(AssetHeader),
-                                                         header.content_block_size);
-
-        // asset was not changed
-        if(header.version == slot->version &&
-           header.asset_id == handle.asset_id_)
-        {
-            // saving already baked bytes
-            bakeBytes(context, handle.asset_id_, slot->version, content_bytes, dependencies);
-
-            // baking dependencies
-            for(const auto& dep : dependencies)
-            {
-                if(const auto err = bakeImpl(context, dep))
-                {
-                    return err;
-                }
-            }
-
-            return {};
-        }
-    }
-
-    const auto baked_bytes = loader->saveBaked(slot->erased());
-    if(!baked_bytes)
-    {
-        return baked_bytes.error();
-    }
-
-    const auto bound = ZSTD_compressBound(baked_bytes->size());
-    if(ZSTD_isError(bound))
-    {
-        core::LogCallback::error(debug_output_,
-                                 "Cannot compress asset. Error: {}. Asset ID: {}, type ID: {}",
-                                 bound,
-                                 handle.asset_id_, handle.type_id_);
-        return Error::kCompressionFailed;
-    }
-
-    core::Vector<std::byte> compressed(bound, get_allocator());
-    const auto written = ZSTD_compress(
-        compressed.data(), compressed.size(),
-        baked_bytes->data(), baked_bytes->size(),
-        context.compression_level);
-    if(ZSTD_isError(written))
-    {
-        core::LogCallback::error(debug_output_,
-                                 "Cannot compress asset. Error is: {}, Asset ID: {}, type ID: {}",
-                                 written,
-                                 handle.asset_id_, handle.type_id_);
-        return Error::kCompressionFailed;
-    }
-
-    // a zstd frame can be larger than the raw payload. store the raw bytes in that case
-    std::span stored = *baked_bytes;
-    if(written < baked_bytes->size())
-    {
-        compressed.resize(written);
-        stored = { compressed.data(), compressed.size() };
-    }
-
-    // saving record
-    bakeBytes(context, handle.asset_id_, slot->version, stored, dependencies);
-
-    // baking all direct dependencies
-    for(const auto& dep : dependencies)
-    {
-        if(const auto err = bakeImpl(context, dep))
-        {
-            return err;
-        }
-    }
-
-    return {};
-}
-
-void sgf::assets::AssetServer::bakeBytes(BakeContext& context, AssetId asset_id, std::uint64_t version,
-                                         std::span<const std::byte> asset_bytes,
-                                         std::span<const AnyHandle> dependencies) const
-{
-    // 8 bytes per handle: asset id, then type id
-    core::Vector<std::uint32_t> handles_bytes(get_allocator());
-    handles_bytes.reserve(dependencies.size() * 2);
-    for(const auto& dep : dependencies)
-    {
-        handles_bytes.push_back(dep.asset_id_);
-        handles_bytes.push_back(dep.type_id_);
-    }
-
-    const auto dependencies_bytes = handles_bytes.size() * sizeof(std::uint32_t);
-
-    AssetHeader header;
-    header.content_block_size = asset_bytes.size();
-    header.dependencies_block_size = dependencies_bytes;
-    header.version = version;
-    header.asset_id = asset_id;
-
-    // asset record size
-    const auto record_size = sizeof(header) + asset_bytes.size() + dependencies_bytes;
-
-    AssetCatalog::BakedAsset baked;
-    baked.asset_id = asset_id;
-    baked.offset = context.output_bytes.size();
-    baked.size = record_size;
-
-    context.baked_data.push_back(baked);
-
-    context.output_bytes.reserve(context.output_bytes.size() + record_size);
-
-    const auto* header_bytes = reinterpret_cast<const std::byte*>(&header);
-    context.output_bytes.insert(context.output_bytes.end(), header_bytes, header_bytes + sizeof(header));
-    context.output_bytes.insert(context.output_bytes.end(), asset_bytes.begin(), asset_bytes.end());
-    // if asset has dependencies then inserting the dependencies block
-    if(dependencies_bytes != 0)
-    {
-        const auto* dependency_bytes = reinterpret_cast<const std::byte*>(handles_bytes.data());
-        context.output_bytes.insert(context.output_bytes.end(), dependency_bytes, dependency_bytes + dependencies_bytes);
     }
 }
 

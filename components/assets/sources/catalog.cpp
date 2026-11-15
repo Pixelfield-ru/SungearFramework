@@ -63,7 +63,8 @@ sgf::assets::AssetCatalog::AcquiredFile sgf::assets::AssetCatalog::acquireFile(s
 
     auto& file = files_.emplace_back();
     file.id = file_id;
-    file.path = std::move(file_path);
+    file.source = File::Source {};
+    file.source->path = std::move(file_path);
 
     return { file, true };
 }
@@ -127,6 +128,7 @@ bool sgf::assets::AssetCatalog::setBaked(const std::filesystem::path& archive, s
     {
         std::size_t index {};
         File::Baked baked;
+        std::uint32_t version = 1;
     };
 
     // paths are copied before any row changes, so a throw or a missing id leaves the catalog as it was
@@ -143,12 +145,14 @@ bool sgf::assets::AssetCatalog::setBaked(const std::filesystem::path& archive, s
         baked.archive = archive;
         baked.offset = asset.offset;
         baked.size = asset.size;
-        updates.push_back(Update { it->second, std::move(baked) });
+        updates.push_back(Update { it->second, std::move(baked), asset.version });
     }
 
     for(auto& update : updates)
     {
-        files_[update.index].baked = std::move(update.baked);
+        auto& file = files_[update.index];
+        file.baked = std::move(update.baked);
+        file.version = update.version;
     }
 
     return true;

@@ -33,6 +33,8 @@ namespace sgf::assets
     // todo: use stable type index
     struct AssetServer final
     {
+        friend class Baker;
+
         using allocator_type = std::pmr::polymorphic_allocator<>;
 
     private:
@@ -131,6 +133,9 @@ namespace sgf::assets
 
             // the slot is already kLoading by other caller
             if(!claimed.load) return handle;
+
+            // first read of this slot. set version from the catalog
+            slot->version = acquired.file.version;
 
             // capture the handle to increase lifetime of the slot
             if(const auto err = postTracked([loader, actual_path, handle] {
@@ -281,21 +286,7 @@ namespace sgf::assets
         AssetServer& operator=(AssetServer&& other) noexcept;
 
     private:
-        struct BakeContext final
-        {
-            core::UnorderedSet<AssetId> baked_ids;
-
-            core::Vector<std::byte> output_bytes;
-            core::Vector<AssetCatalog::BakedAsset> baked_data;
-            std::filesystem::path archive_path;
-            std::int32_t compression_level {};
-        };
-
         [[nodiscard]] std::error_code postTracked(std::move_only_function<void()> task) noexcept;
-        std::error_code bakeImpl(BakeContext& context, const AnyHandle& handle);
-        void bakeBytes(BakeContext& context, AssetId asset_id, std::uint64_t version,
-                       std::span<const std::byte> asset_bytes,
-                       std::span<const AnyHandle> dependencies) const;
 
         static void finishPosted(const core::SharedPtr<PostedJobs>& posted) noexcept;
 

@@ -334,6 +334,7 @@ namespace sgf::assets
     struct AnyHandle final : HandleBase
     {
         friend struct AssetServer;
+        friend class Baker;
         friend struct AnyWeakHandle;
 
         AnyHandle() = default;
