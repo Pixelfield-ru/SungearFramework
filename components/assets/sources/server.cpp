@@ -115,9 +115,9 @@ std::expected<sgf::assets::AnyHandle, std::error_code> sgf::assets::AssetServer:
     if(!claimed.load) return handle;
 
     // if files is stored by path
-    if(file->path && std::filesystem::exists(root / *file->path))
+    if(file->source && std::filesystem::exists(root / file->source->path))
     {
-        const auto actual_path = root / *file->path;
+        const auto actual_path = root / file->source->path;
 
         // loading meta of the file near the file
         if(const auto err = loader->loadMeta(actual_path, file->id))
@@ -371,7 +371,7 @@ std::error_code sgf::assets::AssetServer::reload(const AnyHandle& handle) noexce
     const auto root = catalog_.root();
 
     // asset was not saved in file
-    if(!file->path || !std::filesystem::exists(root / *file->path))
+    if(!file->source || !std::filesystem::exists(root / file->source->path))
     {
         core::LogCallback::error(debug_output_,
                                  "Cannot find file in filesystem. Asset ID: {}, type ID: {}",
@@ -379,7 +379,7 @@ std::error_code sgf::assets::AssetServer::reload(const AnyHandle& handle) noexce
         return Error::kNoSource;
     }
 
-    const auto file_path = root / *file->path;
+    const auto file_path = root / file->source->path;
 
     // write meta before loading source
     if(const auto err = loader->writeMeta(file_path, handle.asset_id_)) return err;

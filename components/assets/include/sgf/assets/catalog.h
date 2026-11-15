@@ -35,9 +35,21 @@ namespace sgf::assets
                 std::size_t size {};
             };
 
+            struct Source final
+            {
+                /// Path to a file.
+                std::filesystem::path path;
+                /// Last write time of a file.
+                std::uint64_t last_write_time {};
+                /// Size of a file.
+                std::uint64_t size {};
+            };
+
             AssetId id {};
             std::int64_t type_id {};
-            std::optional<std::filesystem::path> path;
+            std::uint32_t version = 1;
+
+            std::optional<Source> source;
             std::optional<Baked> baked;
         };
 
