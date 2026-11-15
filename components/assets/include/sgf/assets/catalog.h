@@ -102,6 +102,7 @@ namespace sgf::assets
         /// Creates a row without a path.
         File acquireFile();
         /// Finds the archive for this path or creates a closed one.
+        /// Stays valid until mount. Do not call mount while a load is using the archive.
         core::MappedFile& acquireArchive(std::filesystem::path archive_path);
 
         void setTypeId(AssetId id, std::int64_t type_id);

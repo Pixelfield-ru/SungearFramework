@@ -137,7 +137,7 @@ namespace sgf::assets
             id = 0;
             version = 1;
             storage = {};
-            value = std::nullopt;
+            value.reset();
         }
     };
 }

@@ -153,9 +153,8 @@ std::expected<sgf::assets::AnyHandle, std::error_code> sgf::assets::AssetServer:
 
     if(file->baked)
     {
-        // loading asset from archive. acquire finds an existing mapping or creates one
+        // the archive stays open for this load. mount and close are not called while it runs
         auto& archive = catalog_.acquireArchive(file->baked->archive);
-
         if(const auto err = archive.open(std::ios::in))
         {
             slot->error = err;
@@ -164,8 +163,7 @@ std::expected<sgf::assets::AnyHandle, std::error_code> sgf::assets::AssetServer:
         }
 
         const auto archive_path = archive.path().generic_string();
-        const auto archive_access = archive.access();
-        const auto archive_span = archive_access.bytes();
+        const auto archive_span = archive.bytes();
 
         const auto baked_offset = file->baked->offset;
         const auto baked_size = file->baked->size;
@@ -269,10 +267,7 @@ std::expected<sgf::assets::AnyHandle, std::error_code> sgf::assets::AssetServer:
 
         // loading baked source
         // capture the handle to increase lifetime of the slot
-        if(const auto err = postTracked([loader, asset_bytes, archive_access, handle, allocator, dependencies = std::move(dependencies)] {
-            // archive_access owns the mapping that asset_bytes points into
-            // copying archive_access just to increase lifetime of mapped file
-            (void) archive_access;
+        if(const auto err = postTracked([loader, asset_bytes, handle, allocator, dependencies = std::move(dependencies)] {
             auto* slot = handle.slot_;
 
             std::span<const std::byte> plain = asset_bytes;

@@ -58,14 +58,17 @@ namespace sgf::assets
          */
         void waitPosted() noexcept;
 
-        /***
+        /**
          * Mount the catalog in a directory.
+         * Do not call while a load is in progress. A loaded asset may already live outside the new root.
          * @param path Path to mount the catalog.
          */
         std::error_code mount(std::filesystem::path path) noexcept;
 
         /**
          * Load asset by path.
+         * Do not call while a caller still uses the pointer from get() for this asset.
+         * Do not use the asset until the load has finished.
          * @tparam AssetT Type of asset.
          * @param path Path of asset.
          * @return Handle to the asset or an error.
@@ -155,6 +158,8 @@ namespace sgf::assets
         /**
          * Load asset that exists in catalog.
          * Asset loads only if it was not loaded earlier and was saved by path or in an archive.
+         * Do not call while a caller still uses the pointer from get() for this asset.
+         * Do not use the asset until the load has finished.
          * @param asset_id Asset ID that needs to be loaded.
          * @param type_id Type ID of asset.
          * @return Handle to the asset.
@@ -163,6 +168,8 @@ namespace sgf::assets
 
         /**
          * Reload asset by path.
+         * Do not call while a caller still uses the pointer from get().
+         * Do not use the asset until this reload has finished.
          * @param handle Asset that needs to be reloaded.
          * @return Error.
          */

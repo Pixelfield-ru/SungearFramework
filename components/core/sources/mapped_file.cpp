@@ -20,72 +20,17 @@
 
 #endif
 
-sgf::core::MappedFile::Mapping::Mapping(Mapping&& other) noexcept
-{
-#if SGF_PLATFORM_OS_WINDOWS
-    view_ = std::exchange(other.view_, nullptr);
-    file_mapping_ = std::exchange(other.file_mapping_, nullptr);
-    size_ = std::exchange(other.size_, 0);
-#else
-    static_cast<void>(other);
-#endif
-}
-
-sgf::core::MappedFile::Mapping::~Mapping()
-{
-    std::ignore = unmap();
-}
-
-std::span<const std::byte> sgf::core::MappedFile::Mapping::bytes() const noexcept
-{
-#if SGF_PLATFORM_OS_WINDOWS
-    return { static_cast<std::byte const*>(view_), size_ };
-#else
-    return {};
-#endif
-}
-
-std::error_code sgf::core::MappedFile::Mapping::unmap()
-{
-#if SGF_PLATFORM_OS_WINDOWS
-    std::error_code error;
-    if(view_)
-    {
-        if(!::UnmapViewOfFile(view_))
-        {
-            error = { static_cast<int>(::GetLastError()), std::system_category() };
-        }
-        view_ = {};
-    }
-
-    if(file_mapping_)
-    {
-        if(!::CloseHandle(static_cast<HANDLE>(file_mapping_)) && !error)
-        {
-            error = { static_cast<int>(::GetLastError()), std::system_category() };
-        }
-        file_mapping_ = {};
-    }
-
-    size_ = 0;
-    return error;
-#else
-    return {};
-#endif
-}
-
 sgf::core::MappedFile::~MappedFile()
 {
     std::unique_lock lock(mutex_);
-    mapping_.reset();
+    std::ignore = unmap();
 }
 
 sgf::core::MappedFile::MappedFile(MappedFile&& other) noexcept
 {
     std::unique_lock lock(other.mutex_);
     path_ = std::move(other.path_);
-    resource_ = other.resource_;
-    mapping_ = std::move(other.mapping_);
+    adopt(other);
 }
 
 sgf::core::MappedFile& sgf::core::MappedFile::operator=(MappedFile&& other) noexcept
@@ -96,18 +41,16 @@ sgf::core::MappedFile& sgf::core::MappedFile::operator=(MappedFile&& other) noex
     std::unique_lock other_lock(other.mutex_, std::defer_lock);
     std::lock(lock, other_lock);
 
-    mapping_.reset();
+    std::ignore = unmap();
     path_ = std::move(other.path_);
-    resource_ = other.resource_;
-    mapping_ = std::move(other.mapping_);
-
+    adopt(other);
     return *this;
 }
 
-std::error_code sgf::core::MappedFile::Mapping::map(const std::filesystem::path& path, std::ios_base::openmode mode)
+std::error_code sgf::core::MappedFile::map(std::ios_base::openmode mode)
 {
 #if SGF_PLATFORM_OS_WINDOWS
-    if(path.empty()) return std::make_error_code(std::errc::invalid_argument);
+    if(path_.empty()) return std::make_error_code(std::errc::invalid_argument);
 
     const bool read = (mode & std::ios::in) == std::ios::in;
     const bool write = (mode & std::ios::out) == std::ios::out;
@@ -134,7 +77,7 @@ std::error_code sgf::core::MappedFile::Mapping::map(const std::filesystem::path&
     }
 
     const HANDLE file = ::CreateFileW(
-        path.c_str(),
+        path_.c_str(),
         access,
         share_mode,
         nullptr,
@@ -187,55 +130,86 @@ std::error_code sgf::core::MappedFile::Mapping::map(const std::filesystem::path&
     return {};
 #elif SGF_PLATFORM_OS_LINUX
     // todo: mmap
-    static_cast<void>(path);
     static_cast<void>(mode);
 #endif
 
     return {};
 }
 
+std::error_code sgf::core::MappedFile::unmap()
+{
+#if SGF_PLATFORM_OS_WINDOWS
+    std::error_code error;
+    if(view_)
+    {
+        if(!::UnmapViewOfFile(view_))
+        {
+            error = { static_cast<int>(::GetLastError()), std::system_category() };
+        }
+        view_ = {};
+    }
+
+    if(file_mapping_)
+    {
+        if(!::CloseHandle(static_cast<HANDLE>(file_mapping_)) && !error)
+        {
+            error = { static_cast<int>(::GetLastError()), std::system_category() };
+        }
+        file_mapping_ = {};
+    }
+
+    size_ = 0;
+    return error;
+#else
+    return {};
+#endif
+}
+
+void sgf::core::MappedFile::adopt(MappedFile& other) noexcept
+{
+#if SGF_PLATFORM_OS_WINDOWS
+    view_ = std::exchange(other.view_, nullptr);
+    file_mapping_ = std::exchange(other.file_mapping_, nullptr);
+    size_ = std::exchange(other.size_, 0);
+#else
+    static_cast<void>(other);
+#endif
+}
+
 std::error_code sgf::core::MappedFile::open(std::ios_base::openmode mode)
 {
     std::unique_lock lock(mutex_);
-    if(mapping_) return {};
-
-    Mapping mapped;
-    if(const auto err = mapped.map(path_, mode)) return err;
-    // an empty file has no view. the next open tries again
-    if(mapped.bytes().empty()) return {};
-
-    mapping_ = core::makeShared<Mapping>(resource_, std::move(mapped));
-    return {};
+#if SGF_PLATFORM_OS_WINDOWS
+    if(view_) return {};
+#endif
+    return map(mode);
 }
 
 std::error_code sgf::core::MappedFile::close()
 {
     std::unique_lock lock(mutex_);
-    if(!mapping_) return {};
-
-    // readers already hold their own Access, so their view stays mapped
-    std::error_code error;
-    if(mapping_.use_count() == 1) error = mapping_->unmap();
-
-    mapping_.reset();
-
-    return error;
+    return unmap();
 }
 
 bool sgf::core::MappedFile::opened() const
 {
     std::shared_lock lock(mutex_);
-    return static_cast<bool>(mapping_);
+#if SGF_PLATFORM_OS_WINDOWS
+    return view_ != nullptr;
+#else
+    return false;
+#endif
 }
 
-sgf::core::MappedFile::Access sgf::core::MappedFile::access() const
+std::span<const std::byte> sgf::core::MappedFile::bytes() const
 {
     std::shared_lock lock(mutex_);
-
-    Access result;
-    result.mapping_ = mapping_;
-    if(mapping_) result.bytes_ = mapping_->bytes();
-    return result;
+#if SGF_PLATFORM_OS_WINDOWS
+    if(!view_) return {};
+    return { static_cast<std::byte const*>(view_), size_ };
+#else
+    return {};
+#endif
 }
 
 std::filesystem::path sgf::core::MappedFile::path() const

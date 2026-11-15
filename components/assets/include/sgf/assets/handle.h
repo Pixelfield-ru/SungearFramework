@@ -134,12 +134,16 @@ namespace sgf::assets
             HandleBase(std::move(other))
         { }
 
+        /// The pointer stays valid while this slot is not loading or reloading.
+        /// Do not load or reload the asset while the pointer is in use.
         [[nodiscard]] const AssetT* get() const noexcept
         {
             auto* slot = slotAs<AssetT>();
             return valid() ? &(*slot->value) : nullptr;
         }
 
+        /// The pointer stays valid while this slot is not loading or reloading.
+        /// Do not load or reload the asset while the pointer is in use.
         [[nodiscard]] AssetT* get() noexcept
         {
             auto* slot = slotAs<AssetT>();
