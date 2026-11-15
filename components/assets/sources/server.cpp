@@ -382,7 +382,16 @@ std::error_code sgf::assets::AssetServer::reload(const AnyHandle& handle) noexce
     // write meta before loading source
     if(const auto err = loader->writeMeta(file_path, handle.asset_id_)) return err;
 
-    slot->state = AssetState::kLoading;
+    // one reload wins the transition. the other observes kLoading and does not post
+    auto state = slot->state.load(std::memory_order_acquire);
+    do
+    {
+        if(state == AssetState::kLoading) return {};
+    }
+    while(!slot->state.compare_exchange_weak(
+        state, AssetState::kLoading,
+        std::memory_order_acq_rel,
+        std::memory_order_acquire));
 
     // finally, load source
     // capture the handle to increase lifetime of the slot
