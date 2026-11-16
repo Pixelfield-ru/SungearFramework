@@ -10,6 +10,8 @@
 #include "sgf/core/log.h"
 #include "sgf/core/memory.h"
 
+#include "keyboard.h"
+
 namespace sgf::platform
 {
     enum class WindowClientApi
@@ -35,6 +37,8 @@ namespace sgf::platform
 
     struct Window final
     {
+        friend struct Platform;
+
         using allocator_type = std::pmr::polymorphic_allocator<>;
 
         explicit Window(const allocator_type& alloc = {}) noexcept;
@@ -51,12 +55,15 @@ namespace sgf::platform
         void size(std::int32_t& width, std::int32_t& height) const noexcept;
         void setSize(std::int32_t width, std::int32_t height) noexcept;
 
+        [[nodiscard]] const Keyboard& keyboard() const noexcept;
+        Keyboard& keyboard() noexcept;
+
         [[nodiscard]] allocator_type get_allocator() const noexcept;
 
         Window& operator=(const Window&) = delete;
         Window& operator=(Window&& other) noexcept;
 
-        static std::error_code create(const WindowCreateInfo& create_info, Window& output) noexcept;
+        [[nodiscard]] static std::error_code create(const WindowCreateInfo& create_info, Window& output) noexcept;
 
     private:
         struct Impl;
@@ -65,6 +72,8 @@ namespace sgf::platform
         core::UniquePtr<Impl> impl_;
 
         const core::LogCallback* debug_output_ {};
+
+        Keyboard keyboard_;
 
         void destroy() noexcept;
         void setFocused(bool focused) noexcept;

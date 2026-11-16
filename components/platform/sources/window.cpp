@@ -9,6 +9,7 @@
 
 #include "sgf/core/errors.h"
 #include "sgf/platform/glfw/glfw_errors.h"
+#include "sgf/platform/glfw/glfw_types.h"
 #include "sgf/platform/platform.h"
 
 struct sgf::platform::Window::Impl
@@ -18,13 +19,15 @@ struct sgf::platform::Window::Impl
     static void closeCallback(GLFWwindow* window) noexcept;
     static void iconifyCallback(GLFWwindow* window, int iconified) noexcept;
     static void framebufferSizeCallback(GLFWwindow* window, int width, int height) noexcept;
-    static void windowFocusedCallback(GLFWwindow* window, int focused) noexcept;
+    static void windowFocusedCallback(GLFWwindow* window, int focused);
     static void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) noexcept;
+    static void charCallback(GLFWwindow* window, unsigned int codepoint) noexcept;
 };
 
 sgf::platform::Window::Window(const allocator_type& alloc) noexcept :
     resource_(alloc.resource()),
-    impl_(core::makeUnique<Impl>(alloc))
+    impl_(core::makeUnique<Impl>(alloc)),
+    keyboard_(alloc)
 {
     platform().addWindow(this);
 }
@@ -32,7 +35,8 @@ sgf::platform::Window::Window(const allocator_type& alloc) noexcept :
 sgf::platform::Window::Window(Window&& other) noexcept :
     resource_(other.resource_),
     impl_(std::move(other.impl_)),
-    debug_output_(other.debug_output_)
+    debug_output_(other.debug_output_),
+    keyboard_(std::move(other.keyboard_))
 {
     platform().addWindow(this);
     adoptNativeOwner(other);
@@ -41,7 +45,8 @@ sgf::platform::Window::Window(Window&& other) noexcept :
 sgf::platform::Window::Window(Window&& other, const allocator_type& alloc) noexcept :
     resource_(other.resource_),
     impl_(std::move(other.impl_)),
-    debug_output_(other.debug_output_)
+    debug_output_(other.debug_output_),
+    keyboard_(std::move(other.keyboard_), alloc)
 {
     platform().addWindow(this);
     adoptNativeOwner(other);
@@ -50,6 +55,15 @@ sgf::platform::Window::Window(Window&& other, const allocator_type& alloc) noexc
 sgf::platform::Window::~Window() noexcept
 {
     destroy();
+
+    try
+    {
+        keyboard_.releaseAll();
+    }
+    catch(...)
+    {
+    }
+
     platform().removeWindow(this);
 }
 
@@ -78,6 +92,16 @@ void sgf::platform::Window::setSize(std::int32_t width, std::int32_t height) noe
     glfwSetWindowSize(impl_->handle, width, height);
 }
 
+const sgf::platform::Keyboard& sgf::platform::Window::keyboard() const noexcept
+{
+    return keyboard_;
+}
+
+sgf::platform::Keyboard& sgf::platform::Window::keyboard() noexcept
+{
+    return keyboard_;
+}
+
 sgf::platform::Window::allocator_type sgf::platform::Window::get_allocator() const noexcept
 {
     return resource_;
@@ -93,6 +117,7 @@ sgf::platform::Window& sgf::platform::Window::operator=(Window&& other) noexcept
     resource_ = other.resource_;
     impl_ = std::move(other.impl_);
     debug_output_ = other.debug_output_;
+    keyboard_ = std::move(other.keyboard_);
 
     adoptNativeOwner(other);
 
@@ -142,6 +167,7 @@ std::error_code sgf::platform::Window::create(const WindowCreateInfo& create_inf
     glfwSetFramebufferSizeCallback(impl->handle, &Impl::framebufferSizeCallback);
     glfwSetWindowFocusCallback(impl->handle, &Impl::windowFocusedCallback);
     glfwSetKeyCallback(impl->handle, &Impl::keyCallback);
+    glfwSetCharCallback(impl->handle, &Impl::charCallback);
 
     if(create_info.client_api == WindowClientApi::kOpenGL)
     {
@@ -170,7 +196,7 @@ void sgf::platform::Window::setFocused(bool focused) noexcept
     }
     else if(platform().focused_window_ == this)
     {
-        platform().focused_window_ = {};
+        platform().defocusWindow();
     }
 }
 
@@ -202,7 +228,7 @@ void sgf::platform::Window::Impl::framebufferSizeCallback(GLFWwindow* window, in
     auto* my_window = static_cast<Window*>(glfwGetWindowUserPointer(window));
 }
 
-void sgf::platform::Window::Impl::windowFocusedCallback(GLFWwindow* window, int focused) noexcept
+void sgf::platform::Window::Impl::windowFocusedCallback(GLFWwindow* window, int focused)
 {
     auto* my_window = static_cast<Window*>(glfwGetWindowUserPointer(window));
     my_window->setFocused(focused == GLFW_TRUE);
@@ -211,4 +237,15 @@ void sgf::platform::Window::Impl::windowFocusedCallback(GLFWwindow* window, int 
 void sgf::platform::Window::Impl::keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) noexcept
 {
     auto* my_window = static_cast<Window*>(glfwGetWindowUserPointer(window));
+
+    const auto my_action = fromGlfwKeyAction(action);
+    if(!my_action) return;
+
+    my_window->keyboard_.pushKey(fromGlfwKey(key), scancode, *my_action, fromGlfwKeyMod(mods));
+}
+
+void sgf::platform::Window::Impl::charCallback(GLFWwindow* window, unsigned int codepoint) noexcept
+{
+    auto* my_window = static_cast<Window*>(glfwGetWindowUserPointer(window));
+    my_window->keyboard_.pushText(codepoint);
 }

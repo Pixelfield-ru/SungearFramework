@@ -43,8 +43,9 @@ namespace sgf::platform
 
         void addWindow(Window* window) noexcept;
         void removeWindow(Window* window) noexcept;
+        void defocusWindow() noexcept;
 
-        static void glfwErrorCallback(int level, const char* description) noexcept;
+        static void glfwErrorCallback(int error, const char* description) noexcept;
     };
 
     Platform& platform() noexcept;

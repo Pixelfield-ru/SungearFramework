@@ -7,7 +7,9 @@
 #include <algorithm>
 
 #include "GLFW/glfw3.h"
+#include "sgf/platform/window.h"
 #include "sgf/platform/glfw/glfw_errors.h"
+#include "sgf/platform/glfw/glfw_types.h"
 
 sgf::platform::Platform::~Platform() noexcept
 {
@@ -48,6 +50,12 @@ void sgf::platform::Platform::setDebugOutput(const core::LogCallback& callback) 
 
 void sgf::platform::Platform::poll() const noexcept
 {
+    // clear events of window
+    for(auto* window : windows_)
+    {
+        window->keyboard().clearFrame();
+    }
+
     glfwPollEvents();
 }
 
@@ -64,14 +72,19 @@ void sgf::platform::Platform::removeWindow(Window* window) noexcept
 
     if(window == focused_window_)
     {
-        focused_window_ = {};
+        defocusWindow();
     }
 }
 
-void sgf::platform::Platform::glfwErrorCallback(int level, const char* description) noexcept
+void sgf::platform::Platform::defocusWindow() noexcept
 {
-    // todo: use level
-    core::LogCallback::error(platform().debug_output_, description);
+    focused_window_->keyboard_.releaseScancodes();
+    focused_window_ = {};
+}
+
+void sgf::platform::Platform::glfwErrorCallback(int error, const char* description) noexcept
+{
+    core::LogCallback::print(platform().debug_output_, fromGlfwError(error), description ? description : "");
 }
 
 sgf::platform::Platform& sgf::platform::platform() noexcept

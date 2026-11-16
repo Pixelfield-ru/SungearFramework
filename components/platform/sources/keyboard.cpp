@@ -141,6 +141,17 @@ void sgf::platform::Keyboard::clearFrame() noexcept
     text_.clear();
 }
 
+void sgf::platform::Keyboard::releaseScancodes() noexcept
+{
+    for(auto& flags : scancodes_)
+    {
+        if(!hasFlag(flags, KeyFlags::kDown)) continue;
+
+        flags &= ~KeyFlags::kDown;
+        flags |= KeyFlags::kReleased;
+    }
+}
+
 void sgf::platform::Keyboard::releaseAll()
 {
     for(std::size_t index = 0; index < keys_.size(); ++index)
