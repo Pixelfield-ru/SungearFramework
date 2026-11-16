@@ -69,27 +69,68 @@ sgf::platform::Window::~Window() noexcept
 
 void sgf::platform::Window::setTitle(std::string_view title) noexcept
 {
+    if(!valid()) return;
     glfwSetWindowTitle(impl_->handle, title.data());
 }
 
 void sgf::platform::Window::position(std::int32_t& x, std::int32_t& y) const noexcept
 {
+    if(!valid())
+    {
+        x = 0;
+        y = 0;
+        return;
+    }
     glfwGetWindowPos(impl_->handle, &x, &y);
 }
 
 void sgf::platform::Window::setPosition(std::int32_t x, std::int32_t y) noexcept
 {
+    if(!valid()) return;
     glfwSetWindowPos(impl_->handle, x, y);
 }
 
 void sgf::platform::Window::size(std::int32_t& width, std::int32_t& height) const noexcept
 {
+    if(!valid())
+    {
+        width = 0;
+        height = 0;
+        return;
+    }
     glfwGetWindowSize(impl_->handle, &width, &height);
 }
 
 void sgf::platform::Window::setSize(std::int32_t width, std::int32_t height) noexcept
 {
+    if(!valid()) return;
     glfwSetWindowSize(impl_->handle, width, height);
+}
+
+void sgf::platform::Window::close() noexcept
+{
+    if(!valid()) return;
+
+    try
+    {
+        keyboard_.releaseAll();
+    }
+    catch(...)
+    {
+    }
+
+    glfwDestroyWindow(impl_->handle);
+    impl_->handle = {};
+
+    setFocused(false);
+
+    --platform().opened_windows_count_;
+}
+
+bool sgf::platform::Window::shouldClose() const noexcept
+{
+    if(!valid()) return false;
+    return glfwWindowShouldClose(impl_->handle) == GLFW_TRUE;
 }
 
 const sgf::platform::Keyboard& sgf::platform::Window::keyboard() const noexcept
@@ -176,7 +217,14 @@ std::error_code sgf::platform::Window::create(const WindowCreateInfo& create_inf
 
     glfwDefaultWindowHints();
 
+    ++platform().opened_windows_count_;
+
     return {};
+}
+
+bool sgf::platform::Window::valid() const noexcept
+{
+    return impl_ && impl_->handle;
 }
 
 void sgf::platform::Window::destroy() noexcept
@@ -185,6 +233,8 @@ void sgf::platform::Window::destroy() noexcept
     {
         glfwDestroyWindow(impl_->handle);
         impl_->handle = {};
+
+        --platform().opened_windows_count_;
     }
 }
 

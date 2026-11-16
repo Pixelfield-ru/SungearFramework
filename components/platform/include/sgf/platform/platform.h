@@ -28,6 +28,8 @@ namespace sgf::platform
         [[nodiscard]] std::error_code init() noexcept;
         [[nodiscard]] bool initialized() const noexcept;
 
+        [[nodiscard]] std::uint32_t openedWindowsCount() const noexcept;
+
         Window* focusedWindow() noexcept;
 
         void setDebugOutput(const core::LogCallback& callback) noexcept;
@@ -40,6 +42,7 @@ namespace sgf::platform
 
         core::Vector<Window*> windows_;
         Window* focused_window_ {};
+        std::uint32_t opened_windows_count_ {};
 
         void addWindow(Window* window) noexcept;
         void removeWindow(Window* window) noexcept;

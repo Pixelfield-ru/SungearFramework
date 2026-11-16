@@ -55,6 +55,9 @@ namespace sgf::platform
         void size(std::int32_t& width, std::int32_t& height) const noexcept;
         void setSize(std::int32_t width, std::int32_t height) noexcept;
 
+        void close() noexcept;
+        [[nodiscard]] bool shouldClose() const noexcept;
+
         [[nodiscard]] const Keyboard& keyboard() const noexcept;
         Keyboard& keyboard() noexcept;
 
@@ -75,6 +78,7 @@ namespace sgf::platform
 
         Keyboard keyboard_;
 
+        [[nodiscard]] bool valid() const noexcept;
         void destroy() noexcept;
         void setFocused(bool focused) noexcept;
         void adoptNativeOwner(Window& from) noexcept;

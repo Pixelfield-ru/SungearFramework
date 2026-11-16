@@ -38,6 +38,11 @@ bool sgf::platform::Platform::initialized() const noexcept
     return initialized_;
 }
 
+std::uint32_t sgf::platform::Platform::openedWindowsCount() const noexcept
+{
+    return opened_windows_count_;
+}
+
 sgf::platform::Window* sgf::platform::Platform::focusedWindow() noexcept
 {
     return focused_window_;
@@ -50,10 +55,12 @@ void sgf::platform::Platform::setDebugOutput(const core::LogCallback& callback) 
 
 void sgf::platform::Platform::poll() const noexcept
 {
-    // clear events of window
     for(auto* window : windows_)
     {
         window->keyboard().clearFrame();
+
+        if(window->valid() && window->shouldClose())
+            window->close();
     }
 
     glfwPollEvents();

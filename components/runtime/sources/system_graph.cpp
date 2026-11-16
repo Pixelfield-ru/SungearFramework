@@ -26,7 +26,6 @@ std::error_code sgf::runtime::SystemGraph::build(
     output.entries.clear();
 
     output.nodes.resize(build_info.systems.size());
-    output.entries.resize(build_info.systems.size());
 
     const auto& context = build_info.context;
 
@@ -116,7 +115,7 @@ std::error_code sgf::runtime::SystemGraph::build(
         const auto& node = output.nodes[i];
         if(node.dependency_count > 0) continue;
 
-        output.entries[i] = node.index;
+        output.entries.push_back(node.index);
     }
 
     // initializing state to check cycles
