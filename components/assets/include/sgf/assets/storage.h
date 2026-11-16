@@ -63,21 +63,25 @@ namespace sgf::assets
 
         void setLoader(core::UniquePtr<IAssetLoader<AssetT>> loader) noexcept
         {
+            std::unique_lock lock(mutex_);
             loader_ = std::move(loader);
         }
 
         [[nodiscard]] IAssetLoader<AssetT>* loader() noexcept
         {
+            std::unique_lock lock(mutex_);
             return loader_.get();
         }
 
         [[nodiscard]] IErasedAssetLoader* erasedLoader() noexcept override
         {
+            std::unique_lock lock(mutex_);
             return loader_.get();
         }
 
         [[nodiscard]] const IAssetLoader<AssetT>* loader() const noexcept
         {
+            std::unique_lock lock(mutex_);
             return loader_.get();
         }
 

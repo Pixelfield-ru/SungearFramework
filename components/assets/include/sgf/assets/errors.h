@@ -19,7 +19,8 @@ namespace sgf::assets
         kUnknownStorageType,
         kCompressionFailed,
         kNotLoaded,
-        kLockedArchive
+        kLockedArchive,
+        kImporterNotSpecified
     };
 
     struct ErrorCategory final : public std::error_category
@@ -40,6 +41,7 @@ namespace sgf::assets
                 case Error::kCompressionFailed: return "Failed to compress or decompress baked asset bytes.";
                 case Error::kNotLoaded: return "Asset is not loaded.";
                 case Error::kLockedArchive: return "Archive is busy.";
+                case Error::kImporterNotSpecified: return "The importer was not specified for this extension of a source.";
                 default: return "Unknown error";
             }
         }

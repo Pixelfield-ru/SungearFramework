@@ -12,6 +12,10 @@ namespace sgf::assets
 {
     struct BlobLoader final : IAssetLoader<Blob>
     {
+        explicit BlobLoader(allocator_type allocator = {}) :
+            IAssetLoader(allocator)
+        { }
+
         [[nodiscard]] std::error_code loadSource(const std::filesystem::path& source, Blob& asset) override;
         [[nodiscard]] std::error_code loadBaked(std::span<const std::byte> bytes,
                                                 std::span<const AnyHandle> dependencies,
@@ -22,5 +26,10 @@ namespace sgf::assets
         [[nodiscard]] std::error_code writeMeta(const std::filesystem::path& source, AssetId id) override;
 
         [[nodiscard]] core::Vector<AnyHandle> dependencies(const Blob& asset) override;
+
+        std::error_code addImporter(core::UniquePtr<IAssetImporter<Blob>>) override
+        {
+            return std::make_error_code(std::errc::not_supported);
+        }
     };
 }

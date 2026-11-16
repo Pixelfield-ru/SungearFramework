@@ -132,3 +132,15 @@ std::expected<std::filesystem::path, std::error_code> sgf::core::normalizedRelat
 
     return std::filesystem::path { relative.generic_string() };
 }
+
+sgf::core::String sgf::core::normalizedExtension(std::string_view extension,
+                                                 const std::pmr::polymorphic_allocator<char>& alloc)
+{
+    String key(extension, alloc);
+    for(char& ch : key)
+    {
+        ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+    }
+
+    return key;
+}

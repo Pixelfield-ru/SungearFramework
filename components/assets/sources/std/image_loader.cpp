@@ -4,26 +4,13 @@
 
 #include "sgf/assets/std/image_loader.h"
 
-#include "sgf/core/utility/file.h"
-
-#include <cstring>
 #include <limits>
-#include <memory>
 #include <optional>
 
-#define STB_IMAGE_IMPLEMENTATION
-#include <stb_image.h>
+#include "sgf/assets/std/image_utils.h"
 
 namespace
 {
-    struct StbImageDeleter
-    {
-        void operator()(void* pixels) const noexcept
-        {
-            stbi_image_free(pixels);
-        }
-    };
-
     /// Baked image: three little-endian uint32 values, then tightly packed 8-bit pixels.
     struct ImageRecord final
     {
@@ -31,55 +18,6 @@ namespace
         std::uint32_t height {};
         std::uint32_t channels {};
     };
-
-    [[nodiscard]] std::optional<std::size_t> pixelCount(
-        std::uint32_t width, std::uint32_t height, std::uint32_t channels) noexcept
-    {
-        if(width == 0 || height == 0 || channels == 0 || channels > 4) return {};
-
-        const auto plane = static_cast<std::uint64_t>(width) * height;
-        if(plane > std::numeric_limits<std::size_t>::max() / channels) return {};
-
-        return static_cast<std::size_t>(plane * channels);
-    }
-}
-
-std::error_code sgf::assets::ImageLoader::loadSource(const std::filesystem::path& source, Image& asset)
-{
-    auto file = core::readFile(source, asset.pixels.get_allocator());
-    if(!file) return file.error();
-
-    if(file->size() > static_cast<std::size_t>(std::numeric_limits<int>::max()))
-    {
-        return std::make_error_code(std::errc::file_too_large);
-    }
-
-    int width = 0;
-    int height = 0;
-    int channels = 0;
-
-    const std::unique_ptr<stbi_uc, StbImageDeleter> decoded(stbi_load_from_memory(
-        reinterpret_cast<const stbi_uc*>(file->data()),
-        static_cast<int>(file->size()),
-        &width, &height, &channels, 0));
-
-    if(!decoded) return std::make_error_code(std::errc::invalid_argument);
-
-    const auto count = pixelCount(
-        static_cast<std::uint32_t>(width),
-        static_cast<std::uint32_t>(height),
-        static_cast<std::uint32_t>(channels));
-    if(!count) return std::make_error_code(std::errc::invalid_argument);
-
-    const auto* begin = reinterpret_cast<const std::byte*>(decoded.get());
-    core::Vector<std::byte> pixels(begin, begin + *count, asset.pixels.get_allocator());
-
-    asset.width = static_cast<std::uint32_t>(width);
-    asset.height = static_cast<std::uint32_t>(height);
-    asset.channels = static_cast<std::uint32_t>(channels);
-    asset.pixels = std::move(pixels);
-
-    return {};
 }
 
 std::error_code sgf::assets::ImageLoader::loadBaked(
@@ -92,7 +30,7 @@ std::error_code sgf::assets::ImageLoader::loadBaked(
     ImageRecord record;
     std::memcpy(&record, bytes.data(), sizeof(record));
 
-    const auto count = pixelCount(record.width, record.height, record.channels);
+    const auto count = utils::pixelCount(record.width, record.height, record.channels);
     if(!count || bytes.size() != sizeof(ImageRecord) + *count)
     {
         return std::make_error_code(std::errc::result_out_of_range);
@@ -111,7 +49,7 @@ std::error_code sgf::assets::ImageLoader::loadBaked(
 
 std::expected<sgf::core::Vector<std::byte>, std::error_code> sgf::assets::ImageLoader::saveBaked(const Image& asset)
 {
-    const auto count = pixelCount(asset.width, asset.height, asset.channels);
+    const auto count = utils::pixelCount(asset.width, asset.height, asset.channels);
     if(!count || asset.pixels.size() != *count)
     {
         return std::unexpected(std::make_error_code(std::errc::invalid_argument));

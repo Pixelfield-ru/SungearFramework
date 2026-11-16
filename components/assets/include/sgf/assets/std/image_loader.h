@@ -12,7 +12,10 @@ namespace sgf::assets
 {
     struct ImageLoader final : IAssetLoader<Image>
     {
-        [[nodiscard]] std::error_code loadSource(const std::filesystem::path& source, Image& asset) override;
+        explicit ImageLoader(allocator_type allocator = {}) :
+            IAssetLoader(allocator)
+        { }
+
         [[nodiscard]] std::error_code loadBaked(std::span<const std::byte> bytes,
                                                 std::span<const AnyHandle> dependencies,
                                                 Image& asset) override;

@@ -43,4 +43,11 @@ namespace sgf::core
     [[nodiscard]] std::expected<std::filesystem::path, std::error_code> normalizedRelativePath(
         const std::filesystem::path& path,
         const std::filesystem::path& root);
+
+    /**
+     * @param extension Source extension.
+     * @param alloc Allocator.
+     * @return Lowered extension.
+     */
+    [[nodiscard]] String normalizedExtension(std::string_view extension, const std::pmr::polymorphic_allocator<char>& alloc = {});
 }
