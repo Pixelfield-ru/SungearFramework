@@ -34,7 +34,7 @@ namespace sgf::rhi
         }
 
         VulkanShader& operator=(const VulkanShader&) = delete;
-        VulkanShader& operator=(VulkanShader&&) noexcept;
+        VulkanShader& operator=(VulkanShader&& other) noexcept;
 
     private:
         struct Stage final

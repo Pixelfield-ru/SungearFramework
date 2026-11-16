@@ -81,6 +81,7 @@ namespace sgf::rhi
         friend struct VulkanPass;
         friend struct VulkanBuffer;
         friend struct VulkanDescriptorSet;
+        friend struct VulkanSurface;
 
         explicit VulkanContext(const allocator_type& allocator = {}) noexcept;
         VulkanContext(const VulkanContext&) = delete;
