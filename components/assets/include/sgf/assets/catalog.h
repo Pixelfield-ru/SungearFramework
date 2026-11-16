@@ -8,7 +8,9 @@
 #include <optional>
 #include <shared_mutex>
 #include <span>
+#include <utility>
 
+#include "archive.h"
 #include "slot.h"
 
 #include "sgf/core/memory.h"
@@ -63,16 +65,6 @@ namespace sgf::assets
             std::size_t offset {};
             std::size_t size {};
             std::uint32_t version = 1;
-        };
-
-        struct Archive final
-        {
-            friend struct Baker;
-
-            core::MappedFile file;
-        private:
-            /// Is archive is baking at the time.
-            std::atomic<bool> busy_ {};
         };
 
         using allocator_type = std::pmr::polymorphic_allocator<>;

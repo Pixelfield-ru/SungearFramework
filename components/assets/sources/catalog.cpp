@@ -37,7 +37,7 @@ bool sgf::assets::AssetCatalog::hasFile(AssetId id) const noexcept
     return true;
 }
 
-sgf::assets::AssetCatalog::Archive* sgf::assets::AssetCatalog::findArchive(const std::filesystem::path& archive_path)
+sgf::assets::Archive* sgf::assets::AssetCatalog::findArchive(const std::filesystem::path& archive_path)
 {
     std::shared_lock lock(mutex_);
     const auto it = archives_mapping_.find(archive_path);
@@ -83,7 +83,7 @@ sgf::assets::AssetCatalog::File sgf::assets::AssetCatalog::acquireFile()
     return file;
 }
 
-sgf::assets::AssetCatalog::Archive& sgf::assets::AssetCatalog::claimArchive(std::filesystem::path archive_path)
+sgf::assets::Archive& sgf::assets::AssetCatalog::claimArchive(std::filesystem::path archive_path)
 {
     std::unique_lock lock(mutex_);
     const auto existing = archives_mapping_.find(archive_path);

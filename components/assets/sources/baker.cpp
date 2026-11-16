@@ -6,7 +6,6 @@
 
 #include "sgf/assets/header.h"
 #include "sgf/core/utility/encoding.h"
-#include "sgf/core/utility/defer.h"
 
 #include <cstring>
 #include <filesystem>
@@ -31,16 +30,8 @@ std::error_code sgf::assets::Baker::bake(
 
     auto& found_archive = server_->catalog_.claimArchive(*archive_path);
 
-    bool archive_busy_expected = false;
-    if(!found_archive.busy_.compare_exchange_strong(archive_busy_expected, true))
-    {
-        return Error::kLockedArchive;
-    }
-
-    // unlock archive in the end
-    SGF_DEFER([&found_archive]() {
-        found_archive.busy_ = false;
-    });
+    const auto archive_lock = found_archive.tryLock();
+    if(!archive_lock) return Error::kLockedArchive;
 
     BakeContext context;
     context.baked_ids = core::UnorderedSet<AssetId>(server_->get_allocator());
