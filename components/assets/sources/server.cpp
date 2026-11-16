@@ -156,39 +156,37 @@ std::expected<sgf::assets::AnyHandle, std::error_code> sgf::assets::AssetServer:
         return handle;
     }
 
+    // load from an archive
     if(file->baked)
     {
         // the archive stays open for this load. mount and close are not called while it runs
         auto& archive = catalog_.claimArchive(file->baked->archive);
-        if(const auto err = archive.open(std::ios::in))
+        if(const auto err = archive.file.open(std::ios::in))
         {
             slot->error = err;
             slot->state = AssetState::kFailed;
             return std::unexpected(err);
         }
 
-        const auto archive_path = core::pathToUtf8(archive.path());
-        const auto archive_span = archive.bytes();
-
         const auto baked_offset = file->baked->offset;
         const auto baked_size = file->baked->size;
 
+        const auto archive_path = core::pathToUtf8(archive.file.path());
+        auto asset_record_bytes = archive.file.copyBytes(baked_offset, baked_size, get_allocator());
+
         // baked_offset + baked_size may provide integer overflow
-        if(baked_offset > archive_span.size() ||
-           baked_size > archive_span.size() - baked_offset)
+        if(!asset_record_bytes)
         {
             core::LogCallback::error(debug_output_,
                                      "Invalid baked file. Archive: '{}', asset ID: {}, type ID: {}",
                                      archive_path,
                                      asset_id, type_id);
-            slot->error = std::make_error_code(std::errc::result_out_of_range);
+            slot->error = asset_record_bytes.error();
             slot->state = AssetState::kFailed;
-            return std::unexpected(std::make_error_code(std::errc::result_out_of_range));
+            return std::unexpected(slot->error);
         }
 
-        const auto asset_record_bytes = archive_span.subspan(baked_offset, baked_size);
-
-        if(asset_record_bytes.size() < sizeof(AssetHeader))
+        if(asset_record_bytes->size() < sizeof(AssetHeader))
         {
             core::LogCallback::error(debug_output_,
                                      "No bytes for asset. Archive: '{}', asset ID: {}, type ID: {}",
@@ -201,9 +199,9 @@ std::expected<sgf::assets::AnyHandle, std::error_code> sgf::assets::AssetServer:
 
         AssetHeader header;
         // reading header
-        std::memcpy(&header, asset_record_bytes.data(), sizeof(AssetHeader));
+        std::memcpy(&header, asset_record_bytes->data(), sizeof(AssetHeader));
 
-        const auto after_header = asset_record_bytes.size() - sizeof(AssetHeader);
+        const auto after_header = asset_record_bytes->size() - sizeof(AssetHeader);
         if(header.content_block_size > after_header ||
            header.dependencies_block_size > after_header - header.content_block_size)
         {
@@ -229,11 +227,8 @@ std::expected<sgf::assets::AnyHandle, std::error_code> sgf::assets::AssetServer:
             return std::unexpected(std::make_error_code(std::errc::result_out_of_range));
         }
 
-        const auto asset_bytes = asset_record_bytes.subspan(sizeof(AssetHeader),
-                                                            static_cast<std::size_t>(header.content_block_size));
-        const auto dependency_bytes = asset_record_bytes.subspan(
-            sizeof(AssetHeader) + static_cast<std::size_t>(header.content_block_size),
-            static_cast<std::size_t>(header.dependencies_block_size));
+        const auto dependency_bytes = std::span(*asset_record_bytes).subspan(
+            sizeof(AssetHeader) + header.content_block_size, header.dependencies_block_size);
 
         const auto allocator = get_allocator();
 
@@ -275,7 +270,13 @@ std::expected<sgf::assets::AnyHandle, std::error_code> sgf::assets::AssetServer:
 
         // loading baked source
         // capture the handle to increase lifetime of the slot
-        if(const auto err = postTracked([loader, asset_bytes, handle, allocator, dependencies = std::move(dependencies)] {
+        if(const auto err = postTracked(
+        [loader, asset_record_bytes = std::move(asset_record_bytes),
+         handle, allocator, dependencies = std::move(dependencies), header] {
+
+            const auto asset_bytes = std::span(*asset_record_bytes).subspan(
+                sizeof(AssetHeader), header.content_block_size);
+
             auto* slot = handle.slot_;
 
             std::span<const std::byte> plain = asset_bytes;

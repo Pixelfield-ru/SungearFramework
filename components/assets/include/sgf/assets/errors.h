@@ -18,7 +18,8 @@ namespace sgf::assets
         kInvalidHandle,
         kUnknownStorageType,
         kCompressionFailed,
-        kNotLoaded
+        kNotLoaded,
+        kLockedArchive
     };
 
     struct ErrorCategory final : public std::error_category
@@ -38,6 +39,7 @@ namespace sgf::assets
                 case Error::kUnknownStorageType: return "Asset was not saved by path and was not baked. Storage type is unknown.";
                 case Error::kCompressionFailed: return "Failed to compress or decompress baked asset bytes.";
                 case Error::kNotLoaded: return "Asset is not loaded.";
+                case Error::kLockedArchive: return "Archive is busy.";
                 default: return "Unknown error";
             }
         }

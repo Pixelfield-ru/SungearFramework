@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include <expected>
 #include <filesystem>
 #include <ios>
 #include <shared_mutex>
@@ -11,6 +12,7 @@
 #include <system_error>
 
 #include "sgf/core/utility/platform.h"
+#include "sgf/core//memory.h"
 
 namespace sgf::core
 {
@@ -19,6 +21,7 @@ namespace sgf::core
     {
         ~MappedFile();
 
+        MappedFile() = default;
         explicit MappedFile(std::filesystem::path path) :
             path_(std::move(path))
         { }
@@ -34,6 +37,12 @@ namespace sgf::core
         /// Bytes of the open mapping. Empty when the file is closed.
         /// Valid until close(). Do not close the file while the span is in use.
         [[nodiscard]] std::span<const std::byte> bytes() const;
+
+        [[nodiscard]] std::size_t size() const noexcept;
+
+        [[nodiscard]] std::expected<Vector<std::byte>, std::error_code> copyBytes(
+            std::size_t offset, std::size_t size,
+            const std::pmr::polymorphic_allocator<>& alloc = { }) const;
 
         [[nodiscard]] std::filesystem::path path() const;
 

@@ -65,6 +65,16 @@ namespace sgf::assets
             std::uint32_t version = 1;
         };
 
+        struct Archive final
+        {
+            friend struct Baker;
+
+            core::MappedFile file;
+        private:
+            /// Is archive is baking at the time.
+            std::atomic<bool> busy_ {};
+        };
+
         using allocator_type = std::pmr::polymorphic_allocator<>;
 
         explicit AssetCatalog(const allocator_type& alloc = {}) :
@@ -104,7 +114,7 @@ namespace sgf::assets
         [[nodiscard]] bool hasFile(AssetId id) const noexcept;
 
         /// Archive object for this path. Stays allocated until the catalog is reloaded or destroyed.
-        core::MappedFile* findArchive(const std::filesystem::path& archive_path);
+        Archive* findArchive(const std::filesystem::path& archive_path);
 
         /// Finds the row for this path or creates one. Creation is serialized with other catalog writes.
         AcquiredFile acquireFile(std::filesystem::path file_path);
@@ -112,7 +122,7 @@ namespace sgf::assets
         File acquireFile();
         /// Finds the archive for this path or creates a closed one.
         /// Stays valid until mount. Do not call mount while a load is using the archive.
-        core::MappedFile& claimArchive(std::filesystem::path archive_path);
+        Archive& claimArchive(std::filesystem::path archive_path);
 
         void setTypeId(AssetId id, std::int64_t type_id);
         /// Writes the baked location of an existing row. False when the id is missing.
@@ -143,7 +153,7 @@ namespace sgf::assets
     private:
         std::atomic<AssetId> next_asset_id_ = 1;
         core::Vector<File> files_;
-        core::Vector<core::UniquePtr<core::MappedFile>> archives_;
+        core::Vector<core::UniquePtr<Archive>> archives_;
         core::UnorderedMap<std::filesystem::path, std::size_t> archives_mapping_;
         core::UnorderedMap<std::filesystem::path, std::size_t> files_mapping_;
         core::UnorderedMap<AssetId, std::size_t> files_mapping_ids_;

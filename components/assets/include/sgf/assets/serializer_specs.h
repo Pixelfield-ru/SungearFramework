@@ -120,8 +120,9 @@ namespace sgf::serialization
 
                 const auto index = value.archives_.size();
                 value.archives_mapping_.emplace(file.baked->archive, index);
-                value.archives_.push_back(core::makeUnique<core::MappedFile>(
-                    value.get_allocator(), value.path_ / file.baked->archive));
+                auto archive = core::makeUnique<assets::AssetCatalog::Archive>(value.get_allocator());
+                archive->file = core::MappedFile(value.path_ / file.baked->archive);
+                value.archives_.push_back(std::move(archive));
             }
 
             return {};

@@ -6,6 +6,7 @@
 
 #include "sgf/assets/header.h"
 #include "sgf/core/utility/encoding.h"
+#include "sgf/core/utility/defer.h"
 
 #include <cstring>
 #include <filesystem>
@@ -28,6 +29,19 @@ std::error_code sgf::assets::Baker::bake(
     auto archive_path = core::normalizedRelativePath(root / archive, root);
     if(!archive_path) return archive_path.error();
 
+    auto& found_archive = server_->catalog_.claimArchive(*archive_path);
+
+    bool archive_busy_expected = false;
+    if(!found_archive.busy_.compare_exchange_strong(archive_busy_expected, true))
+    {
+        return Error::kLockedArchive;
+    }
+
+    // unlock archive in the end
+    SGF_DEFER([&found_archive]() {
+        found_archive.busy_ = false;
+    });
+
     BakeContext context;
     context.baked_ids = core::UnorderedSet<AssetId>(server_->get_allocator());
     context.output_bytes = core::Vector<std::byte>(server_->get_allocator());
@@ -43,13 +57,11 @@ std::error_code sgf::assets::Baker::bake(
     // every asset already lives in another archive
     if(context.output_bytes.empty()) return {};
 
-    auto& mapped = server_->catalog_.claimArchive(context.archive_path);
-
-    if(std::filesystem::exists(mapped.path()))
+    if(std::filesystem::exists(found_archive.file.path()))
     {
-        if(const auto err = mapped.open(std::ios_base::in)) return err;
+        if(const auto err = found_archive.file.open(std::ios_base::in)) return err;
 
-        const auto mapped_bytes = mapped.bytes();
+        const auto mapped_bytes = found_archive.file.bytes();
 
         AssetHeader header;
         std::size_t current_offset {};
@@ -133,15 +145,17 @@ std::error_code sgf::assets::Baker::bake(
         return Error::kUnknownAsset;
     }
 
-    if(const auto err = server_->catalog_.save())
+    // close the destination archive to write it
+    if(const auto err = found_archive.file.close()) return err;
+
+    if(const auto err = core::writeFile(server_->catalog_.root() / context.archive_path, context.output_bytes))
     {
         return err;
     }
 
-    // close the destination archive to write it
-    if(const auto err = mapped.close()) return err;
-
-    return core::writeFile(server_->catalog_.root() / context.archive_path, context.output_bytes);
+    // note: make repairCatalogFromArchive() function to repair the broken catalog that was not saved
+    // in the future
+    return server_->catalog_.save();
 }
 
 std::error_code sgf::assets::Baker::bakeImpl(BakeContext& context, const AnyHandle& handle)
@@ -203,12 +217,12 @@ std::error_code sgf::assets::Baker::bakeOld(BakeContext& context, const AssetCat
                                             std::span<const AnyHandle> dependencies)
 {
     auto& asset_archive = server_->catalog_.claimArchive(file.baked->archive);
-    if(!asset_archive.opened() && std::filesystem::exists(asset_archive.path()))
+    if(!asset_archive.file.opened() && std::filesystem::exists(asset_archive.file.path()))
     {
-        if(const auto err = asset_archive.open(std::ios_base::in)) return err;
+        if(const auto err = asset_archive.file.open(std::ios_base::in)) return err;
     }
 
-    const auto archive_bytes = asset_archive.bytes();
+    const auto archive_bytes = asset_archive.file.bytes();
 
     if(file.baked->size < sizeof(AssetHeader) ||
        file.baked->offset > archive_bytes.size() ||

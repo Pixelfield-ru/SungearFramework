@@ -212,6 +212,33 @@ std::span<const std::byte> sgf::core::MappedFile::bytes() const
 #endif
 }
 
+std::size_t sgf::core::MappedFile::size() const noexcept
+{
+    std::shared_lock lock(mutex_);
+    return size_;
+}
+
+std::expected<sgf::core::Vector<std::byte>, std::error_code> sgf::core::MappedFile::copyBytes(
+    std::size_t offset, std::size_t size,
+    const std::pmr::polymorphic_allocator<>& alloc) const
+{
+    std::shared_lock lock(mutex_);
+#if SGF_PLATFORM_OS_WINDOWS
+    if(!view_) return std::unexpected(std::make_error_code(std::errc::bad_file_descriptor));
+
+    if(offset > size_ ||
+       size_ - offset < size)
+    {
+        return std::unexpected(std::make_error_code(std::errc::result_out_of_range));
+    }
+
+    auto const* byte_view = static_cast<std::byte const*>(view_);
+    return Vector<std::byte>(byte_view + offset, byte_view + offset + size, alloc);
+#else
+    return std::unexpected(std::make_error_code(std::errc::bad_file_descriptor));
+#endif
+}
+
 std::filesystem::path sgf::core::MappedFile::path() const
 {
     std::shared_lock lock(mutex_);
