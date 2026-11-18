@@ -52,6 +52,7 @@ target_link_libraries(
         sgf::serialization
     PRIVATE
         zstd::libzstd
+        fastgltf::fastgltf
 )
 
 target_include_directories(

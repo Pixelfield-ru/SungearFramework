@@ -100,7 +100,7 @@ message(STATUS "ANDROID_STL: ${ANDROID_STL}")
 
 find_package(Bullet REQUIRED)
 find_package(glm CONFIG REQUIRED)
-find_package(assimp CONFIG REQUIRED)
+find_package(fastgltf CONFIG REQUIRED)
 find_package(EnTT CONFIG REQUIRED)
 if(SG_TARGET_PLATFORM_PC)
     find_package(glfw3 CONFIG REQUIRED)
