@@ -31,7 +31,7 @@ namespace sgf::assets
         core::ThreadPool* thread_pool {};
     };
 
-    // todo: use stable type index
+    // todo: maybe use std::future
     struct AssetServer final
     {
         friend class Baker;
