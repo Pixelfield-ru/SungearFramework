@@ -1,6 +1,6 @@
 {
   "name": "sungearframework",
-  "version-string": "0.1",
+  "version-string": "0.3",
   "homepage": "https://github.com/Pixelfield-ru/SungearFramework",
   "builtin-baseline": "de36db04550a8625e3154b1a758c60035901f244",
   "dependencies": [
