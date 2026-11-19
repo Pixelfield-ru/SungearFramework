@@ -145,16 +145,16 @@ namespace sgf::assets
                 if(const auto err = loader->loadSource(actual_path, *slot->value))
                 {
                     slot->error = err;
-                    slot->state = AssetState::kFailed;
+                    slot->setState(AssetState::kFailed);
                     return;
                 }
 
                 slot->error.clear();
-                slot->state = AssetState::kLoaded;
+                slot->setState(AssetState::kLoaded);
             }))
             {
                 slot->error = err;
-                slot->state = AssetState::kFailed;
+                slot->setState(AssetState::kFailed);
                 return std::unexpected(err);
             }
 
@@ -234,7 +234,7 @@ namespace sgf::assets
             auto new_asset = std::make_obj_using_allocator<AssetT>(get_allocator(), *asset);
             slot->insert(std::move(new_asset));
             // the source is loaded so we put kLoaded state in the copy
-            slot->state = AssetState::kLoaded;
+            slot->setState(AssetState::kLoaded);
 
             return Handle<AssetT>(slot, type_id);
         }

@@ -9,6 +9,10 @@
       "version>=": "1.0.1#0"
     },
     {
+      "name": "simdutf",
+      "version>=": "9.4.0"
+    },
+    {
       "name": "boost-stacktrace",
       "version>=": "1.84.0"
     },

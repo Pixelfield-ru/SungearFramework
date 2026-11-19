@@ -125,7 +125,7 @@ std::expected<sgf::assets::AnyHandle, std::error_code> sgf::assets::AssetServer:
         if(const auto err = loader->loadMeta(actual_path, file->id))
         {
             slot->error = err;
-            slot->state = AssetState::kFailed;
+            slot->setState(AssetState::kFailed);
             return std::unexpected(err);
         }
 
@@ -140,16 +140,16 @@ std::expected<sgf::assets::AnyHandle, std::error_code> sgf::assets::AssetServer:
             if(const auto err = loader->loadSource(actual_path, slot->erased()))
             {
                 slot->error = err;
-                slot->state = AssetState::kFailed;
+                slot->setState(AssetState::kFailed);
                 return;
             }
 
             slot->error.clear();
-            slot->state = AssetState::kLoaded;
+            slot->setState(AssetState::kLoaded);
         }))
         {
             slot->error = err;
-            slot->state = AssetState::kFailed;
+            slot->setState(AssetState::kFailed);
             return std::unexpected(err);
         }
 
@@ -164,7 +164,7 @@ std::expected<sgf::assets::AnyHandle, std::error_code> sgf::assets::AssetServer:
         if(const auto err = archive.file.open(std::ios::in))
         {
             slot->error = err;
-            slot->state = AssetState::kFailed;
+            slot->setState(AssetState::kFailed);
             return std::unexpected(err);
         }
 
@@ -182,7 +182,7 @@ std::expected<sgf::assets::AnyHandle, std::error_code> sgf::assets::AssetServer:
                                      archive_path,
                                      asset_id, type_id);
             slot->error = asset_record_bytes.error();
-            slot->state = AssetState::kFailed;
+            slot->setState(AssetState::kFailed);
             return std::unexpected(slot->error);
         }
 
@@ -193,7 +193,7 @@ std::expected<sgf::assets::AnyHandle, std::error_code> sgf::assets::AssetServer:
                                      archive_path,
                                      asset_id, type_id);
             slot->error = std::make_error_code(std::errc::result_out_of_range);
-            slot->state = AssetState::kFailed;
+            slot->setState(AssetState::kFailed);
             return std::unexpected(std::make_error_code(std::errc::result_out_of_range));
         }
 
@@ -210,7 +210,7 @@ std::expected<sgf::assets::AnyHandle, std::error_code> sgf::assets::AssetServer:
                                      archive_path,
                                      asset_id, type_id);
             slot->error = std::make_error_code(std::errc::result_out_of_range);
-            slot->state = AssetState::kFailed;
+            slot->setState(AssetState::kFailed);
             return std::unexpected(std::make_error_code(std::errc::result_out_of_range));
         }
 
@@ -223,7 +223,7 @@ std::expected<sgf::assets::AnyHandle, std::error_code> sgf::assets::AssetServer:
                                      archive_path,
                                      asset_id, type_id);
             slot->error = std::make_error_code(std::errc::result_out_of_range);
-            slot->state = AssetState::kFailed;
+            slot->setState(AssetState::kFailed);
             return std::unexpected(std::make_error_code(std::errc::result_out_of_range));
         }
 
@@ -258,7 +258,7 @@ std::expected<sgf::assets::AnyHandle, std::error_code> sgf::assets::AssetServer:
             if(!loaded)
             {
                 slot->error = loaded.error();
-                slot->state = AssetState::kFailed;
+                slot->setState(AssetState::kFailed);
                 return std::unexpected(loaded.error());
             }
 
@@ -290,7 +290,7 @@ std::expected<sgf::assets::AnyHandle, std::error_code> sgf::assets::AssetServer:
                 if(raw_size > std::numeric_limits<std::size_t>::max())
                 {
                     slot->error = Error::kCompressionFailed;
-                    slot->state = AssetState::kFailed;
+                    slot->setState(AssetState::kFailed);
                     return;
                 }
 
@@ -302,7 +302,7 @@ std::expected<sgf::assets::AnyHandle, std::error_code> sgf::assets::AssetServer:
                 if(ZSTD_isError(written))
                 {
                     slot->error = Error::kCompressionFailed;
-                    slot->state = AssetState::kFailed;
+                    slot->setState(AssetState::kFailed);
                     return;
                 }
 
@@ -312,16 +312,16 @@ std::expected<sgf::assets::AnyHandle, std::error_code> sgf::assets::AssetServer:
             if(const auto err = loader->loadBaked(plain, dependencies, slot->erased()))
             {
                 slot->error = err;
-                slot->state = AssetState::kFailed;
+                slot->setState(AssetState::kFailed);
                 return;
             }
 
             slot->error.clear();
-            slot->state = AssetState::kLoaded;
+            slot->setState(AssetState::kLoaded);
         }))
         {
             slot->error = err;
-            slot->state = AssetState::kFailed;
+            slot->setState(AssetState::kFailed);
             return std::unexpected(err);
         }
 
@@ -333,7 +333,7 @@ std::expected<sgf::assets::AnyHandle, std::error_code> sgf::assets::AssetServer:
                              asset_id, type_id);
 
     slot->error = Error::kUnknownStorageType;
-    slot->state = AssetState::kFailed;
+    slot->setState(AssetState::kFailed);
     return std::unexpected(Error::kUnknownStorageType);
 }
 
@@ -344,7 +344,7 @@ std::error_code sgf::assets::AssetServer::reload(const AnyHandle& handle) noexce
     const auto handle_valid = slot && slot->erased();
     if(!handle_valid) return Error::kInvalidHandle;
 
-    if(slot->state == AssetState::kLoading) return {};
+    if(slot->state() == AssetState::kLoading) return {};
 
     auto* storage = this->storage(core::typeIndexFromStableHash(handle.type_id_));
     if(!storage)
@@ -392,15 +392,12 @@ std::error_code sgf::assets::AssetServer::reload(const AnyHandle& handle) noexce
     if(const auto err = loader->writeMeta(file_path, handle.asset_id_)) return err;
 
     // one reload wins the transition. the other observes kLoading and does not post
-    auto state = slot->state.load(std::memory_order_acquire);
+    auto state = slot->state();
     do
     {
         if(state == AssetState::kLoading) return {};
     }
-    while(!slot->state.compare_exchange_weak(
-        state, AssetState::kLoading,
-        std::memory_order_acq_rel,
-        std::memory_order_acquire));
+    while(!slot->compareExchangeState(state, AssetState::kLoading));
 
     // finally, load source
     // capture the handle to increase lifetime of the slot
@@ -410,17 +407,17 @@ std::error_code sgf::assets::AssetServer::reload(const AnyHandle& handle) noexce
         if(const auto err = loader->loadSource(file_path, slot->erased()))
         {
             slot->error = err;
-            slot->state = AssetState::kFailed;
+            slot->setState(AssetState::kFailed);
             return;
         }
 
         slot->error.clear();
         ++slot->version;
-        slot->state = AssetState::kLoaded;
+        slot->setState(AssetState::kLoaded);
     }))
     {
         slot->error = err;
-        slot->state = AssetState::kFailed;
+        slot->setState(AssetState::kFailed);
         return err;
     }
 

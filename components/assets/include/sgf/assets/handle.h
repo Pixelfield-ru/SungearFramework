@@ -51,7 +51,21 @@ namespace sgf::assets
         [[nodiscard]] AssetState state() const noexcept
         {
             if(!slot_) return AssetState::kUnloaded;
-            return slot_->state;
+            return slot_->state();
+        }
+
+        /// Sleeps until the slot leaves kLoading. An empty handle returns immediately.
+        /// Do not call from a pool thread: the task that wakes this wait runs on that pool.
+        void wait() const noexcept
+        {
+            if(!slot_) return;
+
+            auto current = slot_->state();
+            while(current == AssetState::kLoading)
+            {
+                slot_->waitState(current);
+                current = slot_->state();
+            }
         }
 
         [[nodiscard]] std::error_code error() const noexcept

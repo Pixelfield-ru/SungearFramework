@@ -65,5 +65,4 @@ target_include_directories(
 
 install_component(
     TARGET_NAME ${PROJECT_NAME}
-    DEPENDS core
 )

@@ -139,9 +139,9 @@ namespace sgf::assets
                 {
                     auto& slot = pages_[it->second.page_id].slots[it->second.slot_id];
 
-                    const auto state = slot.state.load(std::memory_order_acquire);
+                    const auto state = slot.state();
                     const bool start_load = state != AssetState::kLoaded && state != AssetState::kLoading;
-                    if(start_load) slot.state.store(AssetState::kLoading, std::memory_order_release);
+                    if(start_load) slot.setState(AssetState::kLoading);
 
                     // fetch_sub in the destructor does not take this lock, so a plain increment can resurrect a slot
                     auto refs = slot.strong_refs.load(std::memory_order_acquire);
@@ -164,7 +164,7 @@ namespace sgf::assets
 
                 // insert new slot if slot was not found
                 auto& slot = insertNewSlot(asset_id);
-                slot.state.store(AssetState::kLoading, std::memory_order_release);
+                slot.setState(AssetState::kLoading);
                 slot.incrementRefCounter();
                 return { &slot, true };
             }
