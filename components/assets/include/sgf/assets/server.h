@@ -15,6 +15,7 @@
 #include <atomic>
 #include <functional>
 #include <shared_mutex>
+#include <type_traits>
 
 #include "storage.h"
 #include "catalog.h"
@@ -104,14 +105,11 @@ namespace sgf::assets
             }
 
             // one catalog lock covers the find-or-create, so two loads of the same path share one row
-            const auto acquired = catalog_.acquireFile(*key);
+            const auto acquired = catalog_.ensureFile(*key, type);
             const auto file_id = acquired.file.id;
             // if new file was created in the catalog
             if(acquired.created)
             {
-                // set the type id for new file
-                catalog_.setTypeId(file_id, type);
-
                 // saving catalog to file
                 if(const auto err = catalog_.save()) return std::unexpected(err);
 
@@ -139,10 +137,10 @@ namespace sgf::assets
             slot->version = acquired.file.version;
 
             // capture the handle to increase lifetime of the slot
-            if(const auto err = postTracked([loader, actual_path, handle] {
+            if(const auto err = postTracked([this, loader, actual_path, handle] {
                 auto* slot = static_cast<AssetSlot<AssetT>*>(handle.slot_);
 
-                if(const auto err = loader->loadSource(actual_path, *slot->value))
+                if(const auto err = loader->loadSource(actual_path, *slot->value, *this))
                 {
                     slot->error = err;
                     slot->setState(AssetState::kFailed);
@@ -158,6 +156,69 @@ namespace sgf::assets
                 return std::unexpected(err);
             }
 
+            return handle;
+        }
+
+        /**
+         * Find the catalog row for this path or create one, then fill the asset on this thread.
+         * The path is a catalog key. The file does not need to exist, and no meta file is written.
+         * A row that is already loading or loaded returns that handle and does not call fill.
+         * Do not call wait() on the returned handle from a pool thread while another caller still fills it.
+         * @tparam AssetT Type of asset.
+         * @param path Catalog key of the asset.
+         * @param fill Writes the asset. Runs only when this call owns the slot.
+         * @return Handle to the asset or an error.
+         */
+        template<typename AssetT, typename FillFunc>
+        requires std::is_invocable_r_v<std::error_code, FillFunc, AssetT&>
+        std::expected<Handle<AssetT>, std::error_code> ensure(const std::filesystem::path& path, FillFunc&& fill)
+        {
+            const auto root = catalog_.root();
+            const auto key = core::normalizedRelativePath(root / path, root);
+            if(!key) return std::unexpected(key.error());
+
+            const auto type = core::registerStableType<AssetStorage<AssetT>>();
+            auto& storage = this->storage<AssetT>();
+
+            // one catalog lock covers the find-or-create, so two acquires of the same path share one row
+            const auto acquired = catalog_.ensureFile(*key, type);
+            const auto file_id = acquired.file.id;
+            if(acquired.created)
+            {
+                // save a catalog after creating a file
+                if(const auto err = catalog_.save()) return std::unexpected(err);
+            }
+            else if(acquired.file.type_id != static_cast<std::int64_t>(type))
+            {
+                core::LogCallback::error(debug_output_,
+                                         "Catalog path is already another asset type. Path: '{}', asset type: '{}'",
+                                         core::pathToUtf8(path), core::typeName<AssetT>());
+                return std::unexpected(std::make_error_code(std::errc::invalid_argument));
+            }
+
+            const auto claimed = storage.claimSlot(file_id);
+            auto* slot = static_cast<AssetSlot<AssetT>*>(claimed.slot);
+
+            Handle<AssetT> handle;
+            handle.slot_ = slot;
+            handle.asset_id_ = file_id;
+            handle.type_id_ = type;
+
+            // the slot is already kLoaded, or another caller is filling it
+            if(!claimed.load) return handle;
+
+            // set slot version from catalog
+            slot->version = acquired.file.version;
+
+            if(const auto err = std::invoke(std::forward<FillFunc>(fill), *slot->value))
+            {
+                slot->error = err;
+                slot->setState(AssetState::kFailed);
+                return std::unexpected(err);
+            }
+
+            slot->error.clear();
+            slot->setState(AssetState::kLoaded);
             return handle;
         }
 
@@ -225,10 +286,9 @@ namespace sgf::assets
             auto& storage = this->storage<AssetT>();
             static const auto type_id = core::registerStableType<AssetStorage<AssetT>>();
 
-            const auto new_file = catalog_.acquireFile();
-            catalog_.setTypeId(new_file.id, type_id);
+            const auto new_file = catalog_.createFile(type_id);
             // get new slot for asset
-            auto* slot = storage.acquireSlot(new_file.id);
+            auto* slot = storage.createSlot(new_file.id);
             // creating new asset using copy constructor with allocator
             // or without allocator if T does not have such constructor
             auto new_asset = std::make_obj_using_allocator<AssetT>(get_allocator(), *asset);

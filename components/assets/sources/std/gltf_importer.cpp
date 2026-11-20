@@ -78,6 +78,9 @@ namespace
         std::ignore = asset;
         std::ignore = mesh_index;
 
+        auto& gltf_mesh = asset.meshes[mesh_index];
+        // todo: impl
+
         return {};
     }
 
@@ -143,8 +146,8 @@ namespace
         model.nodes.resize(asset.nodes.size());
         model.scenes.reserve(asset.scenes.size());
 
-        sgf::core::Vector<bool> visited_nodes(asset.nodes.size(), 0, alloc);
-        sgf::core::Vector<bool> visited_meshes(asset.meshes.size(), 0, alloc);
+        sgf::core::Vector<bool> visited_nodes(asset.nodes.size(), false, alloc);
+        sgf::core::Vector<bool> visited_meshes(asset.meshes.size(), false, alloc);
 
         for(const auto& gltf_scene : asset.scenes)
         {
@@ -176,7 +179,7 @@ std::span<const std::string_view> sgf::assets::GltfImporter::extensions() const
     return ext;
 }
 
-std::error_code sgf::assets::GltfImporter::importSource(const std::filesystem::path& source, Model& asset)
+std::error_code sgf::assets::GltfImporter::importSource(const std::filesystem::path& source, Model& asset, AssetServer&)
 {
     fastgltf::Parser parser;
     auto data = fastgltf::GltfDataBuffer::FromPath(source);

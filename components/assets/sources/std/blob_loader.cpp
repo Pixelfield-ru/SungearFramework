@@ -6,7 +6,7 @@
 
 #include "sgf/core/utility/file.h"
 
-std::error_code sgf::assets::BlobLoader::loadSource(const std::filesystem::path& source, Blob& asset)
+std::error_code sgf::assets::BlobLoader::loadSource(const std::filesystem::path& source, Blob& asset, AssetServer&)
 {
     auto bytes = core::readFile(source, asset.bytes.get_allocator());
     if(!bytes) return bytes.error();

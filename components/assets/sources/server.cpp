@@ -134,10 +134,10 @@ std::expected<sgf::assets::AnyHandle, std::error_code> sgf::assets::AssetServer:
 
         // loading asset by path
         // capture the handle to increase lifetime of the slot
-        if(const auto err = postTracked([loader, actual_path, handle] {
+        if(const auto err = postTracked([this, loader, actual_path, handle] {
             auto* slot = handle.slot_;
 
-            if(const auto err = loader->loadSource(actual_path, slot->erased()))
+            if(const auto err = loader->loadSource(actual_path, slot->erased(), *this))
             {
                 slot->error = err;
                 slot->setState(AssetState::kFailed);
@@ -160,7 +160,7 @@ std::expected<sgf::assets::AnyHandle, std::error_code> sgf::assets::AssetServer:
     if(file->baked)
     {
         // the archive stays open for this load. mount and close are not called while it runs
-        auto& archive = catalog_.claimArchive(file->baked->archive);
+        auto& archive = catalog_.ensureArchive(file->baked->archive);
         if(const auto err = archive.file.open(std::ios::in))
         {
             slot->error = err;
@@ -401,10 +401,10 @@ std::error_code sgf::assets::AssetServer::reload(const AnyHandle& handle) noexce
 
     // finally, load source
     // capture the handle to increase lifetime of the slot
-    if(const auto err = postTracked([loader, file_path, handle] {
+    if(const auto err = postTracked([this, loader, file_path, handle] {
         auto* slot = handle.slot_;
 
-        if(const auto err = loader->loadSource(file_path, slot->erased()))
+        if(const auto err = loader->loadSource(file_path, slot->erased(), *this))
         {
             slot->error = err;
             slot->setState(AssetState::kFailed);

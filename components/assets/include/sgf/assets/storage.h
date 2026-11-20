@@ -26,7 +26,7 @@ namespace sgf::assets
         [[nodiscard]] virtual AssetSlotControl* slotControl(AssetId asset_id) = 0;
         /// Finds a slot and adds one strong reference. Empty when the slot is missing or already released.
         [[nodiscard]] virtual AssetSlotControl* retainErasedSlot(AssetId asset_id) = 0;
-        [[nodiscard]] virtual AssetSlotControl* acquireErasedSlot(AssetId asset_id) = 0;
+        [[nodiscard]] virtual AssetSlotControl* createErasedSlot(AssetId asset_id) = 0;
         /// Finds the slot or creates one. The returned slot already owns one strong reference.
         /// `load` is true only for the caller that must perform the load. The slot is then already kLoading.
         [[nodiscard]] virtual ClaimedSlot claimErasedSlot(AssetId asset_id) = 0;
@@ -103,7 +103,7 @@ namespace sgf::assets
             return &pages_[it->second.page_id].slots[it->second.slot_id];
         }
 
-        [[nodiscard]] AssetSlot<AssetT>* acquireSlot(AssetId asset_id) noexcept
+        [[nodiscard]] AssetSlot<AssetT>* createSlot(AssetId asset_id) noexcept
         {
             std::unique_lock lock(mutex_);
             return &insertNewSlot(asset_id);
@@ -175,9 +175,9 @@ namespace sgf::assets
             return retainSlot(asset_id);
         }
 
-        [[nodiscard]] AssetSlotControl* acquireErasedSlot(AssetId asset_id) noexcept override
+        [[nodiscard]] AssetSlotControl* createErasedSlot(AssetId asset_id) noexcept override
         {
-            return acquireSlot(asset_id);
+            return createSlot(asset_id);
         }
 
         [[nodiscard]] ClaimedSlot claimErasedSlot(AssetId asset_id) noexcept override

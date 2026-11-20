@@ -12,6 +12,6 @@ namespace sgf::assets
     struct MtlImporter final : IAssetImporter<Material>
     {
         [[nodiscard]] std::span<const std::string_view> extensions() const override;
-        [[nodiscard]] std::error_code importSource(const std::filesystem::path& source, Material& asset) override;
+        [[nodiscard]] std::error_code importSource(const std::filesystem::path& source, Material& asset, AssetServer& server) override;
     };
 }

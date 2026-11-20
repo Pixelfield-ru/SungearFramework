@@ -46,7 +46,7 @@ sgf::assets::Archive* sgf::assets::AssetCatalog::findArchive(const std::filesyst
     return archives_[it->second].get();
 }
 
-sgf::assets::AssetCatalog::AcquiredFile sgf::assets::AssetCatalog::acquireFile(std::filesystem::path file_path)
+sgf::assets::AssetCatalog::AcquiredFile sgf::assets::AssetCatalog::ensureFile(std::filesystem::path file_path, std::int64_t type_id)
 {
     std::unique_lock lock(mutex_);
     const auto existing = files_mapping_.find(file_path);
@@ -63,13 +63,14 @@ sgf::assets::AssetCatalog::AcquiredFile sgf::assets::AssetCatalog::acquireFile(s
 
     auto& file = files_.emplace_back();
     file.id = file_id;
+    file.type_id = type_id;
     file.source = File::Source {};
     file.source->path = std::move(file_path);
 
     return { file, true };
 }
 
-sgf::assets::AssetCatalog::File sgf::assets::AssetCatalog::acquireFile()
+sgf::assets::AssetCatalog::File sgf::assets::AssetCatalog::createFile(std::int64_t type_id)
 {
     std::unique_lock lock(mutex_);
     const auto file_index = files_.size();
@@ -79,11 +80,12 @@ sgf::assets::AssetCatalog::File sgf::assets::AssetCatalog::acquireFile()
 
     auto& file = files_.emplace_back();
     file.id = file_id;
+    file.type_id = type_id;
 
     return file;
 }
 
-sgf::assets::Archive& sgf::assets::AssetCatalog::claimArchive(std::filesystem::path archive_path)
+sgf::assets::Archive& sgf::assets::AssetCatalog::ensureArchive(std::filesystem::path archive_path)
 {
     std::unique_lock lock(mutex_);
     const auto existing = archives_mapping_.find(archive_path);
@@ -100,15 +102,6 @@ sgf::assets::Archive& sgf::assets::AssetCatalog::claimArchive(std::filesystem::p
     archives_mapping_.emplace(std::move(archive_path), archive_index);
 
     return *archives_.back();
-}
-
-void sgf::assets::AssetCatalog::setTypeId(AssetId id, std::int64_t type_id)
-{
-    std::unique_lock lock(mutex_);
-    const auto it = files_mapping_ids_.find(id);
-    if(it == files_mapping_ids_.end()) return;
-
-    files_[it->second].type_id = type_id;
 }
 
 bool sgf::assets::AssetCatalog::setBaked(AssetId id, File::Baked baked)

@@ -12,7 +12,7 @@ std::span<const std::string_view> sgf::assets::ObjImporter::extensions() const
     return ext;
 }
 
-std::error_code sgf::assets::ObjImporter::importSource(const std::filesystem::path& source, Model& asset)
+std::error_code sgf::assets::ObjImporter::importSource(const std::filesystem::path&, Model&, AssetServer&)
 {
     // todo: impl
     return {};

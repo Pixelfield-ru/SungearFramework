@@ -29,7 +29,7 @@ std::span<const std::string_view> sgf::assets::PngImporter::extensions() const
     return ext;
 }
 
-std::error_code sgf::assets::PngImporter::importSource(const std::filesystem::path& source, Image& asset)
+std::error_code sgf::assets::PngImporter::importSource(const std::filesystem::path& source, Image& asset, AssetServer&)
 {
     auto file = core::readFile(source, asset.pixels.get_allocator());
     if(!file) return file.error();

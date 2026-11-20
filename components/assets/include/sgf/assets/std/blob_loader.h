@@ -16,7 +16,7 @@ namespace sgf::assets
             IAssetLoader(allocator)
         { }
 
-        [[nodiscard]] std::error_code loadSource(const std::filesystem::path& source, Blob& asset) override;
+        [[nodiscard]] std::error_code loadSource(const std::filesystem::path& source, Blob& asset, AssetServer& server) override;
         [[nodiscard]] std::error_code loadBaked(std::span<const std::byte> bytes,
                                                 std::span<const AnyHandle> dependencies,
                                                 Blob& asset) override;

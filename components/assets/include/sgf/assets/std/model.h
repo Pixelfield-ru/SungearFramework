@@ -15,9 +15,91 @@ namespace sgf::assets
 {
     struct Model final
     {
+        struct Vertex final
+        {
+            glm::vec3 position {};
+            glm::vec3 normal {};
+            glm::vec4 tangent {};
+            glm::vec2 texcoord {};
+        };
+
+        enum class PrimitiveType : std::uint8_t
+        {
+            kPoints,
+            kLines,
+            kLineLoop,
+            kLineStrip,
+            kTriangles,
+            kTriangleStrip,
+            kTriangleFan
+        };
+
+        struct Primitive final
+        {
+            using allocator_type = std::pmr::polymorphic_allocator<>;
+
+            core::Vector<Vertex> vertices;
+            core::Vector<std::uint32_t> indices;
+            std::optional<std::uint32_t> material;
+            PrimitiveType type = PrimitiveType::kTriangles;
+
+            explicit Primitive(const allocator_type& alloc = {}) :
+                vertices(alloc),
+                indices(alloc)
+            { }
+            Primitive(const Primitive&) = default;
+            Primitive(const Primitive& other, const allocator_type& alloc) :
+                vertices(other.vertices, alloc),
+                indices(other.indices, alloc),
+                material(other.material),
+                type(other.type)
+            { }
+            Primitive(Primitive&&) = default;
+            Primitive(Primitive&& other, const allocator_type& alloc) noexcept :
+                vertices(std::move(other.vertices), alloc),
+                indices(std::move(other.indices), alloc),
+                material(std::move(other.material)),
+                type(other.type)
+            { }
+
+            [[nodiscard]] allocator_type get_allocator() const noexcept
+            {
+                return vertices.get_allocator();
+            }
+
+            Primitive& operator=(const Primitive&) = default;
+            Primitive& operator=(Primitive&&) noexcept = default;
+        };
+
         struct Mesh final
         {
-            // todo: impl
+            using allocator_type = std::pmr::polymorphic_allocator<>;
+
+            core::String name;
+            core::Vector<Primitive> primitives;
+
+            explicit Mesh(const allocator_type& alloc = {}) :
+                name(alloc),
+                primitives(alloc)
+            { }
+            Mesh(const Mesh&) = default;
+            Mesh(const Mesh& other, const allocator_type& alloc) :
+                name(other.name, alloc),
+                primitives(other.primitives, alloc)
+            { }
+            Mesh(Mesh&&) = default;
+            Mesh(Mesh&& other, const allocator_type& alloc) noexcept :
+                name(std::move(other.name), alloc),
+                primitives(std::move(other.primitives), alloc)
+            { }
+
+            [[nodiscard]] allocator_type get_allocator() const noexcept
+            {
+                return name.get_allocator();
+            }
+
+            Mesh& operator=(const Mesh&) = default;
+            Mesh& operator=(Mesh&&) noexcept = default;
         };
 
         struct Node final
