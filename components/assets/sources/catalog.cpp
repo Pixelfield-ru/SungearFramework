@@ -70,6 +70,56 @@ sgf::assets::AssetCatalog::AcquiredFile sgf::assets::AssetCatalog::ensureFile(st
     return { file, true };
 }
 
+std::optional<sgf::assets::AssetCatalog::File> sgf::assets::AssetCatalog::removeFile(AssetId id)
+{
+    std::unique_lock lock(mutex_);
+    const auto it = files_mapping_ids_.find(id);
+    if(it == files_mapping_ids_.end()) return {};
+
+    const auto index = it->second;
+    auto removed = std::move(files_[index]);
+    files_mapping_ids_.erase(it);
+    if(removed.source)
+    {
+        files_mapping_.erase(removed.source->path);
+    }
+
+    const auto last = files_.size() - 1;
+    // moving element to the end of the vector
+    if(index != last)
+    {
+        files_[index] = std::move(files_[last]);
+        const auto& swapped = files_[index];
+        files_mapping_ids_[swapped.id] = index;
+        if(swapped.source)
+        {
+            files_mapping_[swapped.source->path] = index;
+        }
+    }
+
+    // removing last element
+    files_.pop_back();
+
+    return removed;
+}
+
+bool sgf::assets::AssetCatalog::restoreFile(File file)
+{
+    std::unique_lock lock(mutex_);
+    if(file.id == 0 || files_mapping_ids_.contains(file.id)) return false;
+    if(file.source && files_mapping_.contains(file.source->path)) return false;
+
+    const auto index = files_.size();
+    files_mapping_ids_.emplace(file.id, index);
+    if(file.source)
+    {
+        files_mapping_.emplace(file.source->path, index);
+    }
+
+    files_.push_back(std::move(file));
+    return true;
+}
+
 sgf::assets::AssetCatalog::File sgf::assets::AssetCatalog::createFile(std::int64_t type_id)
 {
     std::unique_lock lock(mutex_);

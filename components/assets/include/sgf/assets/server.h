@@ -14,6 +14,7 @@
 
 #include <atomic>
 #include <functional>
+#include <mutex>
 #include <shared_mutex>
 #include <type_traits>
 
@@ -104,25 +105,29 @@ namespace sgf::assets
                 return std::unexpected(Error::kLoaderNotSpecified);
             }
 
-            // one catalog lock covers the find-or-create, so two loads of the same path share one row
-            const auto acquired = catalog_.ensureFile(*key, type);
-            const auto file_id = acquired.file.id;
-            // if new file was created in the catalog
-            if(acquired.created)
+            // the catalog row and its slot claim stay together, so remove cannot drop this id in between
+            std::uint32_t file_version = 1;
+            AssetId file_id {};
+            ClaimedSlot claimed;
             {
-                // saving catalog to file
-                if(const auto err = catalog_.save()) return std::unexpected(err);
+                std::unique_lock lock(identity_mutex_);
 
-                // writing meta of the file near the file
-                if(const auto err = loader->writeMeta(actual_path, file_id)) return std::unexpected(err);
-            }
-            else
-            {
-                // load meta of the file near the file
-                if(const auto err = loader->loadMeta(actual_path, file_id)) return std::unexpected(err);
-            }
+                const auto acquired = catalog_.ensureFile(*key, type);
+                file_id = acquired.file.id;
+                file_version = acquired.file.version;
+                if(acquired.created)
+                {
+                    if(const auto err = catalog_.save()) return std::unexpected(err);
 
-            const auto claimed = storage.claimSlot(file_id);
+                    if(const auto err = loader->writeMeta(actual_path, file_id)) return std::unexpected(err);
+                }
+                else
+                {
+                    if(const auto err = loader->loadMeta(actual_path, file_id)) return std::unexpected(err);
+                }
+
+                claimed = storage.claimSlot(file_id);
+            }
             auto* slot = static_cast<AssetSlot<AssetT>*>(claimed.slot);
 
             Handle<AssetT> handle;
@@ -134,7 +139,7 @@ namespace sgf::assets
             if(!claimed.load) return handle;
 
             // first read of this slot. set version from the catalog
-            slot->version = acquired.file.version;
+            slot->version = file_version;
 
             // capture the handle to increase lifetime of the slot
             if(const auto err = postTracked([this, loader, actual_path, handle] {
@@ -180,23 +185,30 @@ namespace sgf::assets
             const auto type = core::registerStableType<AssetStorage<AssetT>>();
             auto& storage = this->storage<AssetT>();
 
-            // one catalog lock covers the find-or-create, so two acquires of the same path share one row
-            const auto acquired = catalog_.ensureFile(*key, type);
-            const auto file_id = acquired.file.id;
-            if(acquired.created)
+            // the catalog row and its slot claim stay together, so remove cannot drop this id in between
+            std::uint32_t file_version = 1;
+            AssetId file_id {};
+            ClaimedSlot claimed;
             {
-                // save a catalog after creating a file
-                if(const auto err = catalog_.save()) return std::unexpected(err);
-            }
-            else if(acquired.file.type_id != static_cast<std::int64_t>(type))
-            {
-                core::LogCallback::error(debug_output_,
-                                         "Catalog path is already another asset type. Path: '{}', asset type: '{}'",
-                                         core::pathToUtf8(path), core::typeName<AssetT>());
-                return std::unexpected(std::make_error_code(std::errc::invalid_argument));
-            }
+                std::unique_lock lock(identity_mutex_);
 
-            const auto claimed = storage.claimSlot(file_id);
+                const auto acquired = catalog_.ensureFile(*key, type);
+                file_id = acquired.file.id;
+                file_version = acquired.file.version;
+                if(acquired.created)
+                {
+                    if(const auto err = catalog_.save()) return std::unexpected(err);
+                }
+                else if(acquired.file.type_id != static_cast<std::int64_t>(type))
+                {
+                    core::LogCallback::error(debug_output_,
+                                             "Catalog path is already another asset type. Path: '{}', asset type: '{}'",
+                                             core::pathToUtf8(path), core::typeName<AssetT>());
+                    return std::unexpected(std::make_error_code(std::errc::invalid_argument));
+                }
+
+                claimed = storage.claimSlot(file_id);
+            }
             auto* slot = static_cast<AssetSlot<AssetT>*>(claimed.slot);
 
             Handle<AssetT> handle;
@@ -208,7 +220,7 @@ namespace sgf::assets
             if(!claimed.load) return handle;
 
             // set slot version from catalog
-            slot->version = acquired.file.version;
+            slot->version = file_version;
 
             if(const auto err = std::invoke(std::forward<FillFunc>(fill), *slot->value))
             {
@@ -241,6 +253,15 @@ namespace sgf::assets
          * @return Error.
          */
         std::error_code reload(const AnyHandle& handle) noexcept;
+
+        /**
+         * Remove the catalog row for this id.
+         * The id is not reused. The source file and the baked bytes stay in place.
+         * A slot that is still in memory keeps the row and returns kInUse.
+         * @param asset_id Asset to remove.
+         * @return Error.
+         */
+        std::error_code remove(AssetId asset_id);
 
         std::error_code bake(const AnyHandle& handle, const std::filesystem::path& archive, std::int32_t compression_level);
 
@@ -286,9 +307,13 @@ namespace sgf::assets
             auto& storage = this->storage<AssetT>();
             static const auto type_id = core::registerStableType<AssetStorage<AssetT>>();
 
-            const auto new_file = catalog_.createFile(type_id);
-            // get new slot for asset
-            auto* slot = storage.createSlot(new_file.id);
+            // the new row and its slot stay together, so remove cannot drop the id before the slot exists
+            AssetSlot<AssetT>* slot = nullptr;
+            {
+                std::unique_lock lock(identity_mutex_);
+                const auto new_file = catalog_.createFile(type_id);
+                slot = storage.createSlot(new_file.id);
+            }
             // creating new asset using copy constructor with allocator
             // or without allocator if T does not have such constructor
             auto new_asset = std::make_obj_using_allocator<AssetT>(get_allocator(), *asset);
@@ -353,6 +378,8 @@ namespace sgf::assets
 
         mutable core::TypeMap storages_map_;
         mutable std::shared_mutex storages_mutex_;
+        /// Catalog identity and the slot claim. remove cannot drop a row that load or ensure is about to claim.
+        std::mutex identity_mutex_;
         AssetCatalog catalog_;
         size_t page_size_ {};
 

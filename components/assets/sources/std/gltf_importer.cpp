@@ -98,6 +98,18 @@ namespace
         return sgf::assets::Material::AlphaMode::kOpaque;
     }
 
+    void assignMaterial(sgf::assets::Material& material, const fastgltf::Material& src)
+    {
+        material.base_color = glm::vec4(src.pbrData.baseColorFactor[0], src.pbrData.baseColorFactor[1],
+                                        src.pbrData.baseColorFactor[2], src.pbrData.baseColorFactor[3]);
+        material.metallic = src.pbrData.metallicFactor;
+        material.roughness = src.pbrData.roughnessFactor;
+        material.emissive = glm::vec3(src.emissiveFactor[0], src.emissiveFactor[1], src.emissiveFactor[2]);
+        material.alpha_cutoff = src.alphaCutoff;
+        material.double_sided = src.doubleSided;
+        material.alpha_mode = mapAlphaMode(src.alphaMode);
+    }
+
     sgf::assets::Model::PrimitiveType mapPrimitiveType(fastgltf::PrimitiveType type) noexcept
     {
         switch(type)
@@ -140,23 +152,25 @@ namespace
                     context.visited_materials[material_index] = true;
 
                     const auto material_path = std::filesystem::path(context.source).concat(".materials") / std::to_string(material_index);
-                    auto handle = context.server->ensure<sgf::assets::Material>(material_path, [&](sgf::assets::Material& material) -> std::error_code
-                    {
-                        const auto& src = context.asset->materials[material_index];
-                        material.base_color = glm::vec4(src.pbrData.baseColorFactor[0], src.pbrData.baseColorFactor[1],
-                                                        src.pbrData.baseColorFactor[2], src.pbrData.baseColorFactor[3]);
-                        material.metallic = src.pbrData.metallicFactor;
-                        material.roughness = src.pbrData.roughnessFactor;
-                        material.emissive = glm::vec3(src.emissiveFactor[0], src.emissiveFactor[1], src.emissiveFactor[2]);
-                        material.alpha_cutoff = src.alphaCutoff;
-                        material.double_sided = src.doubleSided;
-                        material.alpha_mode = mapAlphaMode(src.alphaMode);
-
-                        return {};
+                    auto handle = context.server->ensure<sgf::assets::Material>(material_path, [](sgf::assets::Material&) {
+                        return std::error_code {};
                     });
 
                     if(!handle) return handle.error();
-                    context.model->materials[material_index] = std::move(*handle);
+
+                    auto& material_handle = *handle;
+                    if(!material_handle)
+                    {
+                        if(material_handle.state() == sgf::assets::AssetState::kLoading) return sgf::assets::Error::kLoading;
+                        if(const auto err = material_handle.error()) return err;
+                        return sgf::assets::Error::kNotLoaded;
+                    }
+
+                    const auto& src = context.asset->materials[material_index];
+                    material_handle.edit([&](sgf::assets::Material& material) {
+                        assignMaterial(material, src);
+                    });
+                    context.model->materials[material_index] = std::move(material_handle);
                 }
             }
 
@@ -188,7 +202,7 @@ namespace
 
                 fastgltf::copyFromAccessor<FieldT, sizeof(sgf::assets::Model::Vertex)>(
                     *context.asset, accessor, &(primitive.vertices[0].*member));
-                
+
                 return std::error_code {};
             };
 

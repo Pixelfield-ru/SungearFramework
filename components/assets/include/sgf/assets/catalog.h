@@ -112,6 +112,11 @@ namespace sgf::assets
         AcquiredFile ensureFile(std::filesystem::path file_path, std::int64_t type_id);
         /// Creates a row without a path and stores type_id.
         File createFile(std::int64_t type_id);
+        /// Removes the row for this id. Empty when the id is missing. The next id does not move backwards.
+        std::optional<File> removeFile(AssetId id);
+        /// Puts a removed row back under its old id. False when the id is present or the path is taken.
+        /// The next id does not move.
+        bool restoreFile(File file);
         /// Finds the archive for this path or creates a closed one.
         /// Stays valid until mount. Do not call mount while a load is using the archive.
         Archive& ensureArchive(std::filesystem::path archive_path);

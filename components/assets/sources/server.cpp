@@ -90,22 +90,24 @@ std::expected<sgf::assets::AnyHandle, std::error_code> sgf::assets::AssetServer:
         return std::unexpected(Error::kLoaderNotSpecified);
     }
 
-    // trying to find existing asset
-    const auto file = catalog_.findFile(asset_id);
-
-    // file does not exist in catalog
-    if(!file)
-    {
-        core::LogCallback::error(debug_output_,
-                                 "Cannot find file in catalog. Asset ID: {}, type ID: {}",
-                                 asset_id, type_id);
-        return std::unexpected(Error::kUnknownAsset);
-    }
-
     const auto root = catalog_.root();
 
-    // one lock finds or creates the slot and publishes kLoading before anyone else can acquire it
-    const auto claimed = storage->claimErasedSlot(asset_id);
+    // the catalog row and its slot claim stay together, so remove cannot drop this id in between
+    std::optional<AssetCatalog::File> file;
+    ClaimedSlot claimed;
+    {
+        std::unique_lock lock(identity_mutex_);
+        file = catalog_.findFile(asset_id);
+        if(!file)
+        {
+            core::LogCallback::error(debug_output_,
+                                     "Cannot find file in catalog. Asset ID: {}, type ID: {}",
+                                     asset_id, type_id);
+            return std::unexpected(Error::kUnknownAsset);
+        }
+
+        claimed = storage->claimErasedSlot(asset_id);
+    }
     auto* slot = claimed.slot;
 
     AnyHandle handle;
@@ -418,6 +420,42 @@ std::error_code sgf::assets::AssetServer::reload(const AnyHandle& handle) noexce
     {
         slot->error = err;
         slot->setState(AssetState::kFailed);
+        return err;
+    }
+
+    return {};
+}
+
+std::error_code sgf::assets::AssetServer::remove(AssetId asset_id)
+{
+    std::unique_lock lock(identity_mutex_);
+
+    const auto file = catalog_.findFile(asset_id);
+    if(!file)
+    {
+        core::LogCallback::error(debug_output_, "Cannot find file in catalog. Asset ID: {}", asset_id);
+        return Error::kUnknownAsset;
+    }
+
+    if(auto* storage = this->storage(core::typeIndexFromStableHash(static_cast<std::uint32_t>(file->type_id))))
+    {
+        if(storage->slotControl(asset_id))
+        {
+            core::LogCallback::error(debug_output_, "Asset is still in memory. Asset ID: {}", asset_id);
+            return Error::kInUse;
+        }
+    }
+
+    auto removed = catalog_.removeFile(asset_id);
+    if(!removed)
+    {
+        core::LogCallback::error(debug_output_, "Cannot find file in catalog. Asset ID: {}", asset_id);
+        return Error::kUnknownAsset;
+    }
+
+    if(const auto err = catalog_.save())
+    {
+        catalog_.restoreFile(std::move(*removed));
         return err;
     }
 
