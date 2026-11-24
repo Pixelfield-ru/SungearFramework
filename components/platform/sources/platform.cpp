@@ -58,6 +58,7 @@ void sgf::platform::Platform::poll() const noexcept
     for(auto* window : windows_)
     {
         window->keyboard().clearFrame();
+        window->mouse().clearFrame();
 
         if(window->valid() && window->shouldClose())
             window->close();

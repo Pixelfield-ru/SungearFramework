@@ -11,6 +11,7 @@
 #include "sgf/core/memory.h"
 
 #include "keyboard.h"
+#include "mouse.h"
 
 namespace sgf::platform
 {
@@ -61,6 +62,9 @@ namespace sgf::platform
         [[nodiscard]] const Keyboard& keyboard() const noexcept;
         Keyboard& keyboard() noexcept;
 
+        [[nodiscard]] const Mouse& mouse() const noexcept;
+        Mouse& mouse() noexcept;
+
         [[nodiscard]] allocator_type get_allocator() const noexcept;
 
         Window& operator=(const Window&) = delete;
@@ -77,6 +81,7 @@ namespace sgf::platform
         const core::LogCallback* debug_output_ {};
 
         Keyboard keyboard_;
+        Mouse mouse_;
 
         [[nodiscard]] bool valid() const noexcept;
         void destroy() noexcept;
