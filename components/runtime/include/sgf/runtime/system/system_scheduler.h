@@ -7,7 +7,7 @@
 #include <unordered_map>
 #include <mutex>
 
-#include "sgf/core/thread_pool.h"
+#include "../../../../../core/include/sgf/core/execution/thread_pool.h"
 
 #include "system.h"
 #include "system_graph.h"

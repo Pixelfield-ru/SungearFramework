@@ -2,7 +2,7 @@
 // Created by stuka on 17.10.2026.
 //
 
-#include "sgf/core/thread_pool.h"
+#include "../include/sgf/core/execution/thread_pool.h"
 
 #include <boost/asio/post.hpp>
 #include <boost/asio/bind_allocator.hpp>

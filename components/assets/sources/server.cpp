@@ -70,7 +70,7 @@ std::error_code sgf::assets::AssetServer::mount(std::filesystem::path path) noex
 }
 
 std::expected<sgf::assets::AnyHandle, std::error_code> sgf::assets::AssetServer::load(
-    AssetId asset_id, std::uint32_t type_id) noexcept
+    AssetId asset_id, std::uint32_t type_id, core::ExecutionDomain domain) noexcept
 {
     auto* storage = this->storage(core::typeIndexFromStableHash(type_id));
     if(!storage)
@@ -148,7 +148,7 @@ std::expected<sgf::assets::AnyHandle, std::error_code> sgf::assets::AssetServer:
 
             slot->error.clear();
             slot->setState(AssetState::kLoaded);
-        }))
+        }, domain))
         {
             slot->error = err;
             slot->setState(AssetState::kFailed);
@@ -256,7 +256,7 @@ std::expected<sgf::assets::AnyHandle, std::error_code> sgf::assets::AssetServer:
             }
 
             // load dependency
-            auto loaded = load(dependency_id, dependency_type);
+            auto loaded = load(dependency_id, dependency_type, domain);
             if(!loaded)
             {
                 slot->error = loaded.error();
@@ -272,8 +272,7 @@ std::expected<sgf::assets::AnyHandle, std::error_code> sgf::assets::AssetServer:
 
         // loading baked source
         // capture the handle to increase lifetime of the slot
-        if(const auto err = postTracked(
-        [loader, asset_record_bytes = std::move(asset_record_bytes),
+        auto finish_baked = [loader, asset_record_bytes = std::move(asset_record_bytes),
          handle, allocator, dependencies = std::move(dependencies), header] {
 
             const auto asset_bytes = std::span(*asset_record_bytes).subspan(
@@ -320,7 +319,9 @@ std::expected<sgf::assets::AnyHandle, std::error_code> sgf::assets::AssetServer:
 
             slot->error.clear();
             slot->setState(AssetState::kLoaded);
-        }))
+        };
+
+        if(const auto err = postTracked(std::move(finish_baked), domain))
         {
             slot->error = err;
             slot->setState(AssetState::kFailed);
@@ -339,7 +340,8 @@ std::expected<sgf::assets::AnyHandle, std::error_code> sgf::assets::AssetServer:
     return std::unexpected(Error::kUnknownStorageType);
 }
 
-std::error_code sgf::assets::AssetServer::reload(const AnyHandle& handle) noexcept
+std::error_code sgf::assets::AssetServer::reload(
+    const AnyHandle& handle, core::ExecutionDomain domain) noexcept
 {
     auto* slot = handle.slot_;
 
@@ -416,7 +418,7 @@ std::error_code sgf::assets::AssetServer::reload(const AnyHandle& handle) noexce
         slot->error.clear();
         ++slot->version;
         slot->setState(AssetState::kLoaded);
-    }))
+    }, domain))
     {
         slot->error = err;
         slot->setState(AssetState::kFailed);
@@ -468,8 +470,15 @@ std::error_code sgf::assets::AssetServer::bake(
     return Baker(*this).bake(handle, archive, compression_level);
 }
 
-std::error_code sgf::assets::AssetServer::postTracked(std::move_only_function<void()> task) noexcept
+std::error_code sgf::assets::AssetServer::postTracked(
+    std::move_only_function<void()> task, core::ExecutionDomain domain) noexcept
 {
+    if(domain == core::ExecutionDomain::kCurrent)
+    {
+        task();
+        return {};
+    }
+
     if(!thread_pool_ || !posted_) return core::Error::kUninitialized;
 
     posted_->count.fetch_add(1, std::memory_order_acq_rel);

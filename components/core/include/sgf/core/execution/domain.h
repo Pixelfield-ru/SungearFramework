@@ -6,11 +6,13 @@
 
 #include <cstdint>
 
-namespace sgf::runtime
+namespace sgf::core
 {
     enum class ExecutionDomain : std::uint8_t
     {
-        kMain,
+        /// Runs on the calling thread.
+        kCurrent,
+        /// Runs in any thread.
         kAny
     };
 }

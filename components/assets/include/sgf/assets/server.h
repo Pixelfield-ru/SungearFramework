@@ -5,10 +5,11 @@
 #pragma once
 
 #include "sgf/core/memory.h"
+#include "sgf/core/execution/domain.h"
 #include "sgf/core/structures/type_map.h"
 #include "sgf/core/utility/file.h"
 #include "sgf/core/log.h"
-#include "sgf/core/thread_pool.h"
+#include "sgf/core/execution/thread_pool.h"
 #include "sgf/core/utility/type_index.h"
 #include "sgf/core/utility/encoding.h"
 
@@ -73,13 +74,17 @@ namespace sgf::assets
         /**
          * Load asset by path.
          * Do not call while a caller still uses the pointer from get() for this asset.
-         * Do not use the asset until the load has finished.
+         * kAny returns while the slot may still be kLoading. Do not call wait() on that handle from a pool thread.
+         * kCurrent reads on this thread and returns after the slot is kLoaded or the read has failed.
          * @tparam AssetT Type of asset.
          * @param path Path of asset.
+         * @param domain Where the file is read.
          * @return Handle to the asset or an error.
          */
         template<typename AssetT>
-        std::expected<Handle<AssetT>, std::error_code> load(const std::filesystem::path& path) noexcept
+        std::expected<Handle<AssetT>, std::error_code> load(
+            const std::filesystem::path& path,
+            core::ExecutionDomain domain = core::ExecutionDomain::kAny) noexcept
         {
             const auto root = catalog_.root();
             const auto key = core::normalizedRelativePath(root / path, root);
@@ -154,7 +159,7 @@ namespace sgf::assets
 
                 slot->error.clear();
                 slot->setState(AssetState::kLoaded);
-            }))
+            }, domain))
             {
                 slot->error = err;
                 slot->setState(AssetState::kFailed);
@@ -238,21 +243,29 @@ namespace sgf::assets
          * Load asset that exists in catalog.
          * Asset loads only if it was not loaded earlier and was saved by path or in an archive.
          * Do not call while a caller still uses the pointer from get() for this asset.
-         * Do not use the asset until the load has finished.
+         * kAny returns while the slot may still be kLoading. Do not call wait() on that handle from a pool thread.
+         * kCurrent reads on this thread and returns after the slot is kLoaded or the read has failed.
          * @param asset_id Asset ID that needs to be loaded.
          * @param type_id Type ID of asset.
+         * @param domain Where the asset is read.
          * @return Handle to the asset.
          */
-        std::expected<AnyHandle, std::error_code> load(AssetId asset_id, std::uint32_t type_id) noexcept;
+        std::expected<AnyHandle, std::error_code> load(
+            AssetId asset_id, std::uint32_t type_id,
+            core::ExecutionDomain domain = core::ExecutionDomain::kAny) noexcept;
 
         /**
          * Reload asset by path.
          * Do not call while a caller still uses the pointer from get().
-         * Do not use the asset until this reload has finished.
+         * kAny returns while the reload may still be running. Do not call wait() on that handle from a pool thread.
+         * kCurrent reads on this thread and returns after the slot is kLoaded or the read has failed.
          * @param handle Asset that needs to be reloaded.
+         * @param domain Where the file is read.
          * @return Error.
          */
-        std::error_code reload(const AnyHandle& handle) noexcept;
+        std::error_code reload(
+            const AnyHandle& handle,
+            core::ExecutionDomain domain = core::ExecutionDomain::kAny) noexcept;
 
         /**
          * Remove the catalog row for this id.
@@ -372,7 +385,9 @@ namespace sgf::assets
         AssetServer& operator=(AssetServer&& other) noexcept;
 
     private:
-        [[nodiscard]] std::error_code postTracked(std::move_only_function<void()> task) noexcept;
+        /// kCurrent runs the task before this call returns. kAny posts it to the pool.
+        [[nodiscard]] std::error_code postTracked(
+            std::move_only_function<void()> task, core::ExecutionDomain domain) noexcept;
 
         static void finishPosted(const core::SharedPtr<PostedJobs>& posted) noexcept;
 

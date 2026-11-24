@@ -6,11 +6,15 @@
 
 #include <array>
 #include <cstring>
+#include <expected>
+#include <span>
 #include <system_error>
+#include <variant>
 
 #include <fastgltf/parser.hpp>
 #include <fastgltf/core.hpp>
 #include <fastgltf/tools.hpp>
+#include <fastgltf/uri.hpp>
 #include <fastgltf/glm_element_traits.hpp>
 
 #include <glm/ext/matrix_float4x4.hpp>
@@ -18,6 +22,7 @@
 #include <glm/gtc/quaternion.hpp>
 
 #include "sgf/assets/server.h"
+#include "sgf/assets/std/image_utils.h"
 
 namespace fastgltf
 {
@@ -64,8 +69,118 @@ namespace
         sgf::core::Vector<bool> visited_nodes;
         sgf::core::Vector<bool> visited_meshes;
         sgf::core::Vector<bool> visited_materials;
+        sgf::core::Vector<bool> visited_images;
+        sgf::core::Vector<sgf::assets::Handle<sgf::assets::Image>> images;
         std::filesystem::path source;
     };
+
+    struct EncodedImage final
+    {
+        std::span<const std::byte> bytes;
+        fastgltf::MimeType mime = fastgltf::MimeType::None;
+    };
+
+    std::expected<std::span<const std::byte>, std::error_code> sourceBytes(const fastgltf::DataSource& source)
+    {
+        return fastgltf::visit_exhaustive(fastgltf::visitor {
+            [](std::monostate) -> std::expected<std::span<const std::byte>, std::error_code> {
+                return std::unexpected(std::make_error_code(std::errc::invalid_argument));
+            },
+            [](const fastgltf::sources::BufferView&) -> std::expected<std::span<const std::byte>, std::error_code> {
+                return std::unexpected(std::make_error_code(std::errc::not_supported));
+            },
+            [](const fastgltf::sources::URI&) -> std::expected<std::span<const std::byte>, std::error_code> {
+                return std::unexpected(std::make_error_code(std::errc::not_supported));
+            },
+            [](const fastgltf::sources::Array& array) -> std::expected<std::span<const std::byte>, std::error_code> {
+                return std::span<const std::byte> { array.bytes.data(), array.bytes.size_bytes() };
+            },
+            [](const fastgltf::sources::Vector& vector) -> std::expected<std::span<const std::byte>, std::error_code> {
+                return std::span<const std::byte> { vector.bytes.data(), vector.bytes.size() };
+            },
+            [](const fastgltf::sources::CustomBuffer&) -> std::expected<std::span<const std::byte>, std::error_code> {
+                return std::unexpected(std::make_error_code(std::errc::not_supported));
+            },
+            [](const fastgltf::sources::ByteView& view) -> std::expected<std::span<const std::byte>, std::error_code> {
+                return view.bytes;
+            },
+            [](const fastgltf::sources::Fallback&) -> std::expected<std::span<const std::byte>, std::error_code> {
+                return std::unexpected(std::make_error_code(std::errc::invalid_argument));
+            },
+        }, source);
+    }
+
+    std::expected<EncodedImage, std::error_code> encodedImage(const fastgltf::Asset& asset, const fastgltf::Image& image)
+    {
+        return fastgltf::visit_exhaustive(fastgltf::visitor {
+            [](std::monostate) -> std::expected<EncodedImage, std::error_code> {
+                return std::unexpected(std::make_error_code(std::errc::invalid_argument));
+            },
+            [&](const fastgltf::sources::BufferView& view) -> std::expected<EncodedImage, std::error_code> {
+                if(view.bufferViewIndex >= asset.bufferViews.size())
+                {
+                    return std::unexpected(std::make_error_code(std::errc::result_out_of_range));
+                }
+
+                const auto& buffer_view = asset.bufferViews[view.bufferViewIndex];
+                if(buffer_view.bufferIndex >= asset.buffers.size())
+                {
+                    return std::unexpected(std::make_error_code(std::errc::result_out_of_range));
+                }
+
+                auto bytes = sourceBytes(asset.buffers[buffer_view.bufferIndex].data);
+                if(!bytes) return std::unexpected(bytes.error());
+                if(buffer_view.byteOffset > bytes->size() ||
+                   buffer_view.byteLength > bytes->size() - buffer_view.byteOffset)
+                {
+                    return std::unexpected(std::make_error_code(std::errc::result_out_of_range));
+                }
+
+                return EncodedImage {
+                    bytes->subspan(buffer_view.byteOffset, buffer_view.byteLength),
+                    view.mimeType
+                };
+            },
+            [](const fastgltf::sources::URI&) -> std::expected<EncodedImage, std::error_code> {
+                return std::unexpected(std::make_error_code(std::errc::not_supported));
+            },
+            [](const fastgltf::sources::Array& array) -> std::expected<EncodedImage, std::error_code> {
+                return EncodedImage {
+                    { array.bytes.data(), array.bytes.size_bytes() },
+                    array.mimeType
+                };
+            },
+            [](const fastgltf::sources::Vector& vector) -> std::expected<EncodedImage, std::error_code> {
+                return EncodedImage {
+                    { vector.bytes.data(), vector.bytes.size() },
+                    vector.mimeType
+                };
+            },
+            [](const fastgltf::sources::CustomBuffer&) -> std::expected<EncodedImage, std::error_code> {
+                return std::unexpected(std::make_error_code(std::errc::not_supported));
+            },
+            [](const fastgltf::sources::ByteView& view) -> std::expected<EncodedImage, std::error_code> {
+                return EncodedImage { view.bytes, view.mimeType };
+            },
+            [](const fastgltf::sources::Fallback&) -> std::expected<EncodedImage, std::error_code> {
+                return std::unexpected(std::make_error_code(std::errc::invalid_argument));
+            },
+        }, image.data);
+    }
+
+    std::error_code supportedImageMime(fastgltf::MimeType mime)
+    {
+        switch(mime)
+        {
+            case fastgltf::MimeType::None:
+            case fastgltf::MimeType::JPEG:
+            case fastgltf::MimeType::PNG:
+            case fastgltf::MimeType::OctetStream:
+                return {};
+            default:
+                return std::make_error_code(std::errc::not_supported);
+        }
+    }
 
     glm::mat4 getNodeLocalTransform(const fastgltf::Node& node) noexcept
     {
@@ -108,6 +223,128 @@ namespace
         material.alpha_cutoff = src.alphaCutoff;
         material.double_sided = src.doubleSided;
         material.alpha_mode = mapAlphaMode(src.alphaMode);
+    }
+
+    std::error_code takeImageHandle(ImportContext& context,
+                                    std::size_t image_index,
+                                    std::expected<sgf::assets::Handle<sgf::assets::Image>, std::error_code> handle)
+    {
+        if(!handle) return handle.error();
+
+        auto& image_handle = *handle;
+        if(!image_handle)
+        {
+            if(image_handle.state() == sgf::assets::AssetState::kLoading) return sgf::assets::Error::kLoading;
+            if(const auto err = image_handle.error()) return err;
+            return sgf::assets::Error::kNotLoaded;
+        }
+
+        context.visited_images[image_index] = true;
+        context.images[image_index] = std::move(image_handle);
+        return {};
+    }
+
+    std::error_code ensureImageFile(ImportContext& context, std::size_t image_index, const fastgltf::sources::URI& source)
+    {
+        if(source.uri.valueless_after_move() || !source.uri->valid())
+        {
+            return std::make_error_code(std::errc::invalid_argument);
+        }
+        if(!source.uri->isLocalPath() || source.fileByteOffset != 0)
+        {
+            return std::make_error_code(std::errc::not_supported);
+        }
+        if(const auto err = supportedImageMime(source.mimeType)) return err;
+
+        const auto uri_path = source.uri->fspath();
+        const auto file_path = uri_path.is_absolute() ? uri_path : context.source.parent_path() / uri_path;
+
+        // the read runs on the pool. this import keeps the handle and does not wait
+        auto handle = context.server->load<sgf::assets::Image>(file_path);
+        if(!handle) return handle.error();
+
+        context.visited_images[image_index] = true;
+        context.images[image_index] = std::move(*handle);
+        return {};
+    }
+
+    std::error_code ensureImage(ImportContext& context, std::size_t image_index)
+    {
+        if(image_index >= context.images.size())
+        {
+            return std::make_error_code(std::errc::result_out_of_range);
+        }
+        if(context.visited_images[image_index]) return {};
+
+        const auto& gltf_image = context.asset->images[image_index];
+        if(const auto* uri = std::get_if<fastgltf::sources::URI>(&gltf_image.data))
+        {
+            return ensureImageFile(context, image_index, *uri);
+        }
+
+        const auto encoded = encodedImage(*context.asset, gltf_image);
+        if(!encoded) return encoded.error();
+        if(const auto err = supportedImageMime(encoded->mime)) return err;
+
+        sgf::assets::Image decoded(context.model->get_allocator());
+        if(const auto err = sgf::assets::utils::decodeImage(encoded->bytes, decoded)) return err;
+
+        const auto image_path = std::filesystem::path(context.source).concat(".images") / std::to_string(image_index);
+        auto handle = context.server->ensure<sgf::assets::Image>(image_path, [](sgf::assets::Image&) {
+            return std::error_code {};
+        });
+        if(!handle) return handle.error();
+
+        auto& image_handle = *handle;
+        if(!image_handle)
+        {
+            if(image_handle.state() == sgf::assets::AssetState::kLoading) return sgf::assets::Error::kLoading;
+            if(const auto err = image_handle.error()) return err;
+            return sgf::assets::Error::kNotLoaded;
+        }
+
+        image_handle.edit([&](sgf::assets::Image& image) {
+            image = std::move(decoded);
+        });
+
+        return takeImageHandle(context, image_index, std::move(handle));
+    }
+
+    template<typename OptionalTextureT>
+    const fastgltf::TextureInfo* textureInfo(const OptionalTextureT& texture)
+    {
+        if(!texture) return nullptr;
+        return &*texture;
+    }
+
+    std::error_code loadTextureImage(ImportContext& context,
+                                     const fastgltf::TextureInfo* info,
+                                     sgf::assets::Handle<sgf::assets::Image>& destination)
+    {
+        destination = nullptr;
+        if(!info) return {};
+
+        if(info->texCoordIndex != 0)
+        {
+            return std::make_error_code(std::errc::invalid_argument);
+        }
+        if(info->transform && info->transform->texCoordIndex && *info->transform->texCoordIndex != 0)
+        {
+            return std::make_error_code(std::errc::invalid_argument);
+        }
+        if(info->textureIndex >= context.asset->textures.size())
+        {
+            return std::make_error_code(std::errc::result_out_of_range);
+        }
+
+        const auto& texture = context.asset->textures[info->textureIndex];
+        if(!texture.imageIndex) return std::make_error_code(std::errc::not_supported);
+
+        const auto image_index = *texture.imageIndex;
+        if(const auto err = ensureImage(context, image_index)) return err;
+
+        destination = context.images[image_index];
+        return {};
     }
 
     sgf::assets::Model::PrimitiveType mapPrimitiveType(fastgltf::PrimitiveType type) noexcept
@@ -167,8 +404,40 @@ namespace
                     }
 
                     const auto& src = context.asset->materials[material_index];
+                    sgf::assets::Handle<sgf::assets::Image> base_color_image;
+                    sgf::assets::Handle<sgf::assets::Image> metallic_roughness_image;
+                    sgf::assets::Handle<sgf::assets::Image> normal_image;
+                    sgf::assets::Handle<sgf::assets::Image> occlusion_image;
+                    sgf::assets::Handle<sgf::assets::Image> emissive_image;
+
+                    if(const auto err = loadTextureImage(context, textureInfo(src.pbrData.baseColorTexture), base_color_image))
+                    {
+                        return err;
+                    }
+                    if(const auto err = loadTextureImage(context, textureInfo(src.pbrData.metallicRoughnessTexture), metallic_roughness_image))
+                    {
+                        return err;
+                    }
+                    if(const auto err = loadTextureImage(context, textureInfo(src.normalTexture), normal_image))
+                    {
+                        return err;
+                    }
+                    if(const auto err = loadTextureImage(context, textureInfo(src.occlusionTexture), occlusion_image))
+                    {
+                        return err;
+                    }
+                    if(const auto err = loadTextureImage(context, textureInfo(src.emissiveTexture), emissive_image))
+                    {
+                        return err;
+                    }
+
                     material_handle.edit([&](sgf::assets::Material& material) {
                         assignMaterial(material, src);
+                        material.base_color_image = std::move(base_color_image);
+                        material.metallic_roughness_image = std::move(metallic_roughness_image);
+                        material.normal_image = std::move(normal_image);
+                        material.occlusion_image = std::move(occlusion_image);
+                        material.emissive_image = std::move(emissive_image);
                     });
                     context.model->materials[material_index] = std::move(material_handle);
                 }
@@ -326,6 +595,8 @@ namespace
         context.visited_nodes = sgf::core::Vector<bool>(asset.nodes.size(), false, alloc);
         context.visited_meshes = sgf::core::Vector<bool>(asset.meshes.size(), false, alloc);
         context.visited_materials = sgf::core::Vector<bool>(asset.materials.size(), false, alloc);
+        context.visited_images = sgf::core::Vector<bool>(asset.images.size(), false, alloc);
+        context.images = sgf::core::Vector<sgf::assets::Handle<sgf::assets::Image>>(asset.images.size(), alloc);
 
         for(const auto& gltf_scene : asset.scenes)
         {
@@ -367,7 +638,6 @@ std::error_code sgf::assets::GltfImporter::importSource(const std::filesystem::p
     }
 
     constexpr auto options = fastgltf::Options::LoadExternalBuffers
-                           | fastgltf::Options::LoadExternalImages
                            | fastgltf::Options::DecomposeNodeMatrices;
 
     auto gltf_asset = parser.loadGltf(*data, source.parent_path(), options);
