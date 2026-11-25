@@ -71,7 +71,7 @@ std::error_code sgf::assets::AssetServer::mount(std::filesystem::path path) noex
     return catalog_.load();
 }
 
-std::error_code sgf::assets::AssetServer::importEngineResources(
+std::error_code sgf::assets::AssetServer::importStandardResources(
     const std::filesystem::path& source, bool skip_existing) const noexcept
 {
     const auto root = catalog_.root();

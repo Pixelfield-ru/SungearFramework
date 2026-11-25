@@ -72,7 +72,7 @@ namespace sgf::assets
         std::error_code mount(std::filesystem::path path) noexcept;
 
         /**
-         * Copy an engine resource tree into engine/resources under the mounted catalog.
+         * Copy a standard resource tree into engine/resources under the mounted catalog.
          * Call after mount. Catalog rows are left untouched.
          * An existing file stays in place when skip_existing is true, and is replaced when it is false.
          * Files copied before a failure stay on disk. A later call with skip_existing continues from them.
@@ -80,7 +80,7 @@ namespace sgf::assets
          * @param skip_existing Leave files that are already in the catalog tree.
          * @return Error.
          */
-        std::error_code importEngineResources(const std::filesystem::path& source, bool skip_existing) const noexcept;
+        std::error_code importStandardResources(const std::filesystem::path& source, bool skip_existing) const noexcept;
 
         /**
          * Load asset by path.
