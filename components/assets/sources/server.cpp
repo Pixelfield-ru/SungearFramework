@@ -11,6 +11,8 @@
 #include <limits>
 #include <mutex>
 
+#include "sgf/core/utility/encoding.h"
+
 #include <zstd.h>
 
 #include "sgf/core/errors.h"
@@ -67,6 +69,27 @@ std::error_code sgf::assets::AssetServer::mount(std::filesystem::path path) noex
     }
 
     return catalog_.load();
+}
+
+std::error_code sgf::assets::AssetServer::importEngineResources(
+    const std::filesystem::path& source, bool skip_existing) const noexcept
+{
+    const auto root = catalog_.root();
+    if(root.empty())
+    {
+        core::LogCallback::error(debug_output_, "Cannot import engine resources. The catalog is not mounted.");
+        return core::Error::kUninitialized;
+    }
+
+    const auto destination = root / "engine" / "resources";
+    const auto error = core::copyDirectory(source, destination, skip_existing);
+    if(error)
+    {
+        core::LogCallback::error(debug_output_, "Cannot import engine resources. Source: '{}', destination: '{}'.",
+                                 core::pathToUtf8(source), core::pathToUtf8(destination));
+    }
+
+    return error;
 }
 
 std::expected<sgf::assets::AnyHandle, std::error_code> sgf::assets::AssetServer::load(

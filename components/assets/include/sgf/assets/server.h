@@ -72,6 +72,17 @@ namespace sgf::assets
         std::error_code mount(std::filesystem::path path) noexcept;
 
         /**
+         * Copy an engine resource tree into engine/resources under the mounted catalog.
+         * Call after mount. Catalog rows are left untouched.
+         * An existing file stays in place when skip_existing is true, and is replaced when it is false.
+         * Files copied before a failure stay on disk. A later call with skip_existing continues from them.
+         * @param source Directory whose contents are copied.
+         * @param skip_existing Leave files that are already in the catalog tree.
+         * @return Error.
+         */
+        std::error_code importEngineResources(const std::filesystem::path& source, bool skip_existing) const noexcept;
+
+        /**
          * Load asset by path.
          * Do not call while a caller still uses the pointer from get() for this asset.
          * kAny returns while the slot may still be kLoading. Do not call wait() on that handle from a pool thread.
