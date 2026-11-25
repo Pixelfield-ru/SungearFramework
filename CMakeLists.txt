@@ -98,7 +98,6 @@ message(STATUS "ANDROID_STL: ${ANDROID_STL}")
 
 # packages --------------------------------------------------
 
-sgf_find_package(Bullet REQUIRED)
 sgf_find_package(glm CONFIG REQUIRED)
 sgf_find_package(fastgltf CONFIG REQUIRED)
 sgf_find_package(EnTT CONFIG REQUIRED)

@@ -88,6 +88,14 @@ void sgf::platform::Window::setTitle(std::string_view title) noexcept
     glfwSetWindowTitle(impl_->handle, title.data());
 }
 
+std::string_view sgf::platform::Window::title() const noexcept
+{
+    if(!valid()) return {};
+
+    const char* title = glfwGetWindowTitle(impl_->handle);
+    return title ? std::string_view{ title } : std::string_view{};
+}
+
 void sgf::platform::Window::position(std::int32_t& x, std::int32_t& y) const noexcept
 {
     if(!valid())
@@ -257,6 +265,13 @@ std::error_code sgf::platform::Window::create(const WindowCreateInfo& create_inf
     if(create_info.client_api == WindowClientApi::kOpenGL)
     {
         glfwShowWindow(impl->handle);
+    }
+
+    // The window can receive focus inside glfwCreateWindow, before the callback exists.
+    // Clicking that window later does not send a second gain event.
+    if(glfwGetWindowAttrib(impl->handle, GLFW_FOCUSED) == GLFW_TRUE)
+    {
+        output.setFocused(true);
     }
 
     glfwDefaultWindowHints();

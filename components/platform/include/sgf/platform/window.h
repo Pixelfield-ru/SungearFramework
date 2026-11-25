@@ -49,6 +49,7 @@ namespace sgf::platform
         ~Window() noexcept;
 
         void setTitle(std::string_view title) noexcept;
+        [[nodiscard]] std::string_view title() const noexcept;
 
         void position(std::int32_t& x, std::int32_t& y) const noexcept;
         void setPosition(std::int32_t x, std::int32_t y) noexcept;
