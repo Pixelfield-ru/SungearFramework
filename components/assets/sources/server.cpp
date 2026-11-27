@@ -77,7 +77,7 @@ std::error_code sgf::assets::AssetServer::importStandardResources(
     const auto root = catalog_.root();
     if(root.empty())
     {
-        core::LogCallback::error(debug_output_, "Cannot import engine resources. The catalog is not mounted.");
+        core::LogCallback::error(debug_output_, "Cannot import standard resources. The catalog is not mounted.");
         return core::Error::kUninitialized;
     }
 
@@ -85,7 +85,7 @@ std::error_code sgf::assets::AssetServer::importStandardResources(
     const auto error = core::copyDirectory(source, destination, skip_existing);
     if(error)
     {
-        core::LogCallback::error(debug_output_, "Cannot import engine resources. Source: '{}', destination: '{}'.",
+        core::LogCallback::error(debug_output_, "Cannot import standard resources. Source: '{}', destination: '{}'.",
                                  core::pathToUtf8(source), core::pathToUtf8(destination));
     }
 
