@@ -312,7 +312,13 @@ std::expected<VkCommandPool, std::error_code> sgf::rhi::VulkanLogicalDevice::com
 
     VkCommandPoolCreateInfo pool_info{};
     pool_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-    pool_info.queueFamilyIndex = *physical_device_->queue_families_indices_[std::to_underlying(queue_type)];
+    const auto& family_index = physical_device_->queue_families_indices_[std::to_underlying(queue_type)];
+    if(!family_index)
+    {
+        return std::unexpected(VulkanError::kInvalidArgument);
+    }
+
+    pool_info.queueFamilyIndex = *family_index;
     // Allow vkBeginCommandBuffer to reset individual buffers (e.g. after swapchain recreate).
     pool_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 
@@ -669,8 +675,15 @@ std::error_code sgf::rhi::VulkanLogicalDevice::create(const LogicalDeviceCreateI
         return VulkanError::kCannotCreateDevice;
     }
 
-    vkGetDeviceQueue(handle_, *vulkan_physical_device->queue_families_indices_[std::to_underlying(QueueFamilyType::kGraphics)], 0, &queues_[std::to_underlying(QueueFamilyType::kGraphics)]);
-    vkGetDeviceQueue(handle_, *vulkan_physical_device->queue_families_indices_[std::to_underlying(QueueFamilyType::kPresent)], 0, &queues_[std::to_underlying(QueueFamilyType::kPresent)]);
+    for(std::uint32_t type = 0; type < std::to_underlying(QueueFamilyType::kCount); ++type)
+    {
+        if(static_cast<QueueFamilyType>(type) == QueueFamilyType::kPresent) continue;
+
+        const auto& family_index = vulkan_physical_device->queue_families_indices_[type];
+        if(!family_index) continue;
+
+        vkGetDeviceQueue(handle_, *family_index, 0, &queues_[type]);
+    }
 
     return {};
 }

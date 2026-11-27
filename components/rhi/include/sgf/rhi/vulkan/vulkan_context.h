@@ -7,9 +7,8 @@
 #include <vector>
 #include <string>
 
-#define GLFW_INCLUDE_VULKAN
 #include <memory>
-#include <GLFW/glfw3.h>
+#include <vulkan/vulkan.h>
 
 #include "sgf/rhi/context.h"
 #include "sgf/core/memory.h"
@@ -93,6 +92,9 @@ namespace sgf::rhi
 
         [[nodiscard]] core::Vector<core::SharedPtr<IPhysicalDevice>> physicalDevices() noexcept override;
 
+        [[nodiscard]] std::expected<core::UniquePtr<ISurface>, std::error_code> createSurface(
+            const SurfaceCreateInfo& create_info, const allocator_type& alloc) noexcept override;
+
         [[nodiscard]] std::expected<core::UniquePtr<ILogicalDevice>, std::error_code> createLogicalDevice(
             const LogicalDeviceCreateInfo& create_info, const allocator_type& alloc) noexcept override;
 
@@ -113,7 +115,6 @@ namespace sgf::rhi
         core::UniquePtr<VkAllocationCallbacks> allocator_;
 
         VkInstance instance_ {};
-        VkSurfaceKHR surface_ {};
         VkDebugUtilsMessengerEXT messenger_ {};
 
         core::Vector<core::String> enabled_validation_layers_;

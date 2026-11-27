@@ -4,8 +4,13 @@
 
 #include "sgf/rhi/vulkan/vulkan_swapchain.h"
 
+#include <algorithm>
+#include <limits>
+
 #include "sgf/core/errors.h"
+#include "sgf/platform/window.h"
 #include "sgf/rhi/vulkan/vulkan_context.h"
+#include "sgf/rhi/vulkan/vulkan_surface.h"
 #include "sgf/rhi/vulkan/vulkan_image.h"
 #include "sgf/rhi/vulkan/vulkan_image_view.h"
 #include "sgf/rhi/vulkan/vulkan_logical_device.h"
@@ -196,124 +201,129 @@ void sgf::rhi::VulkanSwapchain::destroy() noexcept
 
 std::error_code sgf::rhi::VulkanSwapchain::create(const SwapchainCreateInfo& create_info) noexcept
 {
+    if(!create_info.context || !create_info.logical_device || !create_info.physical_device ||
+       !create_info.surface || !create_info.window)
+    {
+        return VulkanError::kInvalidArgument;
+    }
+
     auto* vulkan_context = static_cast<const VulkanContext*>(create_info.context);
     auto* vulkan_logical_device = static_cast<const VulkanLogicalDevice*>(create_info.logical_device);
-    auto* vulkan_physical_device = static_cast<VulkanPhysicalDevice*>(create_info.physical_device);
+    const auto* vulkan_physical_device = static_cast<const VulkanPhysicalDevice*>(create_info.physical_device);
+    const auto& vulkan_surface = static_cast<const VulkanSurface&>(*create_info.surface);
 
     logical_device_ = vulkan_logical_device;
     context_ = vulkan_context;
 
-    auto& surface_support = vulkan_physical_device->surface_support_;
+    const auto capabilities_result = vulkan_physical_device->querySurfaceCapabilities(*create_info.surface, get_allocator());
+    if(!capabilities_result)
+    {
+        return capabilities_result.error();
+    }
 
-    // Extent/transform change on resize — must refresh, not use cached boot-time caps.
-    VkSurfaceCapabilitiesKHR surface_caps;
-    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(
-        vulkan_physical_device->handle_, context_->surface_, &surface_caps);
+    const SurfaceCapabilities& capabilities = *capabilities_result;
 
-    if(surface_support.formats_.empty() ||
-       surface_support.present_modes_.empty())
+    if(capabilities.formats.empty() || capabilities.present_modes.empty() || capabilities.present_queue_families.empty())
     {
         return VulkanError::kIncompatibleDevice;
     }
 
     // ============================= selecting format & color space
 
-    const auto preferred_color_space = toVkColorSpace(create_info.preferred_color_space);
+    const SurfaceFormat* exact = nullptr;
+    const SurfaceFormat* format_only = nullptr;
 
-    std::optional<VkSurfaceFormatKHR> exact;
-    std::optional<VkSurfaceFormatKHR> format_only;
-
-    for(const auto& available : surface_support.formats_)
+    for(const auto& available : capabilities.formats)
     {
-        const bool format_ok = fromVkFormat(available.format) == create_info.preferred_format;
-        const bool space_ok  = available.colorSpace == preferred_color_space;
+        const bool format_ok = available.format == create_info.preferred_format;
+        const bool space_ok = available.color_space == create_info.preferred_color_space;
 
         if(format_ok && space_ok)
         {
-            exact = available;
+            exact = &available;
             break;
         }
 
         if(format_ok && !format_only)
-            format_only = available;
+        {
+            format_only = &available;
+        }
     }
 
-    surface_format_ = exact.value_or(format_only.value_or(surface_support.formats_[0]));
+    const SurfaceFormat& chosen_format = exact ? *exact : format_only ? *format_only : capabilities.formats.front();
+    surface_format_.format = toVkFormat(chosen_format.format);
+    surface_format_.colorSpace = toVkColorSpace(chosen_format.color_space);
 
     // ============================ choosing present mode
-    auto chosen_present_mode = surface_support.present_modes_[0];
-    for(const auto& available_present_mode : surface_support.present_modes_)
+    const PresentMode preferred_present_mode = fromVkPresentMode(present_mode_);
+    PresentMode chosen_present_mode = capabilities.present_modes.front();
+    for(const auto available_present_mode : capabilities.present_modes)
     {
-        if(available_present_mode == present_mode_)
+        if(available_present_mode == preferred_present_mode)
         {
-            chosen_present_mode = present_mode_;
+            chosen_present_mode = preferred_present_mode;
             break;
         }
     }
 
-    present_mode_ = chosen_present_mode;
+    present_mode_ = toVkPresentMode(chosen_present_mode);
 
     // ============================= choosing extent
 
-    if(surface_caps.currentExtent.width != std::numeric_limits<std::uint32_t>::max())
+    if(capabilities.current_extent.x != std::numeric_limits<std::uint32_t>::max())
     {
-        extent_ = surface_caps.currentExtent;
+        extent_ = { capabilities.current_extent.x, capabilities.current_extent.y };
     }
     else
     {
-        int width, height;
-        glfwGetFramebufferSize(create_info.window_handle, &width, &height);
+        std::int32_t width = 0;
+        std::int32_t height = 0;
+        create_info.window->framebufferSize(width, height);
 
         extent_ = {
             static_cast<uint32_t>(width),
             static_cast<uint32_t>(height)
         };
 
-        extent_.width = std::max(surface_caps.minImageExtent.width,
-            std::min(surface_caps.maxImageExtent.width, extent_.width));
-        extent_.height = std::max(surface_caps.minImageExtent.height,
-            std::min(surface_caps.maxImageExtent.height, extent_.height));
+        extent_.width = std::max(capabilities.min_extent.x, std::min(capabilities.max_extent.x, extent_.width));
+        extent_.height = std::max(capabilities.min_extent.y, std::min(capabilities.max_extent.y, extent_.height));
     }
 
     // ============================== choosing images count
-    std::uint32_t image_count = surface_caps.minImageCount + 1;
+    std::uint32_t image_count = capabilities.min_image_count + 1;
 
-    if(surface_caps.maxImageCount > 0 && image_count > surface_caps.maxImageCount)
+    if(capabilities.max_image_count > 0 && image_count > capabilities.max_image_count)
     {
-        image_count = surface_caps.maxImageCount;
+        image_count = capabilities.max_image_count;
     }
 
     // ============================== creating swapchain
     VkSwapchainCreateInfoKHR swapchain_create_info{};
     swapchain_create_info.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
-    swapchain_create_info.surface = context_->surface_;
+    swapchain_create_info.surface = vulkan_surface.handle_;
     swapchain_create_info.minImageCount = image_count;
     swapchain_create_info.imageFormat = surface_format_.format;
     swapchain_create_info.imageColorSpace = surface_format_.colorSpace;
     swapchain_create_info.imageExtent = extent_;
     swapchain_create_info.imageArrayLayers = 1;
     swapchain_create_info.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-    if(*vulkan_physical_device->queue_families_indices_[std::to_underlying(QueueFamilyType::kGraphics)] != *vulkan_physical_device->queue_families_indices_[std::to_underlying(sgf::rhi::QueueFamilyType::kPresent)])
-    {
-        const std::uint32_t queue_family_indices[] = {
-            *vulkan_physical_device->queue_families_indices_[std::to_underlying(QueueFamilyType::kGraphics)],
-            *vulkan_physical_device->queue_families_indices_[std::to_underlying(QueueFamilyType::kPresent)]
-        };
 
-        swapchain_create_info.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
-        swapchain_create_info.queueFamilyIndexCount = 2;
-        swapchain_create_info.pQueueFamilyIndices = queue_family_indices;
-    }
-    else
+    const auto& graphics_index = vulkan_physical_device->queue_families_indices_[std::to_underlying(QueueFamilyType::kGraphics)];
+    // todo: add queue to present selection
+    const auto graphics_present = std::ranges::find(
+        capabilities.present_queue_families, QueueFamilyType::kGraphics);
+    if(!graphics_index || graphics_present == capabilities.present_queue_families.end())
     {
-        swapchain_create_info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
-        swapchain_create_info.queueFamilyIndexCount = 0; // Optional
-        swapchain_create_info.pQueueFamilyIndices = nullptr; // Optional
+        return VulkanError::kIncompatibleDevice;
     }
 
-    swapchain_create_info.preTransform = surface_caps.currentTransform;
+    swapchain_create_info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    swapchain_create_info.queueFamilyIndexCount = 0;
+    swapchain_create_info.pQueueFamilyIndices = nullptr;
+
+    swapchain_create_info.preTransform = toVkSurfaceTransform(capabilities.current_transform);
     swapchain_create_info.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-    swapchain_create_info.presentMode = chosen_present_mode;
+    swapchain_create_info.presentMode = present_mode_;
     swapchain_create_info.clipped = VK_TRUE;
     swapchain_create_info.oldSwapchain = VK_NULL_HANDLE;
 

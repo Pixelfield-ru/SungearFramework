@@ -57,14 +57,19 @@ namespace sgf::platform
         void size(std::int32_t& width, std::int32_t& height) const noexcept;
         void setSize(std::int32_t width, std::int32_t height) noexcept;
 
+        void framebufferSize(std::int32_t& width, std::int32_t& height) const noexcept;
+
         void close() noexcept;
         [[nodiscard]] bool shouldClose() const noexcept;
+        [[nodiscard]] bool closed() const noexcept;
 
         [[nodiscard]] const Keyboard& keyboard() const noexcept;
         Keyboard& keyboard() noexcept;
 
         [[nodiscard]] const Mouse& mouse() const noexcept;
         Mouse& mouse() noexcept;
+
+        [[nodiscard]] void* handle() const noexcept;
 
         [[nodiscard]] allocator_type get_allocator() const noexcept;
 

@@ -4,8 +4,10 @@
 
 #pragma once
 
+#include <expected>
 #include <string>
 
+#include "surface.h"
 #include "types.h"
 #include "sgf/core/memory.h"
 
@@ -32,6 +34,9 @@ namespace sgf::rhi
         { }
 
         [[nodiscard]] virtual bool valid() const noexcept = 0;
+
+        [[nodiscard]] virtual std::expected<SurfaceCapabilities, std::error_code> querySurfaceCapabilities(
+            const ISurface& surface, const allocator_type& alloc) const = 0;
 
         [[nodiscard]] core::String name() const noexcept
         {

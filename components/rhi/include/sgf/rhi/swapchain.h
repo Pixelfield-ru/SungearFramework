@@ -6,24 +6,31 @@
 
 #include <expected>
 #include <system_error>
-#include <GLFW/glfw3.h>
 #include <glm/vec2.hpp>
 
 #include "types.h"
+
+namespace sgf::platform
+{
+    struct Window;
+}
 
 namespace sgf::rhi
 {
     struct IContext;
     struct ILogicalDevice;
     struct IPhysicalDevice;
+    struct ISurface;
     struct IImageView;
 
     struct SwapchainCreateInfo final
     {
         const IContext* context {};
         const ILogicalDevice* logical_device {};
-        IPhysicalDevice* physical_device {};
-        GLFWwindow* window_handle {};
+        const IPhysicalDevice* physical_device {};
+        const ISurface* surface {};
+        const platform::Window* window {};
+
         Format preferred_format = Format::kBgra8Unorm;
         ColorSpace preferred_color_space = ColorSpace::kSrgbNonlinear;
         std::int8_t max_frames_in_flight = 2;

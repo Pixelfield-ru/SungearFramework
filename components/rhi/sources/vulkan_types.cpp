@@ -225,6 +225,73 @@ namespace sgf::rhi
         }
     }
 
+    VkPresentModeKHR toVkPresentMode(PresentMode present_mode) noexcept
+    {
+        switch(present_mode)
+        {
+            case PresentMode::kImmediate: return VK_PRESENT_MODE_IMMEDIATE_KHR;
+            case PresentMode::kMailbox: return VK_PRESENT_MODE_MAILBOX_KHR;
+            case PresentMode::kFifo: return VK_PRESENT_MODE_FIFO_KHR;
+            case PresentMode::kFifoRelaxed: return VK_PRESENT_MODE_FIFO_RELAXED_KHR;
+
+            case PresentMode::kUnknown:
+            case PresentMode::kCount:
+            default:
+                return VK_PRESENT_MODE_FIFO_KHR;
+        }
+    }
+
+    PresentMode fromVkPresentMode(VkPresentModeKHR present_mode) noexcept
+    {
+        switch(present_mode)
+        {
+            case VK_PRESENT_MODE_IMMEDIATE_KHR: return PresentMode::kImmediate;
+            case VK_PRESENT_MODE_MAILBOX_KHR: return PresentMode::kMailbox;
+            case VK_PRESENT_MODE_FIFO_KHR: return PresentMode::kFifo;
+            case VK_PRESENT_MODE_FIFO_RELAXED_KHR: return PresentMode::kFifoRelaxed;
+            default:
+                return PresentMode::kUnknown;
+        }
+    }
+
+    VkSurfaceTransformFlagBitsKHR toVkSurfaceTransform(SurfaceTransform transform) noexcept
+    {
+        switch(transform)
+        {
+            case SurfaceTransform::kRotate90: return VK_SURFACE_TRANSFORM_ROTATE_90_BIT_KHR;
+            case SurfaceTransform::kRotate180: return VK_SURFACE_TRANSFORM_ROTATE_180_BIT_KHR;
+            case SurfaceTransform::kRotate270: return VK_SURFACE_TRANSFORM_ROTATE_270_BIT_KHR;
+            case SurfaceTransform::kHorizontalMirror: return VK_SURFACE_TRANSFORM_HORIZONTAL_MIRROR_BIT_KHR;
+            case SurfaceTransform::kHorizontalMirrorRotate90: return VK_SURFACE_TRANSFORM_HORIZONTAL_MIRROR_ROTATE_90_BIT_KHR;
+            case SurfaceTransform::kHorizontalMirrorRotate180: return VK_SURFACE_TRANSFORM_HORIZONTAL_MIRROR_ROTATE_180_BIT_KHR;
+            case SurfaceTransform::kHorizontalMirrorRotate270: return VK_SURFACE_TRANSFORM_HORIZONTAL_MIRROR_ROTATE_270_BIT_KHR;
+            case SurfaceTransform::kInherit: return VK_SURFACE_TRANSFORM_INHERIT_BIT_KHR;
+
+            case SurfaceTransform::kIdentity:
+            case SurfaceTransform::kCount:
+            default:
+                return VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
+        }
+    }
+
+    SurfaceTransform fromVkSurfaceTransform(VkSurfaceTransformFlagsKHR transform) noexcept
+    {
+        switch(transform)
+        {
+            case VK_SURFACE_TRANSFORM_ROTATE_90_BIT_KHR: return SurfaceTransform::kRotate90;
+            case VK_SURFACE_TRANSFORM_ROTATE_180_BIT_KHR: return SurfaceTransform::kRotate180;
+            case VK_SURFACE_TRANSFORM_ROTATE_270_BIT_KHR: return SurfaceTransform::kRotate270;
+            case VK_SURFACE_TRANSFORM_HORIZONTAL_MIRROR_BIT_KHR: return SurfaceTransform::kHorizontalMirror;
+            case VK_SURFACE_TRANSFORM_HORIZONTAL_MIRROR_ROTATE_90_BIT_KHR: return SurfaceTransform::kHorizontalMirrorRotate90;
+            case VK_SURFACE_TRANSFORM_HORIZONTAL_MIRROR_ROTATE_180_BIT_KHR: return SurfaceTransform::kHorizontalMirrorRotate180;
+            case VK_SURFACE_TRANSFORM_HORIZONTAL_MIRROR_ROTATE_270_BIT_KHR: return SurfaceTransform::kHorizontalMirrorRotate270;
+            case VK_SURFACE_TRANSFORM_INHERIT_BIT_KHR: return SurfaceTransform::kInherit;
+            case VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR: return SurfaceTransform::kIdentity;
+            default:
+                return SurfaceTransform::kIdentity;
+        }
+    }
+
     VkImageType toVkImageType(ImageType image_type) noexcept
     {
         switch(image_type)

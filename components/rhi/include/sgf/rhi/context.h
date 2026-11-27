@@ -10,6 +10,7 @@
 
 #include "sgf/core/log.h"
 #include "logical_device.h"
+#include "surface.h"
 
 namespace sgf::rhi
 {
@@ -23,8 +24,6 @@ namespace sgf::rhi
         core::String engine_name;
         /// Optional.
         bool enable_api_debug_output {};
-        //// Required.
-        GLFWwindow* window {};
         /// Optional.
         const core::LogCallback* rhi_debug_output {};
 
@@ -37,7 +36,6 @@ namespace sgf::rhi
             app_name(other.app_name, alloc),
             engine_name(other.engine_name, alloc),
             enable_api_debug_output(other.enable_api_debug_output),
-            window(other.window),
             rhi_debug_output(other.rhi_debug_output)
         { }
         ContextCreateInfo(ContextCreateInfo&&) = default;
@@ -45,7 +43,6 @@ namespace sgf::rhi
             app_name(std::move(other.app_name), alloc),
             engine_name(std::move(other.engine_name), alloc),
             enable_api_debug_output(other.enable_api_debug_output),
-            window(other.window),
             rhi_debug_output(other.rhi_debug_output)
         { }
 
@@ -73,6 +70,9 @@ namespace sgf::rhi
         [[nodiscard]] virtual bool valid() const noexcept = 0;
 
         [[nodiscard]] virtual core::Vector<core::SharedPtr<IPhysicalDevice>> physicalDevices() noexcept = 0;
+
+        [[nodiscard]] virtual std::expected<core::UniquePtr<ISurface>, std::error_code> createSurface(
+            const SurfaceCreateInfo& create_info, const allocator_type& alloc) noexcept = 0;
 
         [[nodiscard]] virtual std::expected<core::UniquePtr<ILogicalDevice>, std::error_code> createLogicalDevice(
             const LogicalDeviceCreateInfo& create_info, const allocator_type& alloc) noexcept = 0;

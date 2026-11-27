@@ -11,9 +11,15 @@
 namespace sgf::rhi
 {
     struct VulkanContext;
+    struct VulkanPhysicalDevice;
+    struct VulkanSwapchain;
 
     struct VulkanSurface final : ISurface
     {
+        friend struct VulkanContext;
+        friend struct VulkanPhysicalDevice;
+        friend struct VulkanSwapchain;
+
         VulkanSurface() noexcept = default;
         VulkanSurface(const VulkanSurface&) = delete;
         VulkanSurface(VulkanSurface&& other) noexcept;

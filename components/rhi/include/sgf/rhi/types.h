@@ -288,6 +288,32 @@ namespace sgf::rhi
         kCount
     };
 
+    // Swapchain present mode. Maps to VkPresentModeKHR; OpenGL maps these to a swap interval.
+    enum class PresentMode : std::uint8_t
+    {
+        kUnknown = 0,
+        kImmediate,
+        kMailbox,
+        kFifo,
+        kFifoRelaxed,
+        kCount
+    };
+
+    // Current surface transform. Maps to VkSurfaceTransformFlagBitsKHR.
+    enum class SurfaceTransform : std::uint8_t
+    {
+        kIdentity = 0,
+        kRotate90,
+        kRotate180,
+        kRotate270,
+        kHorizontalMirror,
+        kHorizontalMirrorRotate90,
+        kHorizontalMirrorRotate180,
+        kHorizontalMirrorRotate270,
+        kInherit,
+        kCount
+    };
+
     // Texture / image dimensionality.
     // Maps to VkImageType (+ cube/array via view type / create flags); GL texture target.
     enum class ImageType : std::uint8_t

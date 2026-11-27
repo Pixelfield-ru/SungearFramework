@@ -7,6 +7,8 @@
 #include <iostream>
 #include <utility>
 
+#include <GLFW/glfw3.h>
+
 #include "sgf/core/errors.h"
 #include "sgf/rhi/vulkan/vulkan_framebuffer.h"
 #include "sgf/rhi/vulkan/vulkan_image.h"
@@ -15,6 +17,7 @@
 #include "sgf/rhi/vulkan/vulkan_physical_device.h"
 #include "sgf/rhi/vulkan/vulkan_pipeline_state.h"
 #include "sgf/rhi/vulkan/vulkan_shader.h"
+#include "sgf/rhi/vulkan/vulkan_surface.h"
 #include "sgf/rhi/vulkan/vulkan_swapchain.h"
 #include "sgf/rhi/physical_device.h"
 
@@ -67,7 +70,6 @@ sgf::rhi::VulkanContext::VulkanContext(VulkanContext&& other) noexcept :
     destroy_messenger_(std::exchange(other.destroy_messenger_, VK_NULL_HANDLE)),
     allocator_(std::move(other.allocator_)),
     instance_(std::exchange(other.instance_, VK_NULL_HANDLE)),
-    surface_(std::exchange(other.surface_, VK_NULL_HANDLE)),
     messenger_(std::exchange(other.messenger_, VK_NULL_HANDLE)),
     enabled_validation_layers_(std::move(other.enabled_validation_layers_)),
     enabled_extensions_(std::move(other.enabled_extensions_))
@@ -80,7 +82,6 @@ sgf::rhi::VulkanContext::VulkanContext(VulkanContext&& other, const allocator_ty
     destroy_messenger_(std::exchange(other.destroy_messenger_, VK_NULL_HANDLE)),
     allocator_(std::move(other.allocator_)),
     instance_(std::exchange(other.instance_, VK_NULL_HANDLE)),
-    surface_(std::exchange(other.surface_, VK_NULL_HANDLE)),
     messenger_(std::exchange(other.messenger_, VK_NULL_HANDLE)),
     enabled_validation_layers_(std::move(other.enabled_validation_layers_), allocator),
     enabled_extensions_(std::move(other.enabled_extensions_), allocator)
@@ -198,12 +199,6 @@ std::error_code sgf::rhi::VulkanContext::create(VulkanContextCreateInfo create_i
         }
     }
 
-    // creating surface to present image
-    if(glfwCreateWindowSurface(output.instance_, create_info.window, output.allocator_.get(), &output.surface_) != VK_SUCCESS)
-    {
-        return VulkanError::kCannotCreateSurface;
-    }
-
     return {};
 }
 
@@ -269,31 +264,6 @@ sgf::core::Vector<sgf::core::SharedPtr<sgf::rhi::IPhysicalDevice>> sgf::rhi::Vul
 
         physical_device->features_ = device_features;
         physical_device->handle_ = vulkan_device;
-        auto& surface_support = physical_device->surface_support_;
-        surface_support.formats_ = core::Vector<VkSurfaceFormatKHR>(get_allocator());
-        surface_support.present_modes_ = core::Vector<VkPresentModeKHR>(get_allocator());
-
-        // =========================================
-
-        std::uint32_t format_count;
-        vkGetPhysicalDeviceSurfaceFormatsKHR(physical_device->handle_, surface_, &format_count, nullptr);
-
-        if(format_count != 0)
-        {
-            surface_support.formats_.resize(format_count);
-            vkGetPhysicalDeviceSurfaceFormatsKHR(physical_device->handle_, surface_, &format_count, surface_support.formats_.data());
-        }
-
-        std::uint32_t present_mode_count;
-        vkGetPhysicalDeviceSurfacePresentModesKHR(physical_device->handle_, surface_, &present_mode_count, nullptr);
-
-        if(present_mode_count != 0)
-        {
-            surface_support.present_modes_.resize(present_mode_count);
-            vkGetPhysicalDeviceSurfacePresentModesKHR(physical_device->handle_, surface_, &present_mode_count, surface_support.present_modes_.data());
-        }
-
-        // =========================================
 
         // getting device queues...
         uint32_t queue_family_count = 0;
@@ -339,17 +309,7 @@ sgf::core::Vector<sgf::core::SharedPtr<sgf::rhi::IPhysicalDevice>> sgf::rhi::Vul
             {
                 physical_device->queue_families_indices_[std::to_underlying(QueueFamilyType::kOpticalFlow)] = k;
             }
-
-            VkBool32 present_support = false;
-            vkGetPhysicalDeviceSurfaceSupportKHR(vulkan_device, k, surface_, &present_support);
-
-            if(present_support)
-            {
-                physical_device->queue_families_indices_[std::to_underlying(QueueFamilyType::kPresent)] = k;
-            }
         }
-
-        // todo: select swapchain support
 
         physical_devices[i] = std::move(physical_device);
     }
@@ -371,6 +331,19 @@ std::expected<sgf::core::UniquePtr<sgf::rhi::ILogicalDevice>, std::error_code> s
     return output;
 }
 
+std::expected<sgf::core::UniquePtr<sgf::rhi::ISurface>, std::error_code> sgf::rhi::VulkanContext::createSurface(
+    const SurfaceCreateInfo& create_info, const allocator_type& alloc) noexcept
+{
+    auto output = core::makeUnique<VulkanSurface>(alloc);
+
+    if(const auto err = output->create(create_info))
+    {
+        return std::unexpected(err);
+    }
+
+    return output;
+}
+
 sgf::rhi::VulkanContext& sgf::rhi::VulkanContext::operator=(VulkanContext&& other) noexcept
 {
     if(this == std::addressof(other)) return *this;
@@ -381,7 +354,6 @@ sgf::rhi::VulkanContext& sgf::rhi::VulkanContext::operator=(VulkanContext&& othe
     destroy_messenger_ = std::exchange(other.destroy_messenger_, VK_NULL_HANDLE);
     allocator_ = std::move(other.allocator_);
     instance_ = std::exchange(other.instance_, VK_NULL_HANDLE);
-    surface_ = std::exchange(other.surface_, VK_NULL_HANDLE);
     messenger_ = std::exchange(other.messenger_, VK_NULL_HANDLE);
     enabled_validation_layers_ = std::move(other.enabled_validation_layers_);
     enabled_extensions_ = std::move(other.enabled_extensions_);
@@ -392,12 +364,6 @@ sgf::rhi::VulkanContext& sgf::rhi::VulkanContext::operator=(VulkanContext&& othe
 
 void sgf::rhi::VulkanContext::destroy() noexcept
 {
-    if(surface_)
-    {
-        vkDestroySurfaceKHR(instance_, surface_, allocator_.get());
-        surface_ = VK_NULL_HANDLE;
-    }
-
     if(destroy_messenger_)
     {
         destroy_messenger_(instance_, messenger_, allocator_.get());

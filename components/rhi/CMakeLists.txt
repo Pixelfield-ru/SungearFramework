@@ -49,6 +49,7 @@ target_link_libraries(
     ${PROJECT_NAME}
     PRIVATE
         Vulkan::Vulkan
+        glfw
         glm::glm
         glad::glad
         slang::slang

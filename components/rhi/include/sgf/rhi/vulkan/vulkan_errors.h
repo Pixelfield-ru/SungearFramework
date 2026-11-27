@@ -14,6 +14,7 @@ namespace sgf::rhi
         kCannotCreateInstance,
         kCannotSetupDebug,
         kCannotCreateSurface,
+        kCannotQuerySurface,
         kCannotCreateSemaphore,
         kCannotCreateFence,
         kCannotCreateDevice,
@@ -65,6 +66,7 @@ namespace sgf::rhi
                 case VulkanError::kCannotCreateInstance: return "Failed to create Vulkan instance.";
                 case VulkanError::kCannotSetupDebug: return "Failed to create setup Vulkan debug messenger.";
                 case VulkanError::kCannotCreateSurface: return "Failed to create Vulkan surface.";
+                case VulkanError::kCannotQuerySurface: return "Failed to query Vulkan surface capabilities.";
                 case VulkanError::kCannotCreateSemaphore: return "Failed to create Vulkan semaphore.";
                 case VulkanError::kCannotCreateFence: return "Failed to create Vulkan fence.";
                 case VulkanError::kCannotCreateDevice: return "Failed to create Vulkan device.";

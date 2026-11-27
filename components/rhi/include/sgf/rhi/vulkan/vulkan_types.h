@@ -16,6 +16,12 @@ namespace sgf::rhi
     VkColorSpaceKHR toVkColorSpace(ColorSpace color_space) noexcept;
     ColorSpace fromVkColorSpace(VkColorSpaceKHR color_space) noexcept;
 
+    VkPresentModeKHR toVkPresentMode(PresentMode present_mode) noexcept;
+    PresentMode fromVkPresentMode(VkPresentModeKHR present_mode) noexcept;
+
+    VkSurfaceTransformFlagBitsKHR toVkSurfaceTransform(SurfaceTransform transform) noexcept;
+    SurfaceTransform fromVkSurfaceTransform(VkSurfaceTransformFlagsKHR transform) noexcept;
+
     // Cube/array map to the underlying VkImageType (1D/2D); use to_vk_image_view_type for views.
     VkImageType toVkImageType(ImageType image_type) noexcept;
     ImageType fromVkImageType(VkImageType image_type) noexcept;

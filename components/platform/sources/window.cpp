@@ -124,6 +124,17 @@ void sgf::platform::Window::size(std::int32_t& width, std::int32_t& height) cons
     glfwGetWindowSize(impl_->handle, &width, &height);
 }
 
+void sgf::platform::Window::framebufferSize(std::int32_t& width, std::int32_t& height) const noexcept
+{
+    if(!valid())
+    {
+        width = 0;
+        height = 0;
+        return;
+    }
+    glfwGetFramebufferSize(impl_->handle, &width, &height);
+}
+
 void sgf::platform::Window::setSize(std::int32_t width, std::int32_t height) noexcept
 {
     if(!valid()) return;
@@ -164,6 +175,11 @@ bool sgf::platform::Window::shouldClose() const noexcept
     return glfwWindowShouldClose(impl_->handle) == GLFW_TRUE;
 }
 
+bool sgf::platform::Window::closed() const noexcept
+{
+    return !valid();
+}
+
 const sgf::platform::Keyboard& sgf::platform::Window::keyboard() const noexcept
 {
     return keyboard_;
@@ -182,6 +198,12 @@ const sgf::platform::Mouse& sgf::platform::Window::mouse() const noexcept
 sgf::platform::Mouse& sgf::platform::Window::mouse() noexcept
 {
     return mouse_;
+}
+
+void* sgf::platform::Window::handle() const noexcept
+{
+    if(!valid()) return nullptr;
+    return impl_->handle;
 }
 
 sgf::platform::Window::allocator_type sgf::platform::Window::get_allocator() const noexcept

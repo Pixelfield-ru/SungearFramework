@@ -29,6 +29,11 @@ sgf::rhi::VulkanCommandBuffer::~VulkanCommandBuffer() noexcept
 
 std::error_code sgf::rhi::VulkanCommandBuffer::begin() noexcept
 {
+    if(vkResetCommandBuffer(handle_, 0) != VK_SUCCESS)
+    {
+        return VulkanError::kCannotBeginCommandBuffer;
+    }
+
     VkCommandBufferBeginInfo begin_info{};
     begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     begin_info.flags = 0; // Optional
