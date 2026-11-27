@@ -16,8 +16,12 @@ namespace sgf::assets
 
     struct IAssetStorage;
 
+    struct HandleBase;
+
     struct AssetSlotControl
     {
+        friend struct HandleBase;
+
         virtual ~AssetSlotControl() noexcept = default;
 
         AssetSlotControl() = default;
@@ -25,7 +29,7 @@ namespace sgf::assets
             strong_refs(other.strong_refs.load()),
             generation(other.generation.load()),
             version(other.version.load()),
-            state(other.state.load()),
+            state_(other.state()),
             id(other.id.load()),
             storage(other.storage)
         { }
@@ -33,7 +37,7 @@ namespace sgf::assets
             strong_refs(other.strong_refs.load()),
             generation(other.generation.load()),
             version(other.version.load()),
-            state(other.state.load()),
+            state_(other.state()),
             id(other.id.load()),
             storage(other.storage)
         { }
@@ -43,7 +47,6 @@ namespace sgf::assets
         std::atomic<std::uint32_t> generation = 0;
         /// Version of asset (number of reloads of the same asset).
         std::atomic<std::uint32_t> version = 1;
-        std::atomic<AssetState> state = AssetState::kUnloaded;
         std::atomic<AssetId> id {};
 
         IAssetStorage* storage {};
@@ -61,9 +64,35 @@ namespace sgf::assets
 
         void decrementRefCounter() noexcept;
 
+        [[nodiscard]] AssetState state() const noexcept
+        {
+            return state_.load(std::memory_order_acquire);
+        }
+
+        void setState(AssetState next) noexcept
+        {
+            state_.store(next, std::memory_order_release);
+            state_.notify_all();
+        }
+
+        /// Exchanges the state when it still holds `expected`. On failure, `expected` receives the current state.
+        /// Wakes waiters when the exchange succeeds.
+        bool compareExchangeState(AssetState& expected, AssetState desired) noexcept
+        {
+            if(!state_.compare_exchange_weak(expected, desired,
+                                             std::memory_order_acq_rel,
+                                             std::memory_order_acquire))
+            {
+                return false;
+            }
+
+            state_.notify_all();
+            return true;
+        }
+
         bool loaded() const noexcept
         {
-            return state == AssetState::kLoaded;
+            return state() == AssetState::kLoaded;
         }
 
         virtual std::byte* erased() noexcept = 0;
@@ -77,7 +106,7 @@ namespace sgf::assets
             strong_refs = other.strong_refs.load();
             generation = other.generation.load();
             version = other.version.load();
-            state = other.state.load();
+            state_ = other.state();
             id = other.id.load();
             storage = other.storage;
 
@@ -91,12 +120,20 @@ namespace sgf::assets
             strong_refs = other.strong_refs.load();
             generation = other.generation.load();
             version = other.version.load();
-            state = other.state.load();
+            state_ = other.state();
             id = other.id.load();
             storage = other.storage;
 
             return *this;
         }
+
+    private:
+        void waitState(AssetState observed) const noexcept
+        {
+            state_.wait(observed, std::memory_order_acquire);
+        }
+
+        std::atomic<AssetState> state_ = AssetState::kUnloaded;
     };
 
     /// Has stable address in memory. Always valid if created.
@@ -132,7 +169,7 @@ namespace sgf::assets
 
         void clear() noexcept override
         {
-            state = AssetState::kUnloaded;
+            setState(AssetState::kUnloaded);
             error = {};
             id = 0;
             version = 1;

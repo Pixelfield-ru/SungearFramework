@@ -11,6 +11,8 @@
 
 namespace sgf::assets
 {
+    struct AssetServer;
+
     template<typename AssetT>
     struct IAssetImporter
     {
@@ -18,6 +20,6 @@ namespace sgf::assets
 
         [[nodiscard]] virtual std::span<const std::string_view> extensions() const = 0;
         [[nodiscard]] virtual std::error_code importSource(
-            const std::filesystem::path& source, AssetT& asset) = 0;
+            const std::filesystem::path& source, AssetT& asset, AssetServer& server) = 0;
     };
 }

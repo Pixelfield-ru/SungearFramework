@@ -4,10 +4,15 @@
 
 #pragma once
 
+#include <array>
+#include <span>
+#include <string_view>
 #include <system_error>
 
 #include "sgf/core/log.h"
 #include "sgf/core/memory.h"
+
+#include "gamepad.h"
 
 namespace sgf::platform
 {
@@ -30,6 +35,10 @@ namespace sgf::platform
 
         [[nodiscard]] std::uint32_t openedWindowsCount() const noexcept;
 
+        [[nodiscard]] std::span<const Gamepad> gamepads() const noexcept;
+        [[nodiscard]] std::error_code updateGamepadMappings(
+            std::string_view mappings, const std::pmr::polymorphic_allocator<>& alloc = {}) const;
+
         Window* focusedWindow() noexcept;
 
         void setDebugOutput(const core::LogCallback& callback) noexcept;
@@ -43,10 +52,12 @@ namespace sgf::platform
         core::Vector<Window*> windows_;
         Window* focused_window_ {};
         std::uint32_t opened_windows_count_ {};
+        mutable std::array<Gamepad, kGamepadSlotCount> gamepads_ {};
 
         void addWindow(Window* window) noexcept;
         void removeWindow(Window* window) noexcept;
         void defocusWindow() noexcept;
+        void updateGamepads() const noexcept;
 
         static void glfwErrorCallback(int error, const char* description) noexcept;
     };

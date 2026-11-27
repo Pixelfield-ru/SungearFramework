@@ -21,10 +21,12 @@
 
 namespace sgf::assets
 {
+    struct AssetServer;
+
     struct IErasedAssetLoader
     {
         virtual ~IErasedAssetLoader() = default;
-        [[nodiscard]] virtual std::error_code loadSource(const std::filesystem::path& source, std::byte* asset) = 0;
+        [[nodiscard]] virtual std::error_code loadSource(const std::filesystem::path& source, std::byte* asset, AssetServer& server) = 0;
         [[nodiscard]] virtual std::error_code loadBaked(std::span<const std::byte> source,
                                                               std::span<const AnyHandle> dependencies,
                                                               std::byte* asset) = 0;
@@ -47,15 +49,15 @@ namespace sgf::assets
         { }
 
         ~IAssetLoader() override = default;
-        [[nodiscard]] virtual std::error_code loadSource(const std::filesystem::path& source, AssetT& asset)
+        [[nodiscard]] virtual std::error_code loadSource(const std::filesystem::path& source, AssetT& asset, AssetServer& server)
         {
             auto* importer = findImporter(source);
             if(!importer) return Error::kImporterNotSpecified;
-            return importer->importSource(source, asset);
+            return importer->importSource(source, asset, server);
         }
-        [[nodiscard]] std::error_code loadSource(const std::filesystem::path& source, std::byte* asset) final
+        [[nodiscard]] std::error_code loadSource(const std::filesystem::path& source, std::byte* asset, AssetServer& server) final
         {
-            return loadSource(source, *reinterpret_cast<AssetT*>(asset));
+            return loadSource(source, *reinterpret_cast<AssetT*>(asset), server);
         }
 
         [[nodiscard]] virtual std::error_code loadBaked(std::span<const std::byte> bytes,

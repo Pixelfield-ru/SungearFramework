@@ -28,7 +28,7 @@ std::error_code sgf::assets::Baker::bake(
     auto archive_path = core::normalizedRelativePath(root / archive, root);
     if(!archive_path) return archive_path.error();
 
-    auto& found_archive = server_->catalog_.claimArchive(*archive_path);
+    auto& found_archive = server_->catalog_.ensureArchive(*archive_path);
 
     const auto archive_lock = found_archive.tryLock();
     if(!archive_lock) return Error::kLockedArchive;
@@ -207,7 +207,7 @@ std::error_code sgf::assets::Baker::bakeImpl(BakeContext& context, const AnyHand
 std::error_code sgf::assets::Baker::bakeOld(BakeContext& context, const AssetCatalog::File& file,
                                             std::span<const AnyHandle> dependencies)
 {
-    auto& asset_archive = server_->catalog_.claimArchive(file.baked->archive);
+    auto& asset_archive = server_->catalog_.ensureArchive(file.baked->archive);
     if(!asset_archive.file.opened() && std::filesystem::exists(asset_archive.file.path()))
     {
         if(const auto err = asset_archive.file.open(std::ios_base::in)) return err;

@@ -12,6 +12,6 @@ namespace sgf::assets
     struct PngImporter final : IAssetImporter<Image>
     {
         [[nodiscard]] std::span<const std::string_view> extensions() const override;
-        [[nodiscard]] std::error_code importSource(const std::filesystem::path& source, Image& asset) override;
+        [[nodiscard]] std::error_code importSource(const std::filesystem::path& source, Image& asset, AssetServer& server) override;
     };
 }

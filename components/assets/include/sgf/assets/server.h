@@ -5,16 +5,19 @@
 #pragma once
 
 #include "sgf/core/memory.h"
+#include "sgf/core/execution/domain.h"
 #include "sgf/core/structures/type_map.h"
 #include "sgf/core/utility/file.h"
 #include "sgf/core/log.h"
-#include "sgf/core/thread_pool.h"
+#include "sgf/core/execution/thread_pool.h"
 #include "sgf/core/utility/type_index.h"
 #include "sgf/core/utility/encoding.h"
 
 #include <atomic>
 #include <functional>
+#include <mutex>
 #include <shared_mutex>
+#include <type_traits>
 
 #include "storage.h"
 #include "catalog.h"
@@ -31,7 +34,7 @@ namespace sgf::assets
         core::ThreadPool* thread_pool {};
     };
 
-    // todo: use stable type index
+    // todo: maybe use std::future
     struct AssetServer final
     {
         friend class Baker;
@@ -69,15 +72,30 @@ namespace sgf::assets
         std::error_code mount(std::filesystem::path path) noexcept;
 
         /**
+         * Copy a standard resource tree into engine/resources under the mounted catalog.
+         * Call after mount. Catalog rows are left untouched.
+         * An existing file stays in place when skip_existing is true, and is replaced when it is false.
+         * Files copied before a failure stay on disk. A later call with skip_existing continues from them.
+         * @param source Directory whose contents are copied.
+         * @param skip_existing Leave files that are already in the catalog tree.
+         * @return Error.
+         */
+        std::error_code importStandardResources(const std::filesystem::path& source, bool skip_existing) const noexcept;
+
+        /**
          * Load asset by path.
          * Do not call while a caller still uses the pointer from get() for this asset.
-         * Do not use the asset until the load has finished.
+         * kAny returns while the slot may still be kLoading. Do not call wait() on that handle from a pool thread.
+         * kCurrent reads on this thread and returns after the slot is kLoaded or the read has failed.
          * @tparam AssetT Type of asset.
          * @param path Path of asset.
+         * @param domain Where the file is read.
          * @return Handle to the asset or an error.
          */
         template<typename AssetT>
-        std::expected<Handle<AssetT>, std::error_code> load(const std::filesystem::path& path) noexcept
+        std::expected<Handle<AssetT>, std::error_code> load(
+            const std::filesystem::path& path,
+            core::ExecutionDomain domain = core::ExecutionDomain::kAny) noexcept
         {
             const auto root = catalog_.root();
             const auto key = core::normalizedRelativePath(root / path, root);
@@ -103,28 +121,29 @@ namespace sgf::assets
                 return std::unexpected(Error::kLoaderNotSpecified);
             }
 
-            // one catalog lock covers the find-or-create, so two loads of the same path share one row
-            const auto acquired = catalog_.acquireFile(*key);
-            const auto file_id = acquired.file.id;
-            // if new file was created in the catalog
-            if(acquired.created)
+            // the catalog row and its slot claim stay together, so remove cannot drop this id in between
+            std::uint32_t file_version = 1;
+            AssetId file_id {};
+            ClaimedSlot claimed;
             {
-                // set the type id for new file
-                catalog_.setTypeId(file_id, type);
+                std::unique_lock lock(identity_mutex_);
 
-                // saving catalog to file
-                if(const auto err = catalog_.save()) return std::unexpected(err);
+                const auto acquired = catalog_.ensureFile(*key, type);
+                file_id = acquired.file.id;
+                file_version = acquired.file.version;
+                if(acquired.created)
+                {
+                    if(const auto err = catalog_.save()) return std::unexpected(err);
 
-                // writing meta of the file near the file
-                if(const auto err = loader->writeMeta(actual_path, file_id)) return std::unexpected(err);
+                    if(const auto err = loader->writeMeta(actual_path, file_id)) return std::unexpected(err);
+                }
+                else
+                {
+                    if(const auto err = loader->loadMeta(actual_path, file_id)) return std::unexpected(err);
+                }
+
+                claimed = storage.claimSlot(file_id);
             }
-            else
-            {
-                // load meta of the file near the file
-                if(const auto err = loader->loadMeta(actual_path, file_id)) return std::unexpected(err);
-            }
-
-            const auto claimed = storage.claimSlot(file_id);
             auto* slot = static_cast<AssetSlot<AssetT>*>(claimed.slot);
 
             Handle<AssetT> handle;
@@ -136,25 +155,25 @@ namespace sgf::assets
             if(!claimed.load) return handle;
 
             // first read of this slot. set version from the catalog
-            slot->version = acquired.file.version;
+            slot->version = file_version;
 
             // capture the handle to increase lifetime of the slot
-            if(const auto err = postTracked([loader, actual_path, handle] {
+            if(const auto err = postTracked([this, loader, actual_path, handle] {
                 auto* slot = static_cast<AssetSlot<AssetT>*>(handle.slot_);
 
-                if(const auto err = loader->loadSource(actual_path, *slot->value))
+                if(const auto err = loader->loadSource(actual_path, *slot->value, *this))
                 {
                     slot->error = err;
-                    slot->state = AssetState::kFailed;
+                    slot->setState(AssetState::kFailed);
                     return;
                 }
 
                 slot->error.clear();
-                slot->state = AssetState::kLoaded;
-            }))
+                slot->setState(AssetState::kLoaded);
+            }, domain))
             {
                 slot->error = err;
-                slot->state = AssetState::kFailed;
+                slot->setState(AssetState::kFailed);
                 return std::unexpected(err);
             }
 
@@ -162,24 +181,111 @@ namespace sgf::assets
         }
 
         /**
+         * Find the catalog row for this path or create one, then fill the asset on this thread.
+         * The path is a catalog key. The file does not need to exist, and no meta file is written.
+         * A row that is already loading or loaded returns that handle and does not call fill.
+         * Do not call wait() on the returned handle from a pool thread while another caller still fills it.
+         * @tparam AssetT Type of asset.
+         * @param path Catalog key of the asset.
+         * @param fill Writes the asset. Runs only when this call owns the slot.
+         * @return Handle to the asset or an error.
+         */
+        template<typename AssetT, typename FillFunc>
+        requires std::is_invocable_r_v<std::error_code, FillFunc, AssetT&>
+        std::expected<Handle<AssetT>, std::error_code> ensure(const std::filesystem::path& path, FillFunc&& fill)
+        {
+            const auto root = catalog_.root();
+            const auto key = core::normalizedRelativePath(root / path, root);
+            if(!key) return std::unexpected(key.error());
+
+            const auto type = core::registerStableType<AssetStorage<AssetT>>();
+            auto& storage = this->storage<AssetT>();
+
+            // the catalog row and its slot claim stay together, so remove cannot drop this id in between
+            std::uint32_t file_version = 1;
+            AssetId file_id {};
+            ClaimedSlot claimed;
+            {
+                std::unique_lock lock(identity_mutex_);
+
+                const auto acquired = catalog_.ensureFile(*key, type);
+                file_id = acquired.file.id;
+                file_version = acquired.file.version;
+                if(acquired.created)
+                {
+                    if(const auto err = catalog_.save()) return std::unexpected(err);
+                }
+                else if(acquired.file.type_id != static_cast<std::int64_t>(type))
+                {
+                    core::LogCallback::error(debug_output_,
+                                             "Catalog path is already another asset type. Path: '{}', asset type: '{}'",
+                                             core::pathToUtf8(path), core::typeName<AssetT>());
+                    return std::unexpected(std::make_error_code(std::errc::invalid_argument));
+                }
+
+                claimed = storage.claimSlot(file_id);
+            }
+            auto* slot = static_cast<AssetSlot<AssetT>*>(claimed.slot);
+
+            Handle<AssetT> handle;
+            handle.slot_ = slot;
+            handle.asset_id_ = file_id;
+            handle.type_id_ = type;
+
+            // the slot is already kLoaded, or another caller is filling it
+            if(!claimed.load) return handle;
+
+            // set slot version from catalog
+            slot->version = file_version;
+
+            if(const auto err = std::invoke(std::forward<FillFunc>(fill), *slot->value))
+            {
+                slot->error = err;
+                slot->setState(AssetState::kFailed);
+                return std::unexpected(err);
+            }
+
+            slot->error.clear();
+            slot->setState(AssetState::kLoaded);
+            return handle;
+        }
+
+        /**
          * Load asset that exists in catalog.
          * Asset loads only if it was not loaded earlier and was saved by path or in an archive.
          * Do not call while a caller still uses the pointer from get() for this asset.
-         * Do not use the asset until the load has finished.
+         * kAny returns while the slot may still be kLoading. Do not call wait() on that handle from a pool thread.
+         * kCurrent reads on this thread and returns after the slot is kLoaded or the read has failed.
          * @param asset_id Asset ID that needs to be loaded.
          * @param type_id Type ID of asset.
+         * @param domain Where the asset is read.
          * @return Handle to the asset.
          */
-        std::expected<AnyHandle, std::error_code> load(AssetId asset_id, std::uint32_t type_id) noexcept;
+        std::expected<AnyHandle, std::error_code> load(
+            AssetId asset_id, std::uint32_t type_id,
+            core::ExecutionDomain domain = core::ExecutionDomain::kAny) noexcept;
 
         /**
          * Reload asset by path.
          * Do not call while a caller still uses the pointer from get().
-         * Do not use the asset until this reload has finished.
+         * kAny returns while the reload may still be running. Do not call wait() on that handle from a pool thread.
+         * kCurrent reads on this thread and returns after the slot is kLoaded or the read has failed.
          * @param handle Asset that needs to be reloaded.
+         * @param domain Where the file is read.
          * @return Error.
          */
-        std::error_code reload(const AnyHandle& handle) noexcept;
+        std::error_code reload(
+            const AnyHandle& handle,
+            core::ExecutionDomain domain = core::ExecutionDomain::kAny) noexcept;
+
+        /**
+         * Remove the catalog row for this id.
+         * The id is not reused. The source file and the baked bytes stay in place.
+         * A slot that is still in memory keeps the row and returns kInUse.
+         * @param asset_id Asset to remove.
+         * @return Error.
+         */
+        std::error_code remove(AssetId asset_id);
 
         std::error_code bake(const AnyHandle& handle, const std::filesystem::path& archive, std::int32_t compression_level);
 
@@ -225,16 +331,19 @@ namespace sgf::assets
             auto& storage = this->storage<AssetT>();
             static const auto type_id = core::registerStableType<AssetStorage<AssetT>>();
 
-            const auto new_file = catalog_.acquireFile();
-            catalog_.setTypeId(new_file.id, type_id);
-            // get new slot for asset
-            auto* slot = storage.acquireSlot(new_file.id);
+            // the new row and its slot stay together, so remove cannot drop the id before the slot exists
+            AssetSlot<AssetT>* slot = nullptr;
+            {
+                std::unique_lock lock(identity_mutex_);
+                const auto new_file = catalog_.createFile(type_id);
+                slot = storage.createSlot(new_file.id);
+            }
             // creating new asset using copy constructor with allocator
             // or without allocator if T does not have such constructor
             auto new_asset = std::make_obj_using_allocator<AssetT>(get_allocator(), *asset);
             slot->insert(std::move(new_asset));
             // the source is loaded so we put kLoaded state in the copy
-            slot->state = AssetState::kLoaded;
+            slot->setState(AssetState::kLoaded);
 
             return Handle<AssetT>(slot, type_id);
         }
@@ -287,12 +396,16 @@ namespace sgf::assets
         AssetServer& operator=(AssetServer&& other) noexcept;
 
     private:
-        [[nodiscard]] std::error_code postTracked(std::move_only_function<void()> task) noexcept;
+        /// kCurrent runs the task before this call returns. kAny posts it to the pool.
+        [[nodiscard]] std::error_code postTracked(
+            std::move_only_function<void()> task, core::ExecutionDomain domain) noexcept;
 
         static void finishPosted(const core::SharedPtr<PostedJobs>& posted) noexcept;
 
         mutable core::TypeMap storages_map_;
         mutable std::shared_mutex storages_mutex_;
+        /// Catalog identity and the slot claim. remove cannot drop a row that load or ensure is about to claim.
+        std::mutex identity_mutex_;
         AssetCatalog catalog_;
         size_t page_size_ {};
 

@@ -11,6 +11,7 @@
 #include "sgf/core/memory.h"
 
 #include "keyboard.h"
+#include "mouse.h"
 
 namespace sgf::platform
 {
@@ -48,6 +49,7 @@ namespace sgf::platform
         ~Window() noexcept;
 
         void setTitle(std::string_view title) noexcept;
+        [[nodiscard]] std::string_view title() const noexcept;
 
         void position(std::int32_t& x, std::int32_t& y) const noexcept;
         void setPosition(std::int32_t x, std::int32_t y) noexcept;
@@ -60,6 +62,9 @@ namespace sgf::platform
 
         [[nodiscard]] const Keyboard& keyboard() const noexcept;
         Keyboard& keyboard() noexcept;
+
+        [[nodiscard]] const Mouse& mouse() const noexcept;
+        Mouse& mouse() noexcept;
 
         [[nodiscard]] allocator_type get_allocator() const noexcept;
 
@@ -77,6 +82,7 @@ namespace sgf::platform
         const core::LogCallback* debug_output_ {};
 
         Keyboard keyboard_;
+        Mouse mouse_;
 
         [[nodiscard]] bool valid() const noexcept;
         void destroy() noexcept;

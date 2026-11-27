@@ -22,12 +22,17 @@ struct sgf::platform::Window::Impl
     static void windowFocusedCallback(GLFWwindow* window, int focused);
     static void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) noexcept;
     static void charCallback(GLFWwindow* window, unsigned int codepoint) noexcept;
+    static void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods) noexcept;
+    static void cursorPosCallback(GLFWwindow* window, double x, double y) noexcept;
+    static void scrollCallback(GLFWwindow* window, double x, double y) noexcept;
+    static void cursorEnterCallback(GLFWwindow* window, int entered) noexcept;
 };
 
 sgf::platform::Window::Window(const allocator_type& alloc) noexcept :
     resource_(alloc.resource()),
     impl_(core::makeUnique<Impl>(alloc)),
-    keyboard_(alloc)
+    keyboard_(alloc),
+    mouse_(alloc)
 {
     platform().addWindow(this);
 }
@@ -36,7 +41,8 @@ sgf::platform::Window::Window(Window&& other) noexcept :
     resource_(other.resource_),
     impl_(std::move(other.impl_)),
     debug_output_(other.debug_output_),
-    keyboard_(std::move(other.keyboard_))
+    keyboard_(std::move(other.keyboard_)),
+    mouse_(std::move(other.mouse_))
 {
     platform().addWindow(this);
     adoptNativeOwner(other);
@@ -46,7 +52,8 @@ sgf::platform::Window::Window(Window&& other, const allocator_type& alloc) noexc
     resource_(other.resource_),
     impl_(std::move(other.impl_)),
     debug_output_(other.debug_output_),
-    keyboard_(std::move(other.keyboard_), alloc)
+    keyboard_(std::move(other.keyboard_), alloc),
+    mouse_(std::move(other.mouse_), alloc)
 {
     platform().addWindow(this);
     adoptNativeOwner(other);
@@ -64,6 +71,14 @@ sgf::platform::Window::~Window() noexcept
     {
     }
 
+    try
+    {
+        mouse_.releaseAll();
+    }
+    catch(...)
+    {
+    }
+
     platform().removeWindow(this);
 }
 
@@ -71,6 +86,14 @@ void sgf::platform::Window::setTitle(std::string_view title) noexcept
 {
     if(!valid()) return;
     glfwSetWindowTitle(impl_->handle, title.data());
+}
+
+std::string_view sgf::platform::Window::title() const noexcept
+{
+    if(!valid()) return {};
+
+    const char* title = glfwGetWindowTitle(impl_->handle);
+    return title ? std::string_view{ title } : std::string_view{};
 }
 
 void sgf::platform::Window::position(std::int32_t& x, std::int32_t& y) const noexcept
@@ -119,6 +142,14 @@ void sgf::platform::Window::close() noexcept
     {
     }
 
+    try
+    {
+        mouse_.releaseAll();
+    }
+    catch(...)
+    {
+    }
+
     glfwDestroyWindow(impl_->handle);
     impl_->handle = {};
 
@@ -143,6 +174,16 @@ sgf::platform::Keyboard& sgf::platform::Window::keyboard() noexcept
     return keyboard_;
 }
 
+const sgf::platform::Mouse& sgf::platform::Window::mouse() const noexcept
+{
+    return mouse_;
+}
+
+sgf::platform::Mouse& sgf::platform::Window::mouse() noexcept
+{
+    return mouse_;
+}
+
 sgf::platform::Window::allocator_type sgf::platform::Window::get_allocator() const noexcept
 {
     return resource_;
@@ -159,6 +200,7 @@ sgf::platform::Window& sgf::platform::Window::operator=(Window&& other) noexcept
     impl_ = std::move(other.impl_);
     debug_output_ = other.debug_output_;
     keyboard_ = std::move(other.keyboard_);
+    mouse_ = std::move(other.mouse_);
 
     adoptNativeOwner(other);
 
@@ -209,10 +251,27 @@ std::error_code sgf::platform::Window::create(const WindowCreateInfo& create_inf
     glfwSetWindowFocusCallback(impl->handle, &Impl::windowFocusedCallback);
     glfwSetKeyCallback(impl->handle, &Impl::keyCallback);
     glfwSetCharCallback(impl->handle, &Impl::charCallback);
+    glfwSetMouseButtonCallback(impl->handle, &Impl::mouseButtonCallback);
+    glfwSetCursorPosCallback(impl->handle, &Impl::cursorPosCallback);
+    glfwSetScrollCallback(impl->handle, &Impl::scrollCallback);
+    glfwSetCursorEnterCallback(impl->handle, &Impl::cursorEnterCallback);
+
+    double cursor_x {};
+    double cursor_y {};
+    glfwGetCursorPos(impl->handle, &cursor_x, &cursor_y);
+    output.mouse_.pushMove(cursor_x, cursor_y);
+    output.mouse_.setInside(glfwGetWindowAttrib(impl->handle, GLFW_HOVERED) == GLFW_TRUE);
 
     if(create_info.client_api == WindowClientApi::kOpenGL)
     {
         glfwShowWindow(impl->handle);
+    }
+
+    // The window can receive focus inside glfwCreateWindow, before the callback exists.
+    // Clicking that window later does not send a second gain event.
+    if(glfwGetWindowAttrib(impl->handle, GLFW_FOCUSED) == GLFW_TRUE)
+    {
+        output.setFocused(true);
     }
 
     glfwDefaultWindowHints();
@@ -298,4 +357,33 @@ void sgf::platform::Window::Impl::charCallback(GLFWwindow* window, unsigned int 
 {
     auto* my_window = static_cast<Window*>(glfwGetWindowUserPointer(window));
     my_window->keyboard_.pushText(codepoint);
+}
+
+void sgf::platform::Window::Impl::mouseButtonCallback(GLFWwindow* window, int button, int action, int mods) noexcept
+{
+    auto* my_window = static_cast<Window*>(glfwGetWindowUserPointer(window));
+
+    const auto my_button = fromGlfwMouseButton(button);
+    const auto my_action = fromGlfwKeyAction(action);
+    if(!my_button || !my_action || *my_action == KeyAction::kRepeat) return;
+
+    my_window->mouse_.pushButton(*my_button, *my_action, fromGlfwKeyMod(mods));
+}
+
+void sgf::platform::Window::Impl::cursorPosCallback(GLFWwindow* window, double x, double y) noexcept
+{
+    auto* my_window = static_cast<Window*>(glfwGetWindowUserPointer(window));
+    my_window->mouse_.pushMove(x, y);
+}
+
+void sgf::platform::Window::Impl::scrollCallback(GLFWwindow* window, double x, double y) noexcept
+{
+    auto* my_window = static_cast<Window*>(glfwGetWindowUserPointer(window));
+    my_window->mouse_.pushScroll(x, y);
+}
+
+void sgf::platform::Window::Impl::cursorEnterCallback(GLFWwindow* window, int entered) noexcept
+{
+    auto* my_window = static_cast<Window*>(glfwGetWindowUserPointer(window));
+    my_window->mouse_.setInside(entered == GLFW_TRUE);
 }

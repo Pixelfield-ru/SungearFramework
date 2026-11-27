@@ -12,7 +12,7 @@ std::span<const std::string_view> sgf::assets::MtlImporter::extensions() const
     return ext;
 }
 
-std::error_code sgf::assets::MtlImporter::importSource(const std::filesystem::path& source, Material& asset)
+std::error_code sgf::assets::MtlImporter::importSource(const std::filesystem::path&, Material&, AssetServer&)
 {
     // todo: import mtl files
     return {};

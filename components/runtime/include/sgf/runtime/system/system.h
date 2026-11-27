@@ -9,7 +9,7 @@
 #include <chrono>
 
 #include "sgf/core/structures/type_map.h"
-#include "sgf/runtime/execution/domain.h"
+#include "sgf/core/execution/domain.h"
 
 #include "system_schedule.h"
 
@@ -66,7 +66,7 @@ namespace sgf::runtime
         */
         virtual std::error_code initialize(SystemContext& context) = 0;
 
-        [[nodiscard]] ExecutionDomain executionDomain() const noexcept
+        [[nodiscard]] core::ExecutionDomain executionDomain() const noexcept
         {
             return execution_domain_;
         }
@@ -77,7 +77,7 @@ namespace sgf::runtime
         }
 
     protected:
-        ExecutionDomain execution_domain_ = ExecutionDomain::kAny;
+        core::ExecutionDomain execution_domain_ = core::ExecutionDomain::kAny;
         SystemScheduleType schedule_ = SystemScheduleType::kFrame;
     };
 }

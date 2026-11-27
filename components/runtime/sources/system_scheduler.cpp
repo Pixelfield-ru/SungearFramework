@@ -135,7 +135,7 @@ void sgf::runtime::SystemScheduler::executeNode(SystemContext& context, SystemGr
     }
 
     // if can be executed parallel
-    if(system->executionDomain() == ExecutionDomain::kAny && create_info_.thread_pool)
+    if(system->executionDomain() == core::ExecutionDomain::kAny && create_info_.thread_pool)
     {
         create_info_.thread_pool->post(std::move(execution));
     }

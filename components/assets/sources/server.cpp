@@ -11,6 +11,8 @@
 #include <limits>
 #include <mutex>
 
+#include "sgf/core/utility/encoding.h"
+
 #include <zstd.h>
 
 #include "sgf/core/errors.h"
@@ -69,8 +71,29 @@ std::error_code sgf::assets::AssetServer::mount(std::filesystem::path path) noex
     return catalog_.load();
 }
 
+std::error_code sgf::assets::AssetServer::importStandardResources(
+    const std::filesystem::path& source, bool skip_existing) const noexcept
+{
+    const auto root = catalog_.root();
+    if(root.empty())
+    {
+        core::LogCallback::error(debug_output_, "Cannot import standard resources. The catalog is not mounted.");
+        return core::Error::kUninitialized;
+    }
+
+    const auto destination = root / "engine" / "resources";
+    const auto error = core::copyDirectory(source, destination, skip_existing);
+    if(error)
+    {
+        core::LogCallback::error(debug_output_, "Cannot import standard resources. Source: '{}', destination: '{}'.",
+                                 core::pathToUtf8(source), core::pathToUtf8(destination));
+    }
+
+    return error;
+}
+
 std::expected<sgf::assets::AnyHandle, std::error_code> sgf::assets::AssetServer::load(
-    AssetId asset_id, std::uint32_t type_id) noexcept
+    AssetId asset_id, std::uint32_t type_id, core::ExecutionDomain domain) noexcept
 {
     auto* storage = this->storage(core::typeIndexFromStableHash(type_id));
     if(!storage)
@@ -90,22 +113,24 @@ std::expected<sgf::assets::AnyHandle, std::error_code> sgf::assets::AssetServer:
         return std::unexpected(Error::kLoaderNotSpecified);
     }
 
-    // trying to find existing asset
-    const auto file = catalog_.findFile(asset_id);
-
-    // file does not exist in catalog
-    if(!file)
-    {
-        core::LogCallback::error(debug_output_,
-                                 "Cannot find file in catalog. Asset ID: {}, type ID: {}",
-                                 asset_id, type_id);
-        return std::unexpected(Error::kUnknownAsset);
-    }
-
     const auto root = catalog_.root();
 
-    // one lock finds or creates the slot and publishes kLoading before anyone else can acquire it
-    const auto claimed = storage->claimErasedSlot(asset_id);
+    // the catalog row and its slot claim stay together, so remove cannot drop this id in between
+    std::optional<AssetCatalog::File> file;
+    ClaimedSlot claimed;
+    {
+        std::unique_lock lock(identity_mutex_);
+        file = catalog_.findFile(asset_id);
+        if(!file)
+        {
+            core::LogCallback::error(debug_output_,
+                                     "Cannot find file in catalog. Asset ID: {}, type ID: {}",
+                                     asset_id, type_id);
+            return std::unexpected(Error::kUnknownAsset);
+        }
+
+        claimed = storage->claimErasedSlot(asset_id);
+    }
     auto* slot = claimed.slot;
 
     AnyHandle handle;
@@ -125,7 +150,7 @@ std::expected<sgf::assets::AnyHandle, std::error_code> sgf::assets::AssetServer:
         if(const auto err = loader->loadMeta(actual_path, file->id))
         {
             slot->error = err;
-            slot->state = AssetState::kFailed;
+            slot->setState(AssetState::kFailed);
             return std::unexpected(err);
         }
 
@@ -134,22 +159,22 @@ std::expected<sgf::assets::AnyHandle, std::error_code> sgf::assets::AssetServer:
 
         // loading asset by path
         // capture the handle to increase lifetime of the slot
-        if(const auto err = postTracked([loader, actual_path, handle] {
+        if(const auto err = postTracked([this, loader, actual_path, handle] {
             auto* slot = handle.slot_;
 
-            if(const auto err = loader->loadSource(actual_path, slot->erased()))
+            if(const auto err = loader->loadSource(actual_path, slot->erased(), *this))
             {
                 slot->error = err;
-                slot->state = AssetState::kFailed;
+                slot->setState(AssetState::kFailed);
                 return;
             }
 
             slot->error.clear();
-            slot->state = AssetState::kLoaded;
-        }))
+            slot->setState(AssetState::kLoaded);
+        }, domain))
         {
             slot->error = err;
-            slot->state = AssetState::kFailed;
+            slot->setState(AssetState::kFailed);
             return std::unexpected(err);
         }
 
@@ -160,11 +185,11 @@ std::expected<sgf::assets::AnyHandle, std::error_code> sgf::assets::AssetServer:
     if(file->baked)
     {
         // the archive stays open for this load. mount and close are not called while it runs
-        auto& archive = catalog_.claimArchive(file->baked->archive);
+        auto& archive = catalog_.ensureArchive(file->baked->archive);
         if(const auto err = archive.file.open(std::ios::in))
         {
             slot->error = err;
-            slot->state = AssetState::kFailed;
+            slot->setState(AssetState::kFailed);
             return std::unexpected(err);
         }
 
@@ -182,7 +207,7 @@ std::expected<sgf::assets::AnyHandle, std::error_code> sgf::assets::AssetServer:
                                      archive_path,
                                      asset_id, type_id);
             slot->error = asset_record_bytes.error();
-            slot->state = AssetState::kFailed;
+            slot->setState(AssetState::kFailed);
             return std::unexpected(slot->error);
         }
 
@@ -193,7 +218,7 @@ std::expected<sgf::assets::AnyHandle, std::error_code> sgf::assets::AssetServer:
                                      archive_path,
                                      asset_id, type_id);
             slot->error = std::make_error_code(std::errc::result_out_of_range);
-            slot->state = AssetState::kFailed;
+            slot->setState(AssetState::kFailed);
             return std::unexpected(std::make_error_code(std::errc::result_out_of_range));
         }
 
@@ -210,7 +235,7 @@ std::expected<sgf::assets::AnyHandle, std::error_code> sgf::assets::AssetServer:
                                      archive_path,
                                      asset_id, type_id);
             slot->error = std::make_error_code(std::errc::result_out_of_range);
-            slot->state = AssetState::kFailed;
+            slot->setState(AssetState::kFailed);
             return std::unexpected(std::make_error_code(std::errc::result_out_of_range));
         }
 
@@ -223,7 +248,7 @@ std::expected<sgf::assets::AnyHandle, std::error_code> sgf::assets::AssetServer:
                                      archive_path,
                                      asset_id, type_id);
             slot->error = std::make_error_code(std::errc::result_out_of_range);
-            slot->state = AssetState::kFailed;
+            slot->setState(AssetState::kFailed);
             return std::unexpected(std::make_error_code(std::errc::result_out_of_range));
         }
 
@@ -254,11 +279,11 @@ std::expected<sgf::assets::AnyHandle, std::error_code> sgf::assets::AssetServer:
             }
 
             // load dependency
-            auto loaded = load(dependency_id, dependency_type);
+            auto loaded = load(dependency_id, dependency_type, domain);
             if(!loaded)
             {
                 slot->error = loaded.error();
-                slot->state = AssetState::kFailed;
+                slot->setState(AssetState::kFailed);
                 return std::unexpected(loaded.error());
             }
 
@@ -270,8 +295,7 @@ std::expected<sgf::assets::AnyHandle, std::error_code> sgf::assets::AssetServer:
 
         // loading baked source
         // capture the handle to increase lifetime of the slot
-        if(const auto err = postTracked(
-        [loader, asset_record_bytes = std::move(asset_record_bytes),
+        auto finish_baked = [loader, asset_record_bytes = std::move(asset_record_bytes),
          handle, allocator, dependencies = std::move(dependencies), header] {
 
             const auto asset_bytes = std::span(*asset_record_bytes).subspan(
@@ -290,7 +314,7 @@ std::expected<sgf::assets::AnyHandle, std::error_code> sgf::assets::AssetServer:
                 if(raw_size > std::numeric_limits<std::size_t>::max())
                 {
                     slot->error = Error::kCompressionFailed;
-                    slot->state = AssetState::kFailed;
+                    slot->setState(AssetState::kFailed);
                     return;
                 }
 
@@ -302,7 +326,7 @@ std::expected<sgf::assets::AnyHandle, std::error_code> sgf::assets::AssetServer:
                 if(ZSTD_isError(written))
                 {
                     slot->error = Error::kCompressionFailed;
-                    slot->state = AssetState::kFailed;
+                    slot->setState(AssetState::kFailed);
                     return;
                 }
 
@@ -312,16 +336,18 @@ std::expected<sgf::assets::AnyHandle, std::error_code> sgf::assets::AssetServer:
             if(const auto err = loader->loadBaked(plain, dependencies, slot->erased()))
             {
                 slot->error = err;
-                slot->state = AssetState::kFailed;
+                slot->setState(AssetState::kFailed);
                 return;
             }
 
             slot->error.clear();
-            slot->state = AssetState::kLoaded;
-        }))
+            slot->setState(AssetState::kLoaded);
+        };
+
+        if(const auto err = postTracked(std::move(finish_baked), domain))
         {
             slot->error = err;
-            slot->state = AssetState::kFailed;
+            slot->setState(AssetState::kFailed);
             return std::unexpected(err);
         }
 
@@ -333,18 +359,19 @@ std::expected<sgf::assets::AnyHandle, std::error_code> sgf::assets::AssetServer:
                              asset_id, type_id);
 
     slot->error = Error::kUnknownStorageType;
-    slot->state = AssetState::kFailed;
+    slot->setState(AssetState::kFailed);
     return std::unexpected(Error::kUnknownStorageType);
 }
 
-std::error_code sgf::assets::AssetServer::reload(const AnyHandle& handle) noexcept
+std::error_code sgf::assets::AssetServer::reload(
+    const AnyHandle& handle, core::ExecutionDomain domain) noexcept
 {
     auto* slot = handle.slot_;
 
     const auto handle_valid = slot && slot->erased();
     if(!handle_valid) return Error::kInvalidHandle;
 
-    if(slot->state == AssetState::kLoading) return {};
+    if(slot->state() == AssetState::kLoading) return {};
 
     auto* storage = this->storage(core::typeIndexFromStableHash(handle.type_id_));
     if(!storage)
@@ -392,35 +419,68 @@ std::error_code sgf::assets::AssetServer::reload(const AnyHandle& handle) noexce
     if(const auto err = loader->writeMeta(file_path, handle.asset_id_)) return err;
 
     // one reload wins the transition. the other observes kLoading and does not post
-    auto state = slot->state.load(std::memory_order_acquire);
+    auto state = slot->state();
     do
     {
         if(state == AssetState::kLoading) return {};
     }
-    while(!slot->state.compare_exchange_weak(
-        state, AssetState::kLoading,
-        std::memory_order_acq_rel,
-        std::memory_order_acquire));
+    while(!slot->compareExchangeState(state, AssetState::kLoading));
 
     // finally, load source
     // capture the handle to increase lifetime of the slot
-    if(const auto err = postTracked([loader, file_path, handle] {
+    if(const auto err = postTracked([this, loader, file_path, handle] {
         auto* slot = handle.slot_;
 
-        if(const auto err = loader->loadSource(file_path, slot->erased()))
+        if(const auto err = loader->loadSource(file_path, slot->erased(), *this))
         {
             slot->error = err;
-            slot->state = AssetState::kFailed;
+            slot->setState(AssetState::kFailed);
             return;
         }
 
         slot->error.clear();
         ++slot->version;
-        slot->state = AssetState::kLoaded;
-    }))
+        slot->setState(AssetState::kLoaded);
+    }, domain))
     {
         slot->error = err;
-        slot->state = AssetState::kFailed;
+        slot->setState(AssetState::kFailed);
+        return err;
+    }
+
+    return {};
+}
+
+std::error_code sgf::assets::AssetServer::remove(AssetId asset_id)
+{
+    std::unique_lock lock(identity_mutex_);
+
+    const auto file = catalog_.findFile(asset_id);
+    if(!file)
+    {
+        core::LogCallback::error(debug_output_, "Cannot find file in catalog. Asset ID: {}", asset_id);
+        return Error::kUnknownAsset;
+    }
+
+    if(auto* storage = this->storage(core::typeIndexFromStableHash(static_cast<std::uint32_t>(file->type_id))))
+    {
+        if(storage->slotControl(asset_id))
+        {
+            core::LogCallback::error(debug_output_, "Asset is still in memory. Asset ID: {}", asset_id);
+            return Error::kInUse;
+        }
+    }
+
+    auto removed = catalog_.removeFile(asset_id);
+    if(!removed)
+    {
+        core::LogCallback::error(debug_output_, "Cannot find file in catalog. Asset ID: {}", asset_id);
+        return Error::kUnknownAsset;
+    }
+
+    if(const auto err = catalog_.save())
+    {
+        catalog_.restoreFile(std::move(*removed));
         return err;
     }
 
@@ -433,8 +493,15 @@ std::error_code sgf::assets::AssetServer::bake(
     return Baker(*this).bake(handle, archive, compression_level);
 }
 
-std::error_code sgf::assets::AssetServer::postTracked(std::move_only_function<void()> task) noexcept
+std::error_code sgf::assets::AssetServer::postTracked(
+    std::move_only_function<void()> task, core::ExecutionDomain domain) noexcept
 {
+    if(domain == core::ExecutionDomain::kCurrent)
+    {
+        task();
+        return {};
+    }
+
     if(!thread_pool_ || !posted_) return core::Error::kUninitialized;
 
     posted_->count.fetch_add(1, std::memory_order_acq_rel);

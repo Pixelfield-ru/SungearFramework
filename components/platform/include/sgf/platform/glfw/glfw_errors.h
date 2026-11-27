@@ -11,7 +11,8 @@ namespace sgf::platform
     enum class GLFWError
     {
         kCannotInitGLFW = 1,
-        kCannotCreateWindow
+        kCannotCreateWindow,
+        kInvalidGamepadMappings
     };
 
     struct GLFWErrorCategory final : public std::error_category
@@ -24,6 +25,7 @@ namespace sgf::platform
             {
                 case GLFWError::kCannotInitGLFW: return "Cannot init GLFW library.";
                 case GLFWError::kCannotCreateWindow: return "Cannot create GLFW window.";
+                case GLFWError::kInvalidGamepadMappings: return "Cannot import gamepad mappings.";
                 default: return "Unknown error";
             }
         }

@@ -32,6 +32,32 @@ namespace sgf::core
     [[nodiscard]] std::error_code writeFile(const std::filesystem::path& path, std::span<const std::byte> bytes);
 
     /**
+     * Copies the contents of a directory.
+     * An existing file stays in place when skip_existing is true, and is replaced when it is false.
+     * A directory symlink or a non-regular file returns not_supported. Files copied before a failure stay on disk.
+     * Returns invalid_argument when either path is the same as the other or lies inside it.
+     * @param from Source directory.
+     * @param to Destination directory. Created when missing.
+     * @param skip_existing Leave files that are already at the destination.
+     * @return Empty error code on success.
+     */
+    [[nodiscard]] std::error_code copyDirectory(
+        const std::filesystem::path& from,
+        const std::filesystem::path& to,
+        bool skip_existing);
+
+    /**
+     * True when child is parent or a path inside parent.
+     * Resolves the existing parts of both paths. On Windows the comparison ignores case.
+     * @param child Path that may lie inside parent.
+     * @param parent Directory to test against.
+     * @return True when child is parent or nested in it.
+     */
+    [[nodiscard]] std::expected<bool, std::error_code> sameOrNested(
+        const std::filesystem::path& child,
+        const std::filesystem::path& parent);
+
+    /**
      * Makes a relative lexical path under root.
      * An absolute path is made relative to root. Internal `.`, duplicate separators and cancelling `..` are removed.
      * A path that resolves to root itself becomes `.`.

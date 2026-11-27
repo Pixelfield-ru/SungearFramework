@@ -108,15 +108,18 @@ namespace sgf::assets
         /// Archive object for this path. Stays allocated until the catalog is reloaded or destroyed.
         Archive* findArchive(const std::filesystem::path& archive_path);
 
-        /// Finds the row for this path or creates one. Creation is serialized with other catalog writes.
-        AcquiredFile acquireFile(std::filesystem::path file_path);
-        /// Creates a row without a path.
-        File acquireFile();
+        /// Finds the row for this path or creates one. A new row stores type_id. An existing row keeps its type.
+        AcquiredFile ensureFile(std::filesystem::path file_path, std::int64_t type_id);
+        /// Creates a row without a path and stores type_id.
+        File createFile(std::int64_t type_id);
+        /// Removes the row for this id. Empty when the id is missing. The next id does not move backwards.
+        std::optional<File> removeFile(AssetId id);
+        /// Puts a removed row back under its old id. False when the id is present or the path is taken.
+        /// The next id does not move.
+        bool restoreFile(File file);
         /// Finds the archive for this path or creates a closed one.
         /// Stays valid until mount. Do not call mount while a load is using the archive.
-        Archive& claimArchive(std::filesystem::path archive_path);
-
-        void setTypeId(AssetId id, std::int64_t type_id);
+        Archive& ensureArchive(std::filesystem::path archive_path);
         /// Writes the baked location of an existing row. False when the id is missing.
         bool setBaked(AssetId id, File::Baked baked);
         /// Writes every location under one lock. False when any id is missing, and then no row is changed.

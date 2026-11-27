@@ -52,6 +52,7 @@ target_link_libraries(
         sgf::serialization
     PRIVATE
         zstd::libzstd
+        fastgltf::fastgltf
 )
 
 target_include_directories(
@@ -65,5 +66,4 @@ target_include_directories(
 
 install_component(
     TARGET_NAME ${PROJECT_NAME}
-    PACKAGES zstd
 )
